@@ -67,7 +67,14 @@ import json
 import numpy as np
 from osgeo import gdal
 import open3d as o3d
-import laspy
+
+try:
+    import laspy
+    write_las = True
+except:
+    print("laspy not available. Skipping import!")
+    write_las = False
+
 class MonoPlot:
     """QGIS Plugin Implementation."""
 
@@ -671,21 +678,24 @@ class MonoPlot:
 
         if ofmt == "las":
             
-            header = laspy.LasHeader(point_format=2, version="1.4")
-            header.offsets = np.min(rays_coords, axis=0)
-            header.scales = np.array([0.01, 0.01, 0.01])
+            if write_las:
+                header = laspy.LasHeader(point_format=2, version="1.4")
+                header.offsets = np.min(rays_coords, axis=0)
+                header.scales = np.array([0.01, 0.01, 0.01])
 
-            las_file = laspy.LasData(header)
-            las_file.x = rays_coords[:, 0]
-            las_file.y = rays_coords[:, 1]
-            las_file.z = rays_coords[:, 2]
-            
-            las_file.red = rays_colors[:, 0]*257
-            las_file.green = rays_colors[:, 1]*257
-            las_file.blue = rays_colors[:, 2]*257
+                las_file = laspy.LasData(header)
+                las_file.x = rays_coords[:, 0]
+                las_file.y = rays_coords[:, 1]
+                las_file.z = rays_coords[:, 2]
+                
+                las_file.red = rays_colors[:, 0]*257
+                las_file.green = rays_colors[:, 1]*257
+                las_file.blue = rays_colors[:, 2]*257
 
-            las_file.write(out_path)
-        
+                las_file.write(out_path)
+            else:
+                print("laspy not available. Skipping.")
+                
         elif ofmt == "tif":
            
             pcl = o3d.geometry.PointCloud()
