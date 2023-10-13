@@ -67,13 +67,7 @@ import json
 import numpy as np
 from osgeo import gdal
 import open3d as o3d
-
-try:
-    import laspy
-    write_las = True
-except:
-    print("laspy not available. Skipping import!")
-    write_las = False
+import laspy
 
 class MonoPlot:
     """QGIS Plugin Implementation."""
@@ -156,6 +150,8 @@ class MonoPlot:
         self.dlg.btn_new.clicked.connect(self.create_project)
         self.dlg.btn_load.clicked.connect(self.load_project_dialog)
         
+        self.dlg.btn_add_images.clicked.connect(self.add_images_dialog)
+        
         self.dlg.btn_pan.clicked.connect(self.activate_panning)
         self.dlg.btn_monotool.clicked.connect(self.activate_plotting)
         self.dlg.btn_select.clicked.connect(self.activate_select)
@@ -168,7 +164,7 @@ class MonoPlot:
         self.dlg.ImageTree.customContextMenuRequested.connect(self.ImageTreeMenu)
         self.dlg.ImageTree.setFocusPolicy(Qt.NoFocus)
         
-        ssl._create_default_https_context = ssl._create_unverified_context
+        # ssl._create_default_https_context = ssl._create_unverified_context
         
         self.create_dlg_widget = QDialog(self.dlg)
         create_dlg = Ui_CreateDialog()
@@ -351,7 +347,7 @@ class MonoPlot:
 
     def remove_camera_from_project(self, cam_id):
         
-        expression = "mtum_id = '%s'" % (cam_id)
+        expression = "iid = '%s'" % (cam_id)
         request = QgsFeatureRequest().setFilterExpression(expression)
         
         self.img_line_lyr.startEditing()
@@ -467,103 +463,103 @@ class MonoPlot:
         for feat in cam_feats:
             self.map_canvas.zoomToFeatureExtent(feat.geometry().boundingBox())
     
-    def check_for_update(self, cam_id):
-        new_cam = Camera(img_id=cam_id)
-        old_cam = self.camera_collection[cam_id]
+    # def check_for_update(self, cam_id):
+    #     new_cam = Camera(img_id=cam_id)
+    #     old_cam = self.camera_collection[cam_id]
         
-        old_prc = old_cam.prc
-        new_prc = new_cam.prc
+    #     old_prc = old_cam.prc
+    #     new_prc = new_cam.prc
         
-        if np.allclose(old_prc, new_prc, atol=1*10**-3):
-            return False
-        else:
-            return True
+    #     if np.allclose(old_prc, new_prc, atol=1*10**-3):
+    #         return False
+    #     else:
+    #         return True
     
-    def update_camera(self, cam_id):
-        new_cam = Camera(img_id=cam_id)
-        old_cam = self.camera_collection[cam_id]
+    # def update_camera(self, cam_id):
+    #     new_cam = Camera(img_id=cam_id)
+    #     old_cam = self.camera_collection[cam_id]
         
-        old_prc = old_cam.prc
-        new_prc = new_cam.prc
+    #     old_prc = old_cam.prc
+    #     new_prc = new_cam.prc
         
-        if np.allclose(old_prc, new_prc, atol=1*10**-3):
-            self.msg_bar.pushMessage("Success.", "Camera is up-to-date.", level=Qgis.Success)
+    #     if np.allclose(old_prc, new_prc, atol=1*10**-3):
+    #         self.msg_bar.pushMessage("Success.", "Camera is up-to-date.", level=Qgis.Success)
 
-        else:
+    #     else:
             
-            #the image name might have been individually adjusted within the gpkg; in order to not loose this information
-            #we overwrite the image name in the new camera object
-            if old_cam.meta["name"] != new_cam.meta["name"]:
-                new_cam.meta["name"] = old_cam.meta["name"]
+    #         #the image name might have been individually adjusted within the gpkg; in order to not loose this information
+    #         #we overwrite the image name in the new camera object
+    #         if old_cam.meta["name"] != new_cam.meta["name"]:
+    #             new_cam.meta["name"] = old_cam.meta["name"]
             
-            QApplication.instance().setOverrideCursor(Qt.WaitCursor)
+    #         QApplication.instance().setOverrideCursor(Qt.WaitCursor)
             
-            expression = "mtum_id = '%s'" % (cam_id)
-            request = QgsFeatureRequest().setFilterExpression(expression)
+    #         expression = "mtum_id = '%s'" % (cam_id)
+    #         request = QgsFeatureRequest().setFilterExpression(expression)
             
-            img_feats = list(self.img_line_lyr.getFeatures(request)) #show only those lines which correspond to the currently selected image
+    #         img_feats = list(self.img_line_lyr.getFeatures(request)) #show only those lines which correspond to the currently selected image
             
-            if img_feats:
+    #         if img_feats:
                 
-                self.map_line_lyr.startEditing()
+    #             self.map_line_lyr.startEditing()
                 
-                for feat in img_feats:
-                    feat_fid = feat.id()
-                    feat_geom = feat.geometry()
+    #             for feat in img_feats:
+    #                 feat_fid = feat.id()
+    #                 feat_geom = feat.geometry()
                                         
-                    feat_rays = []
+    #                 feat_rays = []
                     
-                    for vertex in feat_geom.vertices():
-                        v_x = vertex.x()
-                        v_y = vertex.y()
-                        v_ray = new_cam.ray(img_x = v_x, img_y = v_y)
-                        feat_rays.append(v_ray)
+    #                 for vertex in feat_geom.vertices():
+    #                     v_x = vertex.x()
+    #                     v_y = vertex.y()
+    #                     v_ray = new_cam.ray(img_x = v_x, img_y = v_y)
+    #                     feat_rays.append(v_ray)
                     
-                    new_feat_coords = []
-                    res = self.tree.intersect_rays(feat_rays, min_dist=0)
+    #                 new_feat_coords = []
+    #                 res = self.tree.intersect_rays(feat_rays, min_dist=0)
                     
-                    for coord in res:
-                        new_feat_coords.append(QgsPoint(coord[0], coord[1]))
+    #                 for coord in res:
+    #                     new_feat_coords.append(QgsPoint(coord[0], coord[1]))
                     
-                    feat_upd_geom = QgsGeometry.fromPolyline(new_feat_coords)
-                    self.map_line_lyr.changeGeometry(feat_fid, feat_upd_geom)
+    #                 feat_upd_geom = QgsGeometry.fromPolyline(new_feat_coords)
+    #                 self.map_line_lyr.changeGeometry(feat_fid, feat_upd_geom)
                 
-                self.map_line_lyr.commitChanges()
-                self.map_line_lyr.triggerRepaint()
+    #             self.map_line_lyr.commitChanges()
+    #             self.map_line_lyr.triggerRepaint()
                 
             
-            else:
-                pass
+    #         else:
+    #             pass
             
-            self.camera_collection[cam_id] = new_cam
+    #         self.camera_collection[cam_id] = new_cam
                         
-            self.cam_lyr.startEditing()
-            self.cam_hfov_lyr.startEditing()
+    #         self.cam_lyr.startEditing()
+    #         self.cam_hfov_lyr.startEditing()
                         
-            cam_feats = self.cam_lyr.getFeatures(request) #show only those lines which correspond to the currently selected image
-            for feat in cam_feats:
-                self.cam_lyr.deleteFeature(feat.id())
+    #         cam_feats = self.cam_lyr.getFeatures(request) #show only those lines which correspond to the currently selected image
+    #         for feat in cam_feats:
+    #             self.cam_lyr.deleteFeature(feat.id())
             
-            cam_hfov_feats = self.cam_hfov_lyr.getFeatures(request) #show only those lines which correspond to the currently selected image
-            for feat in cam_hfov_feats:
-                self.cam_hfov_lyr.deleteFeature(feat.id())
+    #         cam_hfov_feats = self.cam_hfov_lyr.getFeatures(request) #show only those lines which correspond to the currently selected image
+    #         for feat in cam_hfov_feats:
+    #             self.cam_hfov_lyr.deleteFeature(feat.id())
                      
-            self.cam_lyr.commitChanges()
-            self.cam_hfov_lyr.commitChanges()
+    #         self.cam_lyr.commitChanges()
+    #         self.cam_hfov_lyr.commitChanges()
 
-            self.add_camera_to_lyr(new_cam)
+    #         self.add_camera_to_lyr(new_cam)
             
-            self.msg_bar.pushMessage("Success.", "Sucessfully updated %s." % (cam_id), level=Qgis.Success)
+    #         self.msg_bar.pushMessage("Success.", "Sucessfully updated %s." % (cam_id), level=Qgis.Success)
             
-            root = self.img_tree.invisibleRootItem()
-            for i in range(root.childCount()):
-                item = root.child(i)
-                item_id = item.text(0)
+    #         root = self.img_tree.invisibleRootItem()
+    #         for i in range(root.childCount()):
+    #             item = root.child(i)
+    #             item_id = item.text(0)
                 
-                if item_id == cam_id:
-                    item.child(0).setIcon(0, QApplication.style().standardIcon(QStyle.SP_DialogApplyButton))      
+    #             if item_id == cam_id:
+    #                 item.child(0).setIcon(0, QApplication.style().standardIcon(QStyle.SP_DialogApplyButton))      
             
-            QApplication.instance().restoreOverrideCursor()
+    #         QApplication.instance().restoreOverrideCursor()
             
     def ImageTreeMenu(self, point):
         
@@ -585,23 +581,22 @@ class MonoPlot:
             
             img_menue.addSeparator()
             
+            action_orient = img_menue.addAction("Orient image")
+            # action_orient.triggered.connect(lambda: self.start_orientation(name))
+
+            img_menue.addSeparator()
+
             action_zoom = img_menue.addAction("Center canvas on camera")
             action_zoom.triggered.connect(lambda: self.center_on_camera(name))
             
-            img_menue.addSeparator()
-            
-            action_update = img_menue.addAction("Update camera from Mono3D")
-            action_update.triggered.connect(lambda: self.update_camera(name))
+            # action_update = img_menue.addAction("Update camera from Mono3D")
+            # action_update.triggered.connect(lambda: self.update_camera(name))
             
             action_change = img_menue.addAction("Change image name")
             action_change.triggered.connect(lambda: self.show_change_name_dialog(name))
             
-            img_menue.addSeparator()
-            
             action_ortho = img_menue.addAction("Create Orthophoto")
             action_ortho.triggered.connect(lambda: self.show_create_ortho_dialog(name))
-            
-            img_menue.addSeparator()
                          
             action_remove = img_menue.addAction("Remove camera from project")
             action_remove.triggered.connect(lambda: self.remove_camera_from_project(name))
@@ -678,24 +673,21 @@ class MonoPlot:
 
         if ofmt == "las":
             
-            if write_las:
-                header = laspy.LasHeader(point_format=2, version="1.4")
-                header.offsets = np.min(rays_coords, axis=0)
-                header.scales = np.array([0.01, 0.01, 0.01])
+            header = laspy.LasHeader(point_format=2, version="1.4")
+            header.offsets = np.min(rays_coords, axis=0)
+            header.scales = np.array([0.01, 0.01, 0.01])
 
-                las_file = laspy.LasData(header)
-                las_file.x = rays_coords[:, 0]
-                las_file.y = rays_coords[:, 1]
-                las_file.z = rays_coords[:, 2]
-                
-                las_file.red = rays_colors[:, 0]*257
-                las_file.green = rays_colors[:, 1]*257
-                las_file.blue = rays_colors[:, 2]*257
+            las_file = laspy.LasData(header)
+            las_file.x = rays_coords[:, 0]
+            las_file.y = rays_coords[:, 1]
+            las_file.z = rays_coords[:, 2]
+            
+            las_file.red = rays_colors[:, 0]*257
+            las_file.green = rays_colors[:, 1]*257
+            las_file.blue = rays_colors[:, 2]*257
 
-                las_file.write(out_path)
-            else:
-                print("laspy not available. Skipping.")
-                
+            las_file.write(out_path)
+        
         elif ofmt == "tif":
            
             pcl = o3d.geometry.PointCloud()
@@ -747,12 +739,11 @@ class MonoPlot:
 
     def load_terrain_model(self, mesh=None):
         
-        if mesh is None:
-            
+        if mesh is None:    
             reg_feat = list(self.reg_lyr.getFeatures())[0]
-            # mesh_path = reg_feat["path"] #! workaround for EGU23; can be changed again afterwards;
-            mesh_path = os.path.join(self.tmp_dir, reg_feat["name"])
-            terrain_mesh = o3d.io.read_triangle_mesh(mesh_path)
+            mesh_path = reg_feat["path"]
+            if os.path.exists(mesh_path):
+                terrain_mesh = o3d.io.read_triangle_mesh(mesh_path)
         else:
             terrain_mesh = mesh
             
@@ -804,10 +795,10 @@ class MonoPlot:
         reg_lyr.updateFields() 
             
         # add a feature
-        fet = QgsFeature()
-        fet.setGeometry(QgsGeometry.fromPolygonXY([mesh_bbox]))
-        fet.setAttributes([os.path.basename(mesh_path), mesh_path])
-        pr.addFeatures([fet])
+        feat = QgsFeature()
+        feat.setGeometry(QgsGeometry.fromPolygonXY([mesh_bbox]))
+        feat.setAttributes([os.path.basename(mesh_path), mesh_path])
+        pr.addFeatures([feat])
 
         # update layer's extent when new features have been added
         # because change of extent in provider is not propagated to the layer
@@ -833,65 +824,49 @@ class MonoPlot:
         #create additionally needed layers and add them to the geopackage as well
         cam_lyr = QgsVectorLayer("Point?crs=%s" % (sel_crs), "cameras", "memory")
         cam_pr = cam_lyr.dataProvider()
-        cam_pr.addAttributes([QgsField("mtum_id", QVariant.String),
-                                QgsField("s0", QVariant.Double, "double", 10, 1),
-                                QgsField("x0", QVariant.Double, "double", 10, 1),
-                                QgsField("y0", QVariant.Double, "double", 10, 1),
-                                QgsField("f", QVariant.Double, "double", 10, 1),
-                                QgsField("std_f", QVariant.Double, "double", 10, 1),
-                                QgsField("E", QVariant.Double, "double", 10, 3),
-                                QgsField("std_E", QVariant.Double, "double", 10, 3),
-                                QgsField("N", QVariant.Double, "double", 10, 3),
-                                QgsField("std_N", QVariant.Double, "double", 10, 3),
-                                QgsField("H", QVariant.Double, "double", 10, 3),
-                                QgsField("std_H", QVariant.Double, "double", 10, 3),
-                                QgsField("alpha", QVariant.Double, "double", 10, 5),
-                                QgsField("std_alpha", QVariant.Double, "double", 10, 3),
-                                QgsField("zeta", QVariant.Double, "double", 10, 3),
-                                QgsField("std_zeta", QVariant.Double, "double", 10, 5),
-                                QgsField("kappa", QVariant.Double, "double", 10, 5),
-                                QgsField("std_kappa", QVariant.Double, "double", 10, 3)])
+        cam_pr.addAttributes([QgsField("iid", QVariant.String),
+                              QgsField("is_oriented", QVariant.Int),
+                              QgsField("X", QVariant.Double, "double", 10, 3),
+                              QgsField("Y", QVariant.Double, "double", 10, 3),
+                              QgsField("H", QVariant.Double, "double", 10, 3),
+                              QgsField("X_std", QVariant.Double, "double", 10, 3),
+                              QgsField("Y_std", QVariant.Double, "double", 10, 3),
+                              QgsField("H_std", QVariant.Double, "double", 10, 3),
+                              QgsField("alpha", QVariant.Double, "double", 10, 5),
+                              QgsField("zeta", QVariant.Double, "double", 10, 3),
+                              QgsField("kappa", QVariant.Double, "double", 10, 5),
+                              QgsField("alpha_std", QVariant.Double, "double", 10, 3),
+                              QgsField("zeta_std", QVariant.Double, "double", 10, 5),
+                              QgsField("kappa_std", QVariant.Double, "double", 10, 3),
+                              QgsField("s0", QVariant.Double, "double", 10, 1),
+                              QgsField("x0", QVariant.Double, "double", 10, 1),
+                              QgsField("y0", QVariant.Double, "double", 10, 1),
+                              QgsField("f", QVariant.Double, "double", 10, 1),
+                              QgsField("f_std", QVariant.Double, "double", 10, 1)])
         cam_lyr.updateFields() 
         
         cam_hfov_lyr = QgsVectorLayer("Polygon?crs=%s" % (sel_crs), "cameras_hfov", "memory")
         cam_hfov_pr = cam_hfov_lyr.dataProvider()
-        cam_hfov_pr.addAttributes([QgsField("mtum_id", QVariant.String),
-                                    QgsField("name", QVariant.String),
-                                    QgsField("img_w", QVariant.Int),
-                                    QgsField("img_h", QVariant.Int),
-                                    QgsField("von", QVariant.String),
-                                    QgsField("bis", QVariant.String),
-                                    QgsField("hor_fov", QVariant.Double, "double", 6, 3),
-                                    QgsField("ver_fov", QVariant.Double, "double", 6, 3),
-                                    QgsField("archiv", QVariant.String),
-                                    QgsField("bildtraeger", QVariant.String),
-                                    QgsField("kanaele", QVariant.String),
-                                    QgsField("blickfeld", QVariant.String),
-                                    QgsField("bildinhalt", QVariant.String),
-                                    QgsField("bemerkungen", QVariant.String),
-                                    QgsField("photograph", QVariant.String),
-                                    QgsField("copyright", QVariant.String),
-                                    ])
+        cam_hfov_pr.addAttributes([QgsField("iid", QVariant.String),
+                                   QgsField("is_oriented", QVariant.Int),
+                                    QgsField("path", QVariant.String),
+                                    QgsField("ext", QVariant.String),
+                                    QgsField("w", QVariant.Int),
+                                    QgsField("h", QVariant.Int),
+                                    QgsField("hfov", QVariant.Double, "double", 6, 3),
+                                    QgsField("vfov", QVariant.Double, "double", 6, 3)])
         cam_hfov_lyr.updateFields() 
         
         map_line_lyr = QgsVectorLayer("LineString?crs=%s" % (sel_crs), "lines", "memory")
         map_line_pr = map_line_lyr.dataProvider()
-        map_line_pr.addAttributes([QgsField("mtum_id", QVariant.String)])
-        map_line_pr.addAttributes([QgsField("von", QVariant.String)])
-        map_line_pr.addAttributes([QgsField("bis", QVariant.String)])
-        map_line_pr.addAttributes([QgsField("type", QVariant.String)])
-        map_line_pr.addAttributes([QgsField("comment", QVariant.String)])
+        map_line_pr.addAttributes([QgsField("iid", QVariant.String), QgsField("type", QVariant.String), QgsField("comment", QVariant.String)]);
         map_line_lyr.updateFields() 
         
         map_line_pnts_lyr = QgsVectorLayer("Point?crs=%s" % (sel_crs), "lines_vertices", "memory")
         
         img_line_lyr = QgsVectorLayer("LineString", "lines_img", "memory")
         img_line_pr = img_line_lyr.dataProvider()
-        img_line_pr.addAttributes([QgsField("mtum_id", QVariant.String)])
-        img_line_pr.addAttributes([QgsField("von", QVariant.String)])
-        img_line_pr.addAttributes([QgsField("bis", QVariant.String)])
-        img_line_pr.addAttributes([QgsField("type", QVariant.String)])
-        img_line_pr.addAttributes([QgsField("comment", QVariant.String)])
+        img_line_pr.addAttributes([QgsField("iid", QVariant.String), QgsField("type", QVariant.String), QgsField("comment", QVariant.String)]);
         img_line_lyr.updateFields() 
         
         img_line_pnts_lyr = QgsVectorLayer("Point", "lines_img_vertices", "memory")
@@ -931,6 +906,40 @@ class MonoPlot:
     def create_project(self):
         self.create_dlg_widget.show()
     
+    def add_images_to_project(self, paths):
+        for img_path in paths:
+            img_name = os.path.basename(img_path).rsplit(".")[0]
+            # img_dir = os.path.dirname(img_path)
+            img_ext = img_name.split(".")[-1]
+            
+            img_loaded = False
+            
+            root = self.img_tree.invisibleRootItem()
+            for i in range(root.childCount()):
+                item = root.child(i)
+                item_id = item.text(0)
+                
+                if item_id == img_name:
+                    img_loaded = True
+            
+            if not img_loaded:
+                
+                cam = Camera(name=img_name, path=img_path, ext=img_ext, is_oriented=False)
+                self.camera_collection[cam.iid] = cam
+                self.add_camera_to_tree(cam)
+                self.add_camera_to_lyr(cam)          
+            
+    
+    def add_images_dialog(self):
+        paths = QFileDialog.getOpenFileNames(None, 
+                                            'Add images to project', 
+                                            '', 
+                                            'Images (*.jpeg *.jpg *.png *.tif *.tiff)')[0]
+        self.add_images_to_project(paths)
+        
+        # if path:
+        #     self.load_project(path, terrain=None)
+    
     def load_project_dialog(self):
         path = QFileDialog.getOpenFileName(None, 'Load existing monoplotting project', '', 'All Files (*.gpkg)')[0]
         if path:
@@ -964,28 +973,8 @@ class MonoPlot:
                 
         gpkg_cam_hfov_lyr = path + "|layername=cameras_hfov"
         cam_hfov_lyr = QgsVectorLayer(gpkg_cam_hfov_lyr, "cameras_hfov", "ogr")
-        
-        #necessary as previous created files did not contain this attribute column
-        necessary_fields = ["name", "img_w", "img_h", "von", "bis", "archiv", "bildtraeger", "kanaele", "blickfeld", "bildinhalt", "bemerkungen", "photograph", "copyright"]
-        necessary_types = [QVariant.String, QVariant.Int, QVariant.Int, QVariant.String, QVariant.String, QVariant.String, QVariant.String, QVariant.String, QVariant.String, QVariant.String, QVariant.String, QVariant.String, QVariant.String]
-        
-        avail_fields = cam_hfov_lyr.fields().names()
-        
-        cam_hfov_lyr.startEditing()
-        for ix, field in enumerate(necessary_fields):
-            if field not in avail_fields:
-                cam_hfov_lyr.addAttribute(QgsField(field, necessary_types[ix]))    
-            
-        cam_hfov_lyr.commitChanges()
-        
         self.cam_hfov_lyr = cam_hfov_lyr
         self.cam_hfov_lyr.loadNamedStyle(cam_hfov_qml_path)
-        
-        # add cameras already present in the geopackage to the treeWidget
-        for cam_feat in cam_lyr.getFeatures():
-            cam_mtum_id = cam_feat["mtum_id"]
-            # print(cam_mtum_id)
-            self.load_camera(img_id=cam_mtum_id, from_gpkg=True)
         
         gpkg_map_lines_lyr = path + "|layername=lines"
         map_line_lyr = QgsVectorLayer(gpkg_map_lines_lyr, "lines", "ogr")
@@ -1025,22 +1014,40 @@ class MonoPlot:
         self.gpkg_path = path
         
         self.load_terrain_model(mesh=terrain)
-        
+        self.load_cameras_from_gpkg()
         self.crs = self.cam_lyr.crs()
         
         QApplication.instance().restoreOverrideCursor()
+    
+    def load_cameras_from_gpkg(self):
+        
+        cam_feats = self.cam_lyr.getFeatures() #show only those lines which correspond to the currently selected image
+        for feat in cam_feats:
+            feat_json = json.loads(QgsJsonUtils.exportAttributes(feat))
+            
+            feat_iid = feat_json["iid"]
+            
+            cam = Camera(name=feat_json["iid"], path=img_path, ext=img_ext, is_oriented=False)
+            self.camera_collection[cam.iid] = cam
+            self.add_camera_to_tree(cam)
+            self.add_camera_to_lyr(cam)          
+            
         
     def activate_buttons(self):
         self.dlg.btn_extent.setEnabled(True)
         self.dlg.btn_pan.setEnabled(True)
-        self.dlg.btn_load_mono3d.setEnabled(True)
-        self.dlg.line_id.setEnabled(True)
+        self.dlg.btn_add_images.setEnabled(True)
+        
+        # self.dlg.btn_load_mono3d.setEnabled(True)
+        # self.dlg.line_id.setEnabled(True)
         
     def deactivate_buttons(self):
         self.dlg.btn_load_mono3d.setEnabled(False)
         
         self.dlg.btn_extent.setEnabled(False)
         self.dlg.btn_pan.setEnabled(False)
+        
+        self.dlg.btn_add_images.setEnabled(False)
         
         self.dlg.btn_monotool.setEnabled(False)
         self.dlg.btn_monotool.setChecked(False)
@@ -1119,10 +1126,10 @@ class MonoPlot:
         self.img_canvas.setExtent(self.curr_img_lyr.extent())
         self.img_canvas.refresh()
         
-    def load_terr_img(self, img_id):
+    def load_terr_img(self, iid, img_path):
         
-        img_path = os.path.join(self.tmp_dir, str(img_id) + ".jpg")
-        img_lyr = QgsRasterLayer(img_path, img_id)
+        # img_path = os.path.join(self.tmp_dir, str(img_id) + ".jpg")
+        img_lyr = QgsRasterLayer(img_path, iid)
                 
         if not img_lyr.isValid():
             self.msg_bar.pushMessage("Error", "Could not load %s!" % (img_path), level=Qgis.Critical, duration=3)
@@ -1136,129 +1143,129 @@ class MonoPlot:
             self.img_canvas.setLayers([self.img_line_lyr, img_lyr])
             self.curr_img_lyr = img_lyr
     
-    def get_camera_dict(self, cam_id):
-        cam_dict = dict.fromkeys(["sigma0", "img_id", "name", "eor", "ior", "gcps", "qvv", "cxx", "meta"])
-        cam_dict["eor"] = dict.fromkeys(["prj_ctr", "rot"])
-        # cam_dict["eor"]["prj_ctr"] = dict.fromkeys(["E", "std_E", "N", "std_N", "H", "std_H", "X", "Y", "Z"])
-        # cam_dict["eor"]["rot"] = dict.fromkeys(["rot_mat_ecef", "rot_mat_utm", "alpha", "std_rot_a", "zeta", "std_rot_z", "kappa", "std_rot_k"])
-        # cam_dict["ior"] = dict.fromkeys(["x0", "std_x0", "y0", "std_y0", "f0", "std_f0"])
-        # cam_dict["meta"] = dict.fromkeys(["archiv", "name", "bildtraeger", "kanaele", "von", "bis", "blickfeld", "bildinhalt", "bemerkungen", "photograph", "copyright", "width", "height"])
+    # def get_camera_dict(self, cam_id):
+    #     cam_dict = dict.fromkeys(["sigma0", "img_id", "name", "eor", "ior", "gcps", "qvv", "cxx", "meta"])
+    #     cam_dict["eor"] = dict.fromkeys(["prj_ctr", "rot"])
+    #     # cam_dict["eor"]["prj_ctr"] = dict.fromkeys(["E", "std_E", "N", "std_N", "H", "std_H", "X", "Y", "Z"])
+    #     # cam_dict["eor"]["rot"] = dict.fromkeys(["rot_mat_ecef", "rot_mat_utm", "alpha", "std_rot_a", "zeta", "std_rot_z", "kappa", "std_rot_k"])
+    #     # cam_dict["ior"] = dict.fromkeys(["x0", "std_x0", "y0", "std_y0", "f0", "std_f0"])
+    #     # cam_dict["meta"] = dict.fromkeys(["archiv", "name", "bildtraeger", "kanaele", "von", "bis", "blickfeld", "bildinhalt", "bemerkungen", "photograph", "copyright", "width", "height"])
 
-        expression = "mtum_id = '%s'" % (cam_id)
-        request = QgsFeatureRequest().setFilterExpression(expression)
+    #     expression = "mtum_id = '%s'" % (cam_id)
+    #     request = QgsFeatureRequest().setFilterExpression(expression)
         
-        cam_feats = self.cam_lyr.getFeatures(request) #show only those lines which correspond to the currently selected image
-        for feat in cam_feats:
-            feat_json = json.loads(QgsJsonUtils.exportAttributes(feat))
+    #     cam_feats = self.cam_lyr.getFeatures(request) #show only those lines which correspond to the currently selected image
+    #     for feat in cam_feats:
+    #         feat_json = json.loads(QgsJsonUtils.exportAttributes(feat))
         
-        cam_dict["sigma0"] = feat_json["s0"]
-        cam_dict["img_id"] = feat_json["mtum_id"]
-        cam_dict["name"] = feat_json["mtum_id"]
+    #     cam_dict["sigma0"] = feat_json["s0"]
+    #     cam_dict["img_id"] = feat_json["mtum_id"]
+    #     cam_dict["name"] = feat_json["mtum_id"]
         
-        cam_dict["eor"]["prj_ctr"] = {"E":feat_json["E"],
-                                      "std_E":feat_json["std_E"],
-                                      "N":feat_json["N"],
-                                      "std_N":feat_json["std_N"],
-                                      "H":feat_json["H"],
-                                      "std_H":feat_json["std_H"],
-                                      "X":None,
-                                      "Y":None,
-                                      "Z":None}
+    #     cam_dict["eor"]["prj_ctr"] = {"E":feat_json["E"],
+    #                                   "std_E":feat_json["std_E"],
+    #                                   "N":feat_json["N"],
+    #                                   "std_N":feat_json["std_N"],
+    #                                   "H":feat_json["H"],
+    #                                   "std_H":feat_json["std_H"],
+    #                                   "X":None,
+    #                                   "Y":None,
+    #                                   "Z":None}
         
-        cam_dict["eor"]["rot"] = {"rot_mat_ecef":None,
-                                  "rot_mat_utm":None,
-                                  "alpha":feat_json["alpha"],
-                                  "std_rot_a":feat_json["std_alpha"],
-                                  "zeta":feat_json["zeta"],
-                                  "std_rot_z":feat_json["std_zeta"],
-                                  "kappa":feat_json["kappa"],
-                                  "std_rot_k":feat_json["std_kappa"]}
+    #     cam_dict["eor"]["rot"] = {"rot_mat_ecef":None,
+    #                               "rot_mat_utm":None,
+    #                               "alpha":feat_json["alpha"],
+    #                               "std_rot_a":feat_json["std_alpha"],
+    #                               "zeta":feat_json["zeta"],
+    #                               "std_rot_z":feat_json["std_zeta"],
+    #                               "kappa":feat_json["kappa"],
+    #                               "std_rot_k":feat_json["std_kappa"]}
         
-        cam_dict["ior"] = {"x0":feat_json["x0"],
-                           "std_x0":None,
-                           "y0":feat_json["y0"],
-                           "std_y0":None,
-                           "f0":feat_json["f"],
-                           "std_f0":feat_json["std_f"]}
+    #     cam_dict["ior"] = {"x0":feat_json["x0"],
+    #                        "std_x0":None,
+    #                        "y0":feat_json["y0"],
+    #                        "std_y0":None,
+    #                        "f0":feat_json["f"],
+    #                        "std_f0":feat_json["std_f"]}
                     
-        cam_hfov_feats = self.cam_hfov_lyr.getFeatures(request) #show only those lines which correspond to the currently selected image
-        for feat in cam_hfov_feats:
-            feat_json = json.loads(QgsJsonUtils.exportAttributes(feat))
+    #     cam_hfov_feats = self.cam_hfov_lyr.getFeatures(request) #show only those lines which correspond to the currently selected image
+    #     for feat in cam_hfov_feats:
+    #         feat_json = json.loads(QgsJsonUtils.exportAttributes(feat))
         
-        cam_dict["meta"] = {"archiv":feat_json["archiv"],
-                            "name": feat_json["name"],
-                            "bildtraeger":feat_json["bildtraeger"],
-                            "kanaele":feat_json["kanaele"],
-                            "von":feat_json["von"],
-                            "bis":feat_json["bis"],
-                            "blickeld":feat_json["blickfeld"],
-                            "bildinhalt":feat_json["bildinhalt"],
-                            "bemerkungen":feat_json["bemerkungen"],
-                            "photograph":feat_json["photograph"],
-                            "copyright":feat_json["copyright"],
-                            "width": feat_json["img_w"],
-                            "height": feat_json["img_h"]}          
-        return cam_dict       
+    #     cam_dict["meta"] = {"archiv":feat_json["archiv"],
+    #                         "name": feat_json["name"],
+    #                         "bildtraeger":feat_json["bildtraeger"],
+    #                         "kanaele":feat_json["kanaele"],
+    #                         "von":feat_json["von"],
+    #                         "bis":feat_json["bis"],
+    #                         "blickeld":feat_json["blickfeld"],
+    #                         "bildinhalt":feat_json["bildinhalt"],
+    #                         "bemerkungen":feat_json["bemerkungen"],
+    #                         "photograph":feat_json["photograph"],
+    #                         "copyright":feat_json["copyright"],
+    #                         "width": feat_json["img_w"],
+    #                         "height": feat_json["img_h"]}          
+    #     return cam_dict       
         
-    def load_camera(self, img_id=None, from_gpkg=False):
+    # def load_camera(self, img_id=None, from_gpkg=False):
         
-        #if camera is loaded from gpkg img_is passed as argument; if not, than the img_id is read from the input field
-        if img_id is None:
-            img_id = self.dlg.line_id.text()
+    #     #if camera is loaded from gpkg img_is passed as argument; if not, than the img_id is read from the input field
+    #     if img_id is None:
+    #         img_id = self.dlg.line_id.text()
         
-        already_loaded = False
+    #     already_loaded = False
         
-        root = self.img_tree.invisibleRootItem()
-        for i in range(root.childCount()):
-            item = root.child(i)
-            item_id = item.text(0)
+    #     root = self.img_tree.invisibleRootItem()
+    #     for i in range(root.childCount()):
+    #         item = root.child(i)
+    #         item_id = item.text(0)
             
-            if item_id == img_id:
-                already_loaded = True
+    #         if item_id == img_id:
+    #             already_loaded = True
         
-        self.dlg.line_id.clear()
+    #     self.dlg.line_id.clear()
         
-        if not already_loaded:
+    #     if not already_loaded:
             
-            if from_gpkg: #camera has been loaded previously; therefore the camera object is created from the geopackakge
+    #         if from_gpkg: #camera has been loaded previously; therefore the camera object is created from the geopackakge
                 
-                cam_dict = self.get_camera_dict(img_id)
-                cam = Camera()
-                cam.from_dict(cam_dict)
-                self.camera_collection[cam.id] = cam  
-                self.add_camera_to_tree(cam)               
+    #             cam_dict = self.get_camera_dict(img_id)
+    #             cam = Camera()
+    #             cam.from_dict(cam_dict)
+    #             self.camera_collection[cam.id] = cam  
+    #             self.add_camera_to_tree(cam)               
                 
-                img_path = os.path.join(self.tmp_dir, str(img_id) + ".jpg")
-                if not os.path.exists(img_path): #check if images has already been downloaded previosly...
-                    try:
-                        urllib.request.urlretrieve("https://sehag.geo.tuwien.ac.at/fcgi-bin/iipsrv.fcgi?IIIF=%s.tif/full/full/0/native.jpg" % (str(img_id)), img_path)
-                    except:
-                        self.msg_bar.pushMessage("Error", "Could not download %s!" % (img_id), level=Qgis.Critical, duration=3)
-            else:
+    #             img_path = os.path.join(self.tmp_dir, str(img_id) + ".jpg")
+    #             if not os.path.exists(img_path): #check if images has already been downloaded previosly...
+    #                 try:
+    #                     urllib.request.urlretrieve("https://sehag.geo.tuwien.ac.at/fcgi-bin/iipsrv.fcgi?IIIF=%s.tif/full/full/0/native.jpg" % (str(img_id)), img_path)
+    #                 except:
+    #                     self.msg_bar.pushMessage("Error", "Could not download %s!" % (img_id), level=Qgis.Critical, duration=3)
+    #         else:
                             
-                cam = Camera(img_id=img_id)
+    #             cam = Camera(img_id=img_id)
                 
-                if cam.status == "ok":
+    #             if cam.status == "ok":
                     
-                    img_path = os.path.join(self.tmp_dir, str(img_id) + ".jpg")
-                    print(img_path)
+    #                 img_path = os.path.join(self.tmp_dir, str(img_id) + ".jpg")
+    #                 print(img_path)
                     
-                    if not os.path.exists(img_path): #check if images has already been downloaded previosly...
-                        try:
-                            urllib.request.urlretrieve("https://sehag.geo.tuwien.ac.at/fcgi-bin/iipsrv.fcgi?IIIF=%s.tif/full/full/0/native.jpg" % (str(img_id)), img_path)
-                        except:
-                            self.msg_bar.pushMessage("Error", "Could not download %s!" % (img_id), level=Qgis.Critical, duration=3)
+    #                 if not os.path.exists(img_path): #check if images has already been downloaded previosly...
+    #                     try:
+    #                         urllib.request.urlretrieve("https://sehag.geo.tuwien.ac.at/fcgi-bin/iipsrv.fcgi?IIIF=%s.tif/full/full/0/native.jpg" % (str(img_id)), img_path)
+    #                     except:
+    #                         self.msg_bar.pushMessage("Error", "Could not download %s!" % (img_id), level=Qgis.Critical, duration=3)
 
-                    self.camera_collection[cam.id] = cam    
-                    self.add_camera_to_tree(cam)
-                    self.add_camera_to_lyr(cam)          
+    #                 self.camera_collection[cam.id] = cam    
+    #                 self.add_camera_to_tree(cam)
+    #                 self.add_camera_to_lyr(cam)          
             
-                else:
-                    self.msg_bar.pushMessage("Error", cam.status_msg, level=Qgis.Critical, duration=3)
+    #             else:
+    #                 self.msg_bar.pushMessage("Error", cam.status_msg, level=Qgis.Critical, duration=3)
                     
-        else:
-            self.msg_bar.pushMessage("Warning", "%s already loaded." % (img_id), level=Qgis.Warning, duration=3)
-            self.dlg.line_id.clear()
+    #     else:
+    #         self.msg_bar.pushMessage("Warning", "%s already loaded." % (img_id), level=Qgis.Warning, duration=3)
+    #         self.dlg.line_id.clear()
 
     def activate_plotting(self):
         
@@ -1342,55 +1349,57 @@ class MonoPlot:
                 item.setSelected(False)
             
     def add_camera_to_lyr(self, camera):
-        fet = QgsFeature(self.cam_lyr.fields())
-        fet.setGeometry(QgsGeometry(QgsPoint(camera.prc[0], camera.prc[1], camera.prc[2])))
+        feat = QgsFeature(self.cam_lyr.fields())
+        # feat.setGeometry(QgsGeometry(QgsPoint(camera.prc[0], camera.prc[1], camera.prc[2])))
         
-        fet["mtum_id"] = camera.id
-        fet["s0"] = camera.s0
-        fet["x0"] = float(camera.ior[0])
-        fet["y0"] = float(camera.ior[1])
-        fet["f"] = float(camera.ior[2])
-        fet["std_f"] = float(camera.ior_std[2])
-        fet["E"] = float(camera.prc[0])
-        fet["std_E"] = float(camera.prc_std[0])
-        fet["N"] = float(camera.prc[1])
-        fet["std_N"] = float(camera.prc_std[1])
-        fet["H"] = float(camera.prc[2])
-        fet["std_H"] = float(camera.prc_std[2])
-        fet["alpha"] = float(camera.alpha) #* 180 / math.pi
-        fet["std_alpha"] = float(camera.euler_std[0])
-        fet["zeta"] = float(camera.zeta) #* 180 / math.pi
-        fet["std_zeta"] = float(camera.euler_std[1])
-        fet["kappa"] = float(camera.kappa) #* 180 / math.pi
-        fet["std_kappa"] = float(camera.euler_std[2])
+        feat["iid"] = camera.iid
+        # feat["s0"] = camera.s0
+        # feat["x0"] = float(camera.ior[0])
+        # feat["y0"] = float(camera.ior[1])
+        # feat["f"] = float(camera.ior[2])
+        # feat["std_f"] = float(camera.ior_std[2])
+        # feat["E"] = float(camera.prc[0])
+        # feat["std_E"] = float(camera.prc_std[0])
+        # feat["N"] = float(camera.prc[1])
+        # feat["std_N"] = float(camera.prc_std[1])
+        # feat["H"] = float(camera.prc[2])
+        # feat["std_H"] = float(camera.prc_std[2])
+        # feat["alpha"] = float(camera.alpha) #* 180 / math.pi
+        # feat["std_alpha"] = float(camera.euler_std[0])
+        # feat["zeta"] = float(camera.zeta) #* 180 / math.pi
+        # feat["std_zeta"] = float(camera.euler_std[1])
+        # feat["kappa"] = float(camera.kappa) #* 180 / math.pi
+        # feat["std_kappa"] = float(camera.euler_std[2])
                 
         pr = self.cam_lyr.dataProvider()
-        pr.addFeatures([fet])
+        pr.addFeatures([feat])
         
         # Commit changes
         self.cam_lyr.commitChanges()
         self.cam_lyr.triggerRepaint()
         
-        hfov_fet = QgsFeature(self.cam_hfov_lyr.fields())
-        hfov_fet.setGeometry(QgsGeometry.fromWkt(camera.hfov_geom(dist=100)))
-        hfov_fet["mtum_id"] = camera.id
-        hfov_fet["hor_fov"] = float(camera.hfov)#* 180 / math.pi
-        hfov_fet["ver_fov"] = float(camera.vfov)# * 180 / math.pi
-        hfov_fet["von"] = camera.meta["von"]
-        hfov_fet["bis"] = camera.meta["bis"]
-        hfov_fet["name"] = camera.meta["name"]
-        hfov_fet["img_w"] = camera.meta["width"]
-        hfov_fet["img_h"] = camera.meta["height"]
-        hfov_fet["archiv"] = camera.meta["archiv"]
-        hfov_fet["bildtraeger"] = camera.meta["bildtraeger"]
-        hfov_fet["kanaele"] = camera.meta["kanaele"]
-        hfov_fet["blickfeld"] = camera.meta["blickfeld"]
-        hfov_fet["bemerkungen"] = camera.meta["bemerkungen"]
-        hfov_fet["photograph"] = camera.meta["photograph"]
-        hfov_fet["copyright"] = camera.meta["copyright"]
+        hfov_feat = QgsFeature(self.cam_hfov_lyr.fields())
+        # hfov_feat.setGeometry(QgsGeometry.fromWkt(camera.hfov_geom(dist=100)))
+        hfov_feat["iid"] = camera.iid
+        hfov_feat["path"] = camera.path
+        hfov_feat["ext"] = camera.ext
+        # hfov_feat["hor_fov"] = float(camera.hfov)#* 180 / math.pi
+        # hfov_feat["ver_fov"] = float(camera.vfov)# * 180 / math.pi
+        # hfov_feat["von"] = camera.meta["von"]
+        # hfov_feat["bis"] = camera.meta["bis"]
+        # hfov_feat["name"] = camera.meta["name"]
+        hfov_feat["w"] = camera.w
+        hfov_feat["h"] = camera.h
+        # hfov_feat["archiv"] = camera.meta["archiv"]
+        # hfov_feat["bildtraeger"] = camera.meta["bildtraeger"]
+        # hfov_feat["kanaele"] = camera.meta["kanaele"]
+        # hfov_feat["blickfeld"] = camera.meta["blickfeld"]
+        # hfov_feat["bemerkungen"] = camera.meta["bemerkungen"]
+        # hfov_feat["photograph"] = camera.meta["photograph"]
+        # hfov_feat["copyright"] = camera.meta["copyright"]
         
         pr = self.cam_hfov_lyr.dataProvider()
-        pr.addFeatures([hfov_fet])
+        pr.addFeatures([hfov_feat])
         
         self.cam_hfov_lyr.commitChanges()
         self.cam_hfov_lyr.triggerRepaint()
@@ -1399,16 +1408,16 @@ class MonoPlot:
         
     def add_camera_to_tree(self, camera):
                         
-        l1 = QTreeWidgetItem([camera.id])
+        l1 = QTreeWidgetItem([camera.iid])
         l1.setCheckState(0, Qt.Unchecked)  
         l1.setFlags(l1.flags() & ~Qt.ItemIsSelectable)
         
-        l1_child = QTreeWidgetItem([camera.meta["name"]])
+        l1_child = QTreeWidgetItem([camera.iid])
         
-        if self.check_for_update(camera.id):
-            l1_child.setIcon(0, QApplication.style().standardIcon(QStyle.SP_BrowserReload))  
-        else:
-            l1_child.setIcon(0, QApplication.style().standardIcon(QStyle.SP_DialogApplyButton))      
+        # if self.check_for_update(camera.name):
+        #     l1_child.setIcon(0, QApplication.style().standardIcon(QStyle.SP_BrowserReload))  
+        # else:
+        #     l1_child.setIcon(0, QApplication.style().standardIcon(QStyle.SP_DialogApplyButton))      
         
         l1_child.setFlags(l1.flags() & ~Qt.ItemIsSelectable) #child showing image name is no selectable
         l1.addChild(l1_child)
@@ -1469,38 +1478,41 @@ class MonoPlot:
             if item.checkState(column) == Qt.Checked:
                 
                 item.setSelected(True)            
-                mtum_id = item.text(column)
+                iid = item.text(column)
+                
+                expression = "iid = '%s'" % (iid)
+                request = QgsFeatureRequest ().setFilterExpression(expression)
+                cam_feat = list(self.cam_hfov_lyr.getFeatures(request))[0]
+                 
+                iid_path = cam_feat.attribute("path")
                 
                 self.uncheck_items_in_tree(item)
-                self.load_terr_img(mtum_id)
-                self.active_camera = self.camera_collection[mtum_id]
+                self.load_terr_img(iid, iid_path)
+                self.active_camera = self.camera_collection[iid]
                 
-                self.fill_meta_fields(self.active_camera)
+                # self.fill_meta_fields(self.active_camera)
                 
                 #highlight currently selected camera
                 #clear previously highlighter cameras
                 self.clear_highlighted_features()
                 self.clear_vertex_markers()
-                
-                expression = "mtum_id = '%s'" % (mtum_id)
-                request = QgsFeatureRequest ().setFilterExpression(expression)
 
-                cam_feat = list(self.cam_lyr.getFeatures(request))[0]
-                self.cam_h = QgsHighlight(self.map_canvas, cam_feat, self.cam_lyr)
-                self.cam_h.setColor(self.highlight_color)
-                self.cam_h.setFillColor(self.highlight_color)
-                self.cam_h.show()
+                # cam_feat = list(self.cam_lyr.getFeatures(request))[0]
+                # self.cam_h = QgsHighlight(self.map_canvas, cam_feat, self.cam_lyr)
+                # self.cam_h.setColor(self.highlight_color)
+                # self.cam_h.setFillColor(self.highlight_color)
+                # self.cam_h.show()
                     
-                cam_hfov_feat = list(self.cam_hfov_lyr.getFeatures(request))[0]
-                self.hfov_h = QgsHighlight(self.map_canvas, cam_hfov_feat, self.cam_hfov_lyr)
-                self.hfov_h.setColor(self.highlight_color)
-                self.hfov_h.setFillColor(self.highlight_color)
-                self.hfov_h.show()
+                # cam_hfov_feat = list(self.cam_hfov_lyr.getFeatures(request))[0]
+                # self.hfov_h = QgsHighlight(self.map_canvas, cam_hfov_feat, self.cam_hfov_lyr)
+                # self.hfov_h.setColor(self.highlight_color)
+                # self.hfov_h.setFillColor(self.highlight_color)
+                # self.hfov_h.show()
                 
-                self.img_line_lyr.setSubsetString(expression) #show only those lines which correspond to the currently selected image
+                # self.img_line_lyr.setSubsetString(expression) #show only those lines which correspond to the currently selected image
                 
-                self.mono_tool.set_camera(self.active_camera)
-                self.vertex_tool.set_camera(self.active_camera)
+                # self.mono_tool.set_camera(self.active_camera)
+                # self.vertex_tool.set_camera(self.active_camera)
                 
                 self.dlg.btn_monotool.setEnabled(True)
                 self.dlg.btn_select.setEnabled(True)
@@ -1532,16 +1544,12 @@ class MonoPlot:
                 self.clear_meta_fiels()
 
                 #use a filter which is not available to not show any lines in img canvas if no image is currently selected
-                expression = "mtum_id = 'sth_not_existing'"
+                expression = "iid = 'sth_not_existing'"
                 self.img_line_lyr.setSubsetString(expression) #show only those lines which correspond to the currently selected image
                 
     def run(self):
-        """Run method that performs all the real work"""
-        
-        # QgsProject.instance().setCrs(QgsCoordinateReferenceSystem(25832))
-        # self.map_canvas.setDestinationCrs(QgsCoordinateReferenceSystem(25832))
         
         self.img_canvas.setMapTool(self.pan_tool)
-        
         self.dlg.btn_pan.setChecked(True)
+        
         self.dlg.show()

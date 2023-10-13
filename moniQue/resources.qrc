@@ -1,7 +1,9 @@
 <RCC>
   <qresource prefix="/plugins/monoplot">
+    <file>gfx/icon/mActionCapturePoint.png</file>
     <file>gfx/icon/mActionDeleteSelectedFeatures.png</file>
     <file>gfx/icon/mActionDeleteSelected.png</file>
+    <file>gfx/icon/mActionAddImage.png</file>
     <file>gfx/icon/mActionSelectRectangle.png</file>
     <file>gfx/icon/mActionVertexToolActiveLayer.png</file>
     <file>gfx/icon/mActionAddPolyline.png</file>
