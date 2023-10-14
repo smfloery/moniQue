@@ -44,7 +44,10 @@ class Camera():
         self.hfov = None
         self.vfov = None
         
-        
+    def set_img_dim(self, h, w):
+        self.h = h
+        self.w = w
+          
     #     if not token:
     #         token = "40622e289e7005b3007a499eac4ecb3a"
         

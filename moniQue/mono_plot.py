@@ -36,11 +36,13 @@ from .gui.img_meta_dlg import MetaWindow
 from .gui.mono_plot_create_dialog import Ui_Dialog as Ui_CreateDialog
 from .gui.mono_plot_change_name_dialog import Ui_ChangeDialog 
 from .gui.mono_plot_create_ortho_dialog import Ui_Dialog as Ui_CreateOrthoDialog
+from .gui.mono_plot_orient_dialog import Ui_Dialog as Ui_OrientDialog
 import os.path
 
 from qgis.core import (
     Qgis,
     QgsProject,
+    QgsMapLayerType,
     QgsRasterLayer,
     QgsVectorLayer,
     QgsFeature,
@@ -58,6 +60,10 @@ from qgis.gui import QgsMapToolPan, QgsMessageBar, QgsHighlight
 from .tools.MonoMapTool import MonoMapTool
 from .tools.SelectTool import SelectTool
 from .tools.VertexTool import VertexTool
+# from .tools.OrientTool import OrientTool
+
+from .tools.ImgPickerTool import ImgPickerTool
+from .tools.MapPickerTool import MapPickerTool
 
 import urllib.request
 import urllib.error
@@ -68,6 +74,7 @@ import numpy as np
 from osgeo import gdal
 import open3d as o3d
 import laspy
+from PIL import Image
 
 class MonoPlot:
     """QGIS Plugin Implementation."""
@@ -143,14 +150,21 @@ class MonoPlot:
         self.select_tool = SelectTool(self.img_canvas, self.map_canvas)
         self.vertex_tool = VertexTool(self.img_canvas, self.map_canvas)
         
+        # self.orient_tool = OrientTool(self.img_canvas, self.map_canvas)
+        self.img_picker_tool = ImgPickerTool(self.img_canvas)
+        self.map_picker_tool = MapPickerTool(self.map_canvas)
+        
+        
         self.dlg.btn_extent.clicked.connect(self.set_extent)
         
-        self.dlg.btn_load_mono3d.clicked.connect(lambda: self.load_camera())
+        # self.dlg.btn_load_mono3d.clicked.connect(lambda: self.load_camera())
 
         self.dlg.btn_new.clicked.connect(self.create_project)
         self.dlg.btn_load.clicked.connect(self.load_project_dialog)
         
         self.dlg.btn_add_images.clicked.connect(self.add_images_dialog)
+        
+        self.dlg.btn_oritool.clicked.connect(self.show_orient_tool_dialog)
         
         self.dlg.btn_pan.clicked.connect(self.activate_panning)
         self.dlg.btn_monotool.clicked.connect(self.activate_plotting)
@@ -202,6 +216,15 @@ class MonoPlot:
         create_ortho.btn_out_path.clicked.connect(self.set_ortho_path)
         self.create_ortho_dlg = create_ortho
         
+        #==================================
+        # ORIENT DIALOG
+        #==================================
+        self.orient_tool_widget = QDialog(self.dlg)
+        orient_tool = Ui_OrientDialog()
+        orient_tool.setupUi(self.orient_tool_widget)
+        self.orient_tool_dlg = orient_tool
+        self.orient_tool_dlg.combo_raster_lyrs.currentIndexChanged.connect(self.change_raster_src)
+
         self.project_name = None
         self.curr_region = None
         self.camera_collection = {}
@@ -408,7 +431,31 @@ class MonoPlot:
         root.removeChild(item_to_delete)
 
         self.clear_highlighted_features()
+    
+    def show_orient_tool_dialog(self):
         
+        self.orient_tool_dlg.combo_raster_lyrs.clear()
+        
+        layers = self.iface.mapCanvas().layers()
+        for lyr in layers:
+            if lyr.type() == QgsMapLayerType.RasterLayer:
+                self.orient_tool_dlg.combo_raster_lyrs.addItem(lyr.name(), lyr.id())
+
+        self.orient_tool_widget.show()
+        self.img_canvas.setMapTool(self.img_picker_tool)
+        self.map_canvas.setMapTool(self.map_picker_tool)
+        
+        self.img_picker_tool.set_camera(self.active_camera)
+        self.map_picker_tool.set_camera(self.active_camera)
+    
+    def change_raster_src(self, ix):
+        sel_lyr_id = self.orient_tool_dlg.combo_raster_lyrs.itemData(ix)
+        sel_lyr_name = self.orient_tool_dlg.combo_raster_lyrs.itemText(ix)
+        
+        sel_lyr =  QgsProject.instance().mapLayer(sel_lyr_id)
+        self.map_picker_tool.set_dhm_src(sel_lyr)
+
+    
     def show_change_name_dialog(self, cam_id):
         
         root = self.img_tree.invisibleRootItem()
@@ -581,7 +628,7 @@ class MonoPlot:
             
             img_menue.addSeparator()
             
-            action_orient = img_menue.addAction("Orient image")
+            # action_orient = img_menue.addAction("Orient image")
             # action_orient.triggered.connect(lambda: self.start_orientation(name))
 
             img_menue.addSeparator()
@@ -845,6 +892,33 @@ class MonoPlot:
                               QgsField("f_std", QVariant.Double, "double", 10, 1)])
         cam_lyr.updateFields() 
         
+        gcps_lyr = QgsVectorLayer("Point?crs=%s" % (sel_crs), "gcps", "memory")
+        gcps_pr = gcps_lyr.dataProvider()
+        gcps_pr.addAttributes([QgsField("iid", QVariant.String),
+                              QgsField("gid", QVariant.String),
+                              QgsField("desc", QVariant.String),
+                              QgsField("X", QVariant.Double, "double", 10, 3),
+                              QgsField("Y", QVariant.Double, "double", 10, 3),
+                              QgsField("H", QVariant.Double, "double", 10, 3),
+                              QgsField("H_src", QVariant.String),
+                              QgsField("X_std", QVariant.Double, "double", 10, 3),
+                              QgsField("Y_std", QVariant.Double, "double", 10, 3),
+                              QgsField("H_std", QVariant.Double, "double", 10, 3),
+                              QgsField("active", QVariant.String)])
+        gcps_lyr.updateFields() 
+        
+        gcps_img_lyr = QgsVectorLayer("Point?crs=%s" % (sel_crs), "gcps_img", "memory")
+        gcps_img_pr = gcps_img_lyr.dataProvider()
+        gcps_img_pr.addAttributes([QgsField("iid", QVariant.String),
+                              QgsField("gid", QVariant.String),
+                              QgsField("desc", QVariant.String),
+                              QgsField("x", QVariant.Double, "double", 10, 1),
+                              QgsField("y", QVariant.Double, "double", 10, 1),
+                              QgsField("x_res", QVariant.Double, "double", 10, 1),
+                              QgsField("y_res", QVariant.Double, "double", 10, 1),
+                              QgsField("active", QVariant.String)])
+        gcps_img_lyr.updateFields()
+        
         cam_hfov_lyr = QgsVectorLayer("Polygon?crs=%s" % (sel_crs), "cameras_hfov", "memory")
         cam_hfov_pr = cam_hfov_lyr.dataProvider()
         cam_hfov_pr.addAttributes([QgsField("iid", QVariant.String),
@@ -871,7 +945,7 @@ class MonoPlot:
         
         img_line_pnts_lyr = QgsVectorLayer("Point", "lines_img_vertices", "memory")
         
-        lyrs = [cam_lyr, cam_hfov_lyr, map_line_lyr, map_line_pnts_lyr, img_line_lyr, img_line_pnts_lyr]              
+        lyrs = [cam_lyr, cam_hfov_lyr, map_line_lyr, map_line_pnts_lyr, img_line_lyr, img_line_pnts_lyr, gcps_lyr, gcps_img_lyr]              
         
         for lyr in lyrs:
             options = QgsVectorFileWriter.SaveVectorOptions()
@@ -908,8 +982,12 @@ class MonoPlot:
     
     def add_images_to_project(self, paths):
         for img_path in paths:
+            
+            img = Image.open(img_path)
+            img_h = img.height
+            img_w = img.width
+            
             img_name = os.path.basename(img_path).rsplit(".")[0]
-            # img_dir = os.path.dirname(img_path)
             img_ext = img_name.split(".")[-1]
             
             img_loaded = False
@@ -925,6 +1003,7 @@ class MonoPlot:
             if not img_loaded:
                 
                 cam = Camera(name=img_name, path=img_path, ext=img_ext, is_oriented=False)
+                cam.set_img_dim(h=img_h, w=img_w)
                 self.camera_collection[cam.iid] = cam
                 self.add_camera_to_tree(cam)
                 self.add_camera_to_lyr(cam)          
@@ -936,9 +1015,6 @@ class MonoPlot:
                                             '', 
                                             'Images (*.jpeg *.jpg *.png *.tif *.tiff)')[0]
         self.add_images_to_project(paths)
-        
-        # if path:
-        #     self.load_project(path, terrain=None)
     
     def load_project_dialog(self):
         path = QFileDialog.getOpenFileName(None, 'Load existing monoplotting project', '', 'All Files (*.gpkg)')[0]
@@ -986,11 +1062,24 @@ class MonoPlot:
         self.img_line_lyr = img_line_lyr
         self.img_line_lyr.loadNamedStyle(img_line_qml_path)       
 
+        gpkg_map_gcps_lyr = path + "|layername=gcps"
+        map_gcps_lyr = QgsVectorLayer(gpkg_map_gcps_lyr, "gcps", "ogr")
+        self.map_gcps_lyr = map_gcps_lyr
+        # self.gcps_lyr.loadNamedStyle(gcps_qml_path)       
+
+        gpkg_img_gcps_lyr = path + "|layername=gcps_img"
+        img_gcps_lyr = QgsVectorLayer(gpkg_img_gcps_lyr, "gcps_img", "ogr")
+        self.img_gcps_lyr = img_gcps_lyr
+        # self.gcps_lyr.loadNamedStyle(gcps_qml_path)       
+        
+        
         QgsProject.instance().addMapLayer(self.img_line_lyr, False)
         QgsProject.instance().addMapLayer(self.map_line_lyr, False)
         QgsProject.instance().addMapLayer(self.cam_lyr, False)    
         QgsProject.instance().addMapLayer(self.cam_hfov_lyr, False) 
         QgsProject.instance().addMapLayer(self.reg_lyr, False)
+        QgsProject.instance().addMapLayer(self.map_gcps_lyr, False)
+        QgsProject.instance().addMapLayer(self.img_gcps_lyr, False)
 
         root = QgsProject.instance().layerTreeRoot()
         monoGroup = root.insertGroup(0, self.project_name)
@@ -999,6 +1088,8 @@ class MonoPlot:
         monoGroup.addLayer(self.cam_hfov_lyr) 
         monoGroup.addLayer(self.img_line_lyr) 
         monoGroup.addLayer(self.reg_lyr)
+        monoGroup.addLayer(self.map_gcps_lyr)
+        monoGroup.addLayer(self.img_gcps_lyr)
 
         self.map_canvas.setExtent(self.reg_lyr.extent())
         self.map_canvas.refresh()
@@ -1010,11 +1101,16 @@ class MonoPlot:
         self.mono_tool.set_layers(self.img_line_lyr, self.map_line_lyr)
         self.select_tool.set_layers(self.img_line_lyr, self.map_line_lyr)
         self.vertex_tool.set_layers(self.img_line_lyr, self.map_line_lyr)
+        self.img_picker_tool.set_layers(self.img_gcps_lyr)
+        self.map_picker_tool.set_layers(self.map_gcps_lyr)
+        
+        # self.orient_tool.set_layers(self.img_gcps_lyr, self.map_gcps_lyr)
         
         self.gpkg_path = path
         
         self.load_terrain_model(mesh=terrain)
         self.load_cameras_from_gpkg()
+        
         self.crs = self.cam_lyr.crs()
         
         QApplication.instance().restoreOverrideCursor()
@@ -1027,10 +1123,17 @@ class MonoPlot:
             
             feat_iid = feat_json["iid"]
             
-            cam = Camera(name=feat_json["iid"], path=img_path, ext=img_ext, is_oriented=False)
+            expression = "iid = '%s'" % (feat_iid)
+            request = QgsFeatureRequest().setFilterExpression(expression)
+            
+            cam_feats = list(self.cam_hfov_lyr.getFeatures(request))[0]
+            feat_hfov_json = json.loads(QgsJsonUtils.exportAttributes(cam_feats))
+          
+            cam = Camera(name=feat_json["iid"], path=feat_hfov_json["path"], ext=feat_hfov_json["ext"], is_oriented=False)
+            cam.set_img_dim(w=feat_hfov_json["w"], h=feat_hfov_json["h"])
+            
             self.camera_collection[cam.iid] = cam
             self.add_camera_to_tree(cam)
-            self.add_camera_to_lyr(cam)          
             
         
     def activate_buttons(self):
@@ -1052,6 +1155,9 @@ class MonoPlot:
         self.dlg.btn_monotool.setEnabled(False)
         self.dlg.btn_monotool.setChecked(False)
         
+        self.dlg.btn_oritool.setEnabled(False)
+        self.dlg.btn_oritool.setChecked(False)
+                
         self.dlg.line_id.setEnabled(False)
         
         self.dlg.btn_select.setEnabled(False)
@@ -1140,7 +1246,7 @@ class MonoPlot:
                 
             QgsProject.instance().addMapLayer(img_lyr, False) #False --> do not add layer to LayerTree --> not visible in qgis main canvas
             self.img_canvas.setExtent(img_lyr.extent())
-            self.img_canvas.setLayers([self.img_line_lyr, img_lyr])
+            self.img_canvas.setLayers([self.img_gcps_lyr, self.img_line_lyr, img_lyr])
             self.curr_img_lyr = img_lyr
     
     # def get_camera_dict(self, cam_id):
@@ -1513,11 +1619,18 @@ class MonoPlot:
                 
                 # self.mono_tool.set_camera(self.active_camera)
                 # self.vertex_tool.set_camera(self.active_camera)
+                # self.orient_tool.set_camera(self.active_camera)
                 
-                self.dlg.btn_monotool.setEnabled(True)
-                self.dlg.btn_select.setEnabled(True)
-                # self.dlg.btn_delete.setEnabled(True)
-                self.dlg.btn_vertex.setEnabled(True)
+                if self.active_camera.is_oriented:
+                
+                    self.dlg.btn_monotool.setEnabled(True)
+                    self.dlg.btn_select.setEnabled(True)
+                    self.dlg.btn_oritool.setEnabled(True)
+                    # self.dlg.btn_delete.setEnabled(True)
+                    self.dlg.btn_vertex.setEnabled(True)
+                else:
+                    self.dlg.btn_oritool.setEnabled(True)
+                
                 
             if item.checkState(column) == Qt.Unchecked:
                 item.setSelected(False)
@@ -1530,6 +1643,9 @@ class MonoPlot:
                 self.dlg.btn_monotool.setEnabled(False)
                 self.dlg.btn_monotool.setChecked(False)
                 self.deactivate_plotting()
+                
+                self.dlg.btn_oritool.setEnabled(False)
+                self.dlg.btn_oritool.setChecked(False)
                 
                 self.dlg.btn_select.setEnabled(False)
                 self.dlg.btn_select.setChecked(False)
