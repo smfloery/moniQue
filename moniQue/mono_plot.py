@@ -24,7 +24,7 @@
 from PyQt5.QtCore import QSettings, QTranslator, qVersion, QCoreApplication, QVariant
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QIcon, QColor
-from PyQt5.QtWidgets import QApplication, QAction, QTreeWidgetItem, QFileDialog, QDialog, QMenu, QStyle, QDialogButtonBox, QHeaderView
+from PyQt5.QtWidgets import QApplication, QAction, QTreeWidgetItem,QTableWidgetItem, QFileDialog, QDialog, QMenu, QStyle, QDialogButtonBox, QHeaderView
 
 # Initialize Qt resources from file resources.py
 from .resources import *
@@ -76,6 +76,7 @@ from osgeo import gdal
 import open3d as o3d
 import laspy
 from PIL import Image
+from collections import OrderedDict
 
 class MonoPlot:
     """QGIS Plugin Implementation."""
@@ -456,6 +457,52 @@ class MonoPlot:
             if lyr.type() == QgsMapLayerType.RasterLayer:
                 self.orient_tool_dlg.combo_raster_lyrs.addItem(lyr.name(), lyr.id())
 
+        gcps_dict = {}
+        
+        for feat in self.img_gcps_lyr.getFeatures():
+            feat_dict = json.loads(QgsJsonUtils.exportAttributes(feat))
+            
+            curr_gid = feat_dict["gid"]
+            if curr_gid not in gcps_dict.keys():
+                gcps_dict[curr_gid] = {"x":None, "y":None, "X":None, "Y":None, "Z":None, "active":None}
+            
+            gcps_dict[curr_gid]["x"] = feat_dict["x"]
+            gcps_dict[curr_gid]["y"] = feat_dict["y"]
+            gcps_dict[curr_gid]["active"] = feat_dict["active"]
+            
+        for feat in self.map_gcps_lyr.getFeatures():
+            feat_dict = json.loads(QgsJsonUtils.exportAttributes(feat))
+            
+            curr_gid = feat_dict["gid"]
+            if curr_gid not in gcps_dict.keys():
+                gcps_dict[curr_gid] = {"x":None, "y":None, "X":None, "Y":None, "Z":None, "active":None}
+            
+            gcps_dict[curr_gid]["X"] = feat_dict["X"]
+            gcps_dict[curr_gid]["Y"] = feat_dict["Y"]
+            gcps_dict[curr_gid]["H"] = feat_dict["H"]
+        
+        gcps_dict = OrderedDict(sorted(gcps_dict.items()))
+        for ix, (gid,vals) in enumerate(gcps_dict.items()):
+            self.orient_tool_dlg.table_gcps.insertRow(ix)
+            self.orient_tool_dlg.table_gcps.setRowHeight(ix, 20)
+
+            chkBoxItem = QTableWidgetItem()
+            chkBoxItem.setFlags(Qt.ItemIsUserCheckable | Qt.ItemIsEnabled)
+            
+            if vals["active"] == "1":
+                chkBoxItem.setCheckState(Qt.Checked)       
+            else:
+                chkBoxItem.setCheckState(Qt.Unchecked)   
+                    
+            self.orient_tool_dlg.table_gcps.setItem(ix,0,chkBoxItem)
+            
+            self.orient_tool_dlg.table_gcps.setItem(ix , 1, QTableWidgetItem(gid))
+            self.orient_tool_dlg.table_gcps.setItem(ix , 2, QTableWidgetItem("%.1f" % vals["X"]))
+            self.orient_tool_dlg.table_gcps.setItem(ix , 3, QTableWidgetItem("%.1f" % vals["Y"]))
+            self.orient_tool_dlg.table_gcps.setItem(ix , 4, QTableWidgetItem("%.1f" % vals["H"]))
+            self.orient_tool_dlg.table_gcps.setItem(ix , 5, QTableWidgetItem("%.1f" % vals["x"]))
+            self.orient_tool_dlg.table_gcps.setItem(ix , 6, QTableWidgetItem("%.1f" % vals["y"]))
+            
         self.orient_tool_widget.show()
         self.img_canvas.setMapTool(self.img_picker_tool)
         self.map_canvas.setMapTool(self.map_picker_tool)
