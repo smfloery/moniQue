@@ -24,7 +24,7 @@
 from PyQt5.QtCore import QSettings, QTranslator, qVersion, QCoreApplication, QVariant
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QIcon, QColor
-from PyQt5.QtWidgets import QApplication, QAction, QTreeWidgetItem, QFileDialog, QDialog, QMenu, QStyle, QDialogButtonBox
+from PyQt5.QtWidgets import QApplication, QAction, QTreeWidgetItem, QFileDialog, QDialog, QMenu, QStyle, QDialogButtonBox, QHeaderView
 
 # Initialize Qt resources from file resources.py
 from .resources import *
@@ -33,6 +33,7 @@ from .camera import Camera
 # Import the code for the dialog
 from .gui.mono_plot_dialog import MonoPlotDialog
 from .gui.img_meta_dlg import MetaWindow
+from .gui.gcp_meta_dlg import MetaWindow as GcpMetaWindow
 from .gui.mono_plot_create_dialog import Ui_Dialog as Ui_CreateDialog
 from .gui.mono_plot_change_name_dialog import Ui_ChangeDialog 
 from .gui.mono_plot_create_ortho_dialog import Ui_Dialog as Ui_CreateOrthoDialog
@@ -136,6 +137,7 @@ class MonoPlot:
         self.img_tree.itemChanged.connect(self.tree_item_changed)
                 
         self.meta_window = MetaWindow()
+        self.gcp_meta_window = GcpMetaWindow()
          
         self.curr_img_lyr = None
         self.img_line_lyr = None
@@ -151,8 +153,8 @@ class MonoPlot:
         self.vertex_tool = VertexTool(self.img_canvas, self.map_canvas)
         
         # self.orient_tool = OrientTool(self.img_canvas, self.map_canvas)
-        self.img_picker_tool = ImgPickerTool(self.img_canvas)
-        self.map_picker_tool = MapPickerTool(self.map_canvas)
+        self.img_picker_tool = ImgPickerTool(self.img_canvas, self.gcp_meta_window)
+        self.map_picker_tool = MapPickerTool(self.map_canvas, self.gcp_meta_window)
         
         
         self.dlg.btn_extent.clicked.connect(self.set_extent)
@@ -223,7 +225,20 @@ class MonoPlot:
         orient_tool = Ui_OrientDialog()
         orient_tool.setupUi(self.orient_tool_widget)
         self.orient_tool_dlg = orient_tool
+        
         self.orient_tool_dlg.combo_raster_lyrs.currentIndexChanged.connect(self.change_raster_src)
+        self.orient_tool_dlg.table_gcps.setColumnWidth(0, 10)
+        # self.orient_tool_dlg.table_gcps.setColumnWidth(1, 75)
+        self.orient_tool_dlg.table_gcps.setColumnWidth(2, 80)
+        self.orient_tool_dlg.table_gcps.setColumnWidth(3, 80)
+        self.orient_tool_dlg.table_gcps.setColumnWidth(4, 80)
+        self.orient_tool_dlg.table_gcps.setColumnWidth(5, 80)
+        self.orient_tool_dlg.table_gcps.setColumnWidth(6, 80)
+        header = self.orient_tool_dlg.table_gcps.horizontalHeader()       
+        header.setSectionResizeMode(1, QHeaderView.Stretch)
+        # header.setSectionResizeMode(1, QHeaderView.ResizeToContents)
+        # header.setSectionResizeMode(2, QHeaderView.ResizeToContents)
+
 
         self.project_name = None
         self.curr_region = None
@@ -491,7 +506,6 @@ class MonoPlot:
                 child_item = item.child(0)
                 child_item.setText(0, change_new_name)
 
-        
         expression = "mtum_id = '%s'" % (change_cam_id)
         request = QgsFeatureRequest().setFilterExpression(expression)
         hfov_feats = self.cam_hfov_lyr.getFeatures(request)
@@ -1035,6 +1049,8 @@ class MonoPlot:
         img_line_qml_path = os.path.join(self.plugin_dir, "gfx", "qml", "lines_img.qml")
         map_line_qml_path = os.path.join(self.plugin_dir, "gfx", "qml", "lines_map.qml")
         map_region_qml_path = os.path.join(self.plugin_dir, "gfx", "qml", "region_map.qml")
+        map_gcps_qml_path = os.path.join(self.plugin_dir, "gfx", "qml", "gcps_map.qml")
+        img_gcps_qml_path = os.path.join(self.plugin_dir, "gfx", "qml", "gcps_img.qml")
         
         #load layers from geopackage
         gpkg_reg_lyr = path + "|layername=region"
@@ -1065,21 +1081,20 @@ class MonoPlot:
         gpkg_map_gcps_lyr = path + "|layername=gcps"
         map_gcps_lyr = QgsVectorLayer(gpkg_map_gcps_lyr, "gcps", "ogr")
         self.map_gcps_lyr = map_gcps_lyr
-        # self.gcps_lyr.loadNamedStyle(gcps_qml_path)       
+        self.map_gcps_lyr.loadNamedStyle(map_gcps_qml_path)       
 
         gpkg_img_gcps_lyr = path + "|layername=gcps_img"
         img_gcps_lyr = QgsVectorLayer(gpkg_img_gcps_lyr, "gcps_img", "ogr")
         self.img_gcps_lyr = img_gcps_lyr
-        # self.gcps_lyr.loadNamedStyle(gcps_qml_path)       
+        self.img_gcps_lyr.loadNamedStyle(img_gcps_qml_path)       
         
-        
-        QgsProject.instance().addMapLayer(self.img_line_lyr, False)
-        QgsProject.instance().addMapLayer(self.map_line_lyr, False)
-        QgsProject.instance().addMapLayer(self.cam_lyr, False)    
-        QgsProject.instance().addMapLayer(self.cam_hfov_lyr, False) 
-        QgsProject.instance().addMapLayer(self.reg_lyr, False)
-        QgsProject.instance().addMapLayer(self.map_gcps_lyr, False)
-        QgsProject.instance().addMapLayer(self.img_gcps_lyr, False)
+        # QgsProject.instance().addMapLayer(self.img_line_lyr, False)
+        # QgsProject.instance().addMapLayer(self.map_line_lyr, False)
+        # QgsProject.instance().addMapLayer(self.cam_lyr, False)    
+        # QgsProject.instance().addMapLayer(self.cam_hfov_lyr, False) 
+        # QgsProject.instance().addMapLayer(self.reg_lyr, False)
+        # QgsProject.instance().addMapLayer(self.map_gcps_lyr, False)
+        # QgsProject.instance().addMapLayer(self.img_gcps_lyr, False)
 
         root = QgsProject.instance().layerTreeRoot()
         monoGroup = root.insertGroup(0, self.project_name)
@@ -1091,8 +1106,13 @@ class MonoPlot:
         monoGroup.addLayer(self.map_gcps_lyr)
         monoGroup.addLayer(self.img_gcps_lyr)
 
+        #define layers which should be shown/considered in which canvas
+        self.map_canvas.setLayers([self.map_line_lyr, self.cam_lyr, self.cam_hfov_lyr, self.reg_lyr, self.map_gcps_lyr])
         self.map_canvas.setExtent(self.reg_lyr.extent())
         self.map_canvas.refresh()
+        
+        #define layers which should be shown/considered in which canvas
+        self.img_canvas.setLayers([self.img_line_lyr, self.img_gcps_lyr])
         
         self.dlg.setWindowTitle(self.project_name)
         
@@ -1101,8 +1121,8 @@ class MonoPlot:
         self.mono_tool.set_layers(self.img_line_lyr, self.map_line_lyr)
         self.select_tool.set_layers(self.img_line_lyr, self.map_line_lyr)
         self.vertex_tool.set_layers(self.img_line_lyr, self.map_line_lyr)
-        self.img_picker_tool.set_layers(self.img_gcps_lyr)
-        self.map_picker_tool.set_layers(self.map_gcps_lyr)
+        self.img_picker_tool.set_layers(self.img_gcps_lyr, self.map_gcps_lyr)
+        self.map_picker_tool.set_layers(self.img_gcps_lyr, self.map_gcps_lyr)
         
         # self.orient_tool.set_layers(self.img_gcps_lyr, self.map_gcps_lyr)
         
@@ -1615,7 +1635,9 @@ class MonoPlot:
                 # self.hfov_h.setFillColor(self.highlight_color)
                 # self.hfov_h.show()
                 
-                # self.img_line_lyr.setSubsetString(expression) #show only those lines which correspond to the currently selected image
+                self.img_line_lyr.setSubsetString(expression) #show only those lines which correspond to the currently selected image
+                self.img_gcps_lyr.setSubsetString(expression)
+                self.map_gcps_lyr.setSubsetString(expression)
                 
                 # self.mono_tool.set_camera(self.active_camera)
                 # self.vertex_tool.set_camera(self.active_camera)
@@ -1662,6 +1684,8 @@ class MonoPlot:
                 #use a filter which is not available to not show any lines in img canvas if no image is currently selected
                 expression = "iid = 'sth_not_existing'"
                 self.img_line_lyr.setSubsetString(expression) #show only those lines which correspond to the currently selected image
+                self.img_gcps_lyr.setSubsetString(expression)
+                self.map_gcps_lyr.setSubsetString(expression)
                 
     def run(self):
         

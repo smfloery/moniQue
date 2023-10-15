@@ -114,7 +114,6 @@ class MonoMapTool(QgsMapTool):
                 if result:
                 
                     feat_attr = self.meta_window.getMeta()
-                    
                     self.meta_window.clearFields()
                     
                     map_feat = QgsFeature(self.map_lyr.fields())

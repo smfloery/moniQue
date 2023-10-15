@@ -1,18 +1,21 @@
 from qgis.gui import QgsMapTool, QgsRubberBand
 from qgis.core import QgsPointXY, QgsFeature, QgsPoint, QgsGeometry, QgsRaster
 from qgis.PyQt.QtCore import Qt
-
+import json
 class MapPickerTool(QgsMapTool):
     
-    def __init__(self, canvas):
+    def __init__(self, canvas, meta_window):
         
         self.canvas = canvas
-        # self.meta_window = meta_window
+        self.meta_window = meta_window
         
         QgsMapTool.__init__(self, self.canvas)
         
-    def set_layers(self, lyr):
-        self.lyr = lyr
+    def set_layers(self, img_lyr, map_lyr):
+        self.img_lyr = img_lyr
+        self.img_lyr_gix = img_lyr.dataProvider().fieldNameIndex('gid')
+        self.map_lyr = map_lyr
+        self.map_lyr_gix = map_lyr.dataProvider().fieldNameIndex('gid')
     
     def set_dhm_src(self, lyr):
         self.dhm_src = lyr
@@ -29,22 +32,38 @@ class MapPickerTool(QgsMapTool):
             
             click_h = self.dhm_src.dataProvider().identify(QgsPointXY(mx, my), QgsRaster.IdentifyFormatValue).results()[1]
             if click_h is not None:
+    
+                img_gids = [feat.attributes()[self.img_lyr_gix] for feat in self.img_lyr.getFeatures()]
+                map_gids = [feat.attributes()[self.map_lyr_gix] for feat in self.map_lyr.getFeatures()]
+                pot_gids = list(set(img_gids).difference(map_gids))
                 
-                feat = QgsFeature(self.lyr.fields())
-                feat.setGeometry(QgsPoint(mx, my))
-                feat["iid"] = self.camera.iid
-                feat["gid"] = -1
-                feat["X"] = mx
-                feat["Y"] = my
-                feat["H"] = click_h
-                feat["H_src"] = self.dhm_src.name()
+                self.meta_window.combo_gid.clear()
+                self.meta_window.combo_gid.addItems(pot_gids)
                 
-                self.lyr.dataProvider().addFeatures([feat])
+                self.meta_window.line_iid.setText(self.camera.iid)
+                self.meta_window.line_obj_x.setText(str(mx))
+                self.meta_window.line_obj_y.setText(str(my))
+                self.meta_window.line_obj_h.setText(str(click_h))
                 
-                self.lyr.commitChanges()
-                self.lyr.triggerRepaint()
-                self.lyr.reload()
-                self.canvas.refresh()
+                result = self.meta_window.exec_() 
+                if result:
+                    
+                    feat = QgsFeature(self.map_lyr.fields())
+                    feat.setGeometry(QgsPoint(mx, my))
+                    feat["iid"] = self.camera.iid
+                    feat["gid"] = self.meta_window.combo_gid.currentText() 
+                    feat["X"] = mx
+                    feat["Y"] = my
+                    feat["H"] = click_h
+                    feat["desc"] = self.meta_window.line_desc.text() 
+                    feat["H_src"] = self.dhm_src.name()
+                    
+                    self.map_lyr.dataProvider().addFeatures([feat])
+                    
+                    self.map_lyr.commitChanges()
+                    self.map_lyr.triggerRepaint()
+                    self.map_lyr.reload()
+                    self.canvas.refresh()
                     
     def reset(self):
         pass

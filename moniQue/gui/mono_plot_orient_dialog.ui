@@ -6,9 +6,21 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>726</width>
-    <height>409</height>
+    <width>750</width>
+    <height>400</height>
    </rect>
+  </property>
+  <property name="minimumSize">
+   <size>
+    <width>750</width>
+    <height>400</height>
+   </size>
+  </property>
+  <property name="maximumSize">
+   <size>
+    <width>750</width>
+    <height>400</height>
+   </size>
   </property>
   <property name="windowTitle">
    <string>Dialog</string>
@@ -16,8 +28,8 @@
   <widget class="QDialogButtonBox" name="buttonBox">
    <property name="geometry">
     <rect>
-     <x>380</x>
-     <y>380</y>
+     <x>350</x>
+     <y>360</y>
      <width>341</width>
      <height>32</height>
     </rect>
@@ -29,18 +41,23 @@
     <set>QDialogButtonBox::Cancel|QDialogButtonBox::Ok</set>
    </property>
   </widget>
-  <widget class="QTableWidget" name="tableWidget">
+  <widget class="QTableWidget" name="table_gcps">
    <property name="geometry">
     <rect>
-     <x>10</x>
+     <x>5</x>
      <y>40</y>
-     <width>461</width>
+     <width>541</width>
      <height>271</height>
     </rect>
    </property>
    <property name="sizeAdjustPolicy">
     <enum>QAbstractScrollArea::AdjustToContentsOnFirstShow</enum>
    </property>
+   <column>
+    <property name="text">
+     <string>use</string>
+    </property>
+   </column>
    <column>
     <property name="text">
      <string>gid</string>
@@ -75,21 +92,21 @@
   <widget class="QGroupBox" name="groupBox">
    <property name="geometry">
     <rect>
-     <x>500</x>
-     <y>10</y>
-     <width>200</width>
+     <x>553</x>
+     <y>14</y>
+     <width>190</width>
      <height>190</height>
     </rect>
    </property>
    <property name="minimumSize">
     <size>
-     <width>200</width>
+     <width>190</width>
      <height>190</height>
     </size>
    </property>
    <property name="maximumSize">
     <size>
-     <width>200</width>
+     <width>190</width>
      <height>190</height>
     </size>
    </property>
@@ -142,9 +159,12 @@
          <property name="orientation">
           <enum>Qt::Horizontal</enum>
          </property>
+         <property name="sizeType">
+          <enum>QSizePolicy::Preferred</enum>
+         </property>
          <property name="sizeHint" stdset="0">
           <size>
-           <width>40</width>
+           <width>0</width>
            <height>20</height>
           </size>
          </property>
@@ -195,9 +215,12 @@
          <property name="orientation">
           <enum>Qt::Horizontal</enum>
          </property>
+         <property name="sizeType">
+          <enum>QSizePolicy::Preferred</enum>
+         </property>
          <property name="sizeHint" stdset="0">
           <size>
-           <width>40</width>
+           <width>0</width>
            <height>20</height>
           </size>
          </property>
@@ -245,9 +268,12 @@
          <property name="orientation">
           <enum>Qt::Horizontal</enum>
          </property>
+         <property name="sizeType">
+          <enum>QSizePolicy::Preferred</enum>
+         </property>
          <property name="sizeHint" stdset="0">
           <size>
-           <width>40</width>
+           <width>0</width>
            <height>20</height>
           </size>
          </property>
@@ -314,11 +340,11 @@
           <enum>Qt::Horizontal</enum>
          </property>
          <property name="sizeType">
-          <enum>QSizePolicy::Expanding</enum>
+          <enum>QSizePolicy::Preferred</enum>
          </property>
          <property name="sizeHint" stdset="0">
           <size>
-           <width>10</width>
+           <width>0</width>
            <height>20</height>
           </size>
          </property>
@@ -366,9 +392,12 @@
          <property name="orientation">
           <enum>Qt::Horizontal</enum>
          </property>
+         <property name="sizeType">
+          <enum>QSizePolicy::Preferred</enum>
+         </property>
          <property name="sizeHint" stdset="0">
           <size>
-           <width>40</width>
+           <width>0</width>
            <height>20</height>
           </size>
          </property>
@@ -416,9 +445,12 @@
          <property name="orientation">
           <enum>Qt::Horizontal</enum>
          </property>
+         <property name="sizeType">
+          <enum>QSizePolicy::Preferred</enum>
+         </property>
          <property name="sizeHint" stdset="0">
           <size>
-           <width>40</width>
+           <width>0</width>
            <height>20</height>
           </size>
          </property>
@@ -471,21 +503,21 @@
   <widget class="QGroupBox" name="groupBox_2">
    <property name="geometry">
     <rect>
-     <x>500</x>
-     <y>200</y>
-     <width>200</width>
+     <x>553</x>
+     <y>202</y>
+     <width>190</width>
      <height>110</height>
     </rect>
    </property>
    <property name="minimumSize">
     <size>
-     <width>200</width>
+     <width>190</width>
      <height>110</height>
     </size>
    </property>
    <property name="maximumSize">
     <size>
-     <width>200</width>
+     <width>190</width>
      <height>110</height>
     </size>
    </property>
@@ -500,7 +532,7 @@
      <rect>
       <x>10</x>
       <y>20</y>
-      <width>181</width>
+      <width>171</width>
       <height>80</height>
      </rect>
     </property>
@@ -538,9 +570,12 @@
          <property name="orientation">
           <enum>Qt::Horizontal</enum>
          </property>
+         <property name="sizeType">
+          <enum>QSizePolicy::MinimumExpanding</enum>
+         </property>
          <property name="sizeHint" stdset="0">
           <size>
-           <width>40</width>
+           <width>10</width>
            <height>20</height>
           </size>
          </property>
@@ -548,6 +583,9 @@
        </item>
        <item>
         <widget class="QLineEdit" name="line_x0">
+         <property name="enabled">
+          <bool>true</bool>
+         </property>
          <property name="minimumSize">
           <size>
            <width>100</width>
@@ -588,9 +626,12 @@
          <property name="orientation">
           <enum>Qt::Horizontal</enum>
          </property>
+         <property name="sizeType">
+          <enum>QSizePolicy::MinimumExpanding</enum>
+         </property>
          <property name="sizeHint" stdset="0">
           <size>
-           <width>40</width>
+           <width>10</width>
            <height>20</height>
           </size>
          </property>
@@ -638,9 +679,12 @@
          <property name="orientation">
           <enum>Qt::Horizontal</enum>
          </property>
+         <property name="sizeType">
+          <enum>QSizePolicy::MinimumExpanding</enum>
+         </property>
          <property name="sizeHint" stdset="0">
           <size>
-           <width>40</width>
+           <width>10</width>
            <height>20</height>
           </size>
          </property>
@@ -693,9 +737,9 @@
   <widget class="QWidget" name="layoutWidget">
    <property name="geometry">
     <rect>
-     <x>10</x>
+     <x>5</x>
      <y>10</y>
-     <width>461</width>
+     <width>541</width>
      <height>22</height>
     </rect>
    </property>
