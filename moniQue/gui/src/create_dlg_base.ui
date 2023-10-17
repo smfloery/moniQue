@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>449</width>
-    <height>150</height>
+    <width>500</width>
+    <height>175</height>
    </rect>
   </property>
   <property name="sizePolicy">
@@ -18,31 +18,86 @@
   </property>
   <property name="minimumSize">
    <size>
-    <width>0</width>
-    <height>0</height>
+    <width>500</width>
+    <height>150</height>
    </size>
   </property>
   <property name="maximumSize">
    <size>
     <width>500</width>
-    <height>250</height>
+    <height>200</height>
    </size>
   </property>
   <property name="windowTitle">
    <string>Create new project...</string>
   </property>
-  <layout class="QVBoxLayout" name="verticalLayout">
-   <item>
+  <widget class="QDialogButtonBox" name="buttonBox">
+   <property name="geometry">
+    <rect>
+     <x>330</x>
+     <y>140</y>
+     <width>156</width>
+     <height>23</height>
+    </rect>
+   </property>
+   <property name="orientation">
+    <enum>Qt::Horizontal</enum>
+   </property>
+   <property name="standardButtons">
+    <set>QDialogButtonBox::Cancel|QDialogButtonBox::Save</set>
+   </property>
+  </widget>
+  <widget class="QWidget" name="layoutWidget">
+   <property name="geometry">
+    <rect>
+     <x>179</x>
+     <y>90</y>
+     <width>311</width>
+     <height>43</height>
+    </rect>
+   </property>
+   <layout class="QVBoxLayout" name="verticalLayout">
+    <item>
+     <widget class="QLabel" name="label">
+      <property name="font">
+       <font>
+        <weight>75</weight>
+        <bold>true</bold>
+       </font>
+      </property>
+      <property name="text">
+       <string>Assigned Coordinate Reference System (CRS)</string>
+      </property>
+     </widget>
+    </item>
+    <item>
+     <widget class="QgsProjectionSelectionWidget" name="sel_crs_widget"/>
+    </item>
+   </layout>
+  </widget>
+  <widget class="QSplitter" name="splitter">
+   <property name="geometry">
+    <rect>
+     <x>10</x>
+     <y>10</y>
+     <width>481</width>
+     <height>61</height>
+    </rect>
+   </property>
+   <property name="orientation">
+    <enum>Qt::Vertical</enum>
+   </property>
+   <widget class="QWidget" name="layoutWidget">
     <layout class="QHBoxLayout" name="horizontalLayout">
      <item>
-      <widget class="QLabel" name="label">
+      <widget class="QLabel" name="label_project">
        <property name="text">
-        <string>Path:</string>
+        <string>Project Path:</string>
        </property>
       </widget>
      </item>
      <item>
-      <widget class="QLineEdit" name="line_path">
+      <widget class="QLineEdit" name="line_project_path">
        <property name="sizePolicy">
         <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
          <horstretch>0</horstretch>
@@ -58,18 +113,18 @@
       </widget>
      </item>
      <item>
-      <widget class="QPushButton" name="btn_path">
+      <widget class="QPushButton" name="btn_project_path">
        <property name="text">
         <string>Browse</string>
        </property>
       </widget>
      </item>
     </layout>
-   </item>
-   <item>
+   </widget>
+   <widget class="QWidget" name="layoutWidget">
     <layout class="QHBoxLayout" name="horizontalLayout_2">
      <item>
-      <widget class="QLabel" name="label_2">
+      <widget class="QLabel" name="label_terrain_path">
        <property name="sizePolicy">
         <sizepolicy hsizetype="Fixed" vsizetype="Preferred">
          <horstretch>0</horstretch>
@@ -83,74 +138,44 @@
         </size>
        </property>
        <property name="text">
-        <string>Region (DTM):</string>
+        <string>Terrain Path:</string>
        </property>
       </widget>
      </item>
      <item>
-      <spacer name="horizontalSpacer">
-       <property name="orientation">
-        <enum>Qt::Horizontal</enum>
-       </property>
-       <property name="sizeHint" stdset="0">
-        <size>
-         <width>40</width>
-         <height>20</height>
-        </size>
-       </property>
-      </spacer>
-     </item>
-     <item>
-      <widget class="QComboBox" name="combo_dtm">
+      <widget class="QLineEdit" name="line_terrain_path">
        <property name="sizePolicy">
-        <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+        <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
          <horstretch>0</horstretch>
          <verstretch>0</verstretch>
         </sizepolicy>
        </property>
-       <property name="minimumSize">
-        <size>
-         <width>150</width>
-         <height>0</height>
-        </size>
-       </property>
        <property name="maximumSize">
         <size>
-         <width>150</width>
+         <width>300</width>
          <height>16777215</height>
         </size>
        </property>
-       <item>
-        <property name="text">
-         <string>Martelltal</string>
-        </property>
-       </item>
-       <item>
-        <property name="text">
-         <string>Horlachtal</string>
-        </property>
-       </item>
-       <item>
-        <property name="text">
-         <string>Kaunertal</string>
-        </property>
-       </item>
+      </widget>
+     </item>
+     <item>
+      <widget class="QPushButton" name="btn_terrain_path">
+       <property name="text">
+        <string>Browse</string>
+       </property>
       </widget>
      </item>
     </layout>
-   </item>
-   <item>
-    <widget class="QDialogButtonBox" name="buttonBox">
-     <property name="orientation">
-      <enum>Qt::Horizontal</enum>
-     </property>
-     <property name="standardButtons">
-      <set>QDialogButtonBox::Cancel|QDialogButtonBox::Save</set>
-     </property>
-    </widget>
-   </item>
-  </layout>
+   </widget>
+  </widget>
  </widget>
+ <customwidgets>
+  <customwidget>
+   <class>QgsProjectionSelectionWidget</class>
+   <extends>QWidget</extends>
+   <header>qgsprojectionselectionwidget.h</header>
+  </customwidget>
+ </customwidgets>
  <resources/>
  <connections>
   <connection>

@@ -31,13 +31,15 @@ from .resources import *
 from .camera import Camera
 
 # Import the code for the dialog
-from .gui.mono_plot_dialog import MonoPlotDialog
+from .gui.mono_dlg import MonoDialog
+from .gui.orient_dlg import OrientDialog
+
 from .gui.img_meta_dlg import MetaWindow
 from .gui.gcp_meta_dlg import MetaWindow as GcpMetaWindow
-from .gui.mono_plot_create_dialog import Ui_Dialog as Ui_CreateDialog
-from .gui.mono_plot_change_name_dialog import Ui_ChangeDialog 
-from .gui.mono_plot_create_ortho_dialog import Ui_Dialog as Ui_CreateOrthoDialog
-from .gui.mono_plot_orient_dialog import Ui_Dialog as Ui_OrientDialog
+from .gui.src.create_dlg_base import Ui_Dialog as Ui_CreateDialog
+from .gui.src.change_name_dlg_base import Ui_ChangeDialog 
+from .gui.src.create_ortho_dlg_base import Ui_Dialog as Ui_CreateOrthoDialog
+
 import os.path
 
 from qgis.core import (
@@ -121,7 +123,7 @@ class MonoPlot:
                 QCoreApplication.installTranslator(self.translator)
 
         # Create the dialog (after translation) and keep reference
-        self.dlg = MonoPlotDialog(parent=self.iface.mainWindow())
+        self.dlg = MonoDialog(parent=self.iface.mainWindow())
         self.dlg.setWindowTitle(self.plugin_name)
         self.dlg.setWindowFlag(Qt.WindowMinimizeButtonHint, True)
         self.dlg.setWindowFlag(Qt.WindowMaximizeButtonHint, True)
@@ -167,7 +169,7 @@ class MonoPlot:
         
         self.dlg.btn_add_images.clicked.connect(self.add_images_dialog)
         
-        self.dlg.btn_oritool.clicked.connect(self.show_orient_tool_dialog)
+        self.dlg.btn_oritool.clicked.connect(self.show_orient_dlg)
         
         self.dlg.btn_pan.clicked.connect(self.activate_panning)
         self.dlg.btn_monotool.clicked.connect(self.activate_plotting)
@@ -183,6 +185,7 @@ class MonoPlot:
         
         # ssl._create_default_https_context = ssl._create_unverified_context
         
+                
         self.create_dlg_widget = QDialog(self.dlg)
         create_dlg = Ui_CreateDialog()
         create_dlg.setupUi(self.create_dlg_widget)
@@ -198,48 +201,53 @@ class MonoPlot:
         create_dlg.buttonBox.accepted.connect(self.create_project_file)
         self.create_dlg = create_dlg        
 
-        #==================================
-        # CHANGE NAME DIALOG
-        #==================================
-        self.change_name_widget = QDialog(self.dlg)
-        change_name = Ui_ChangeDialog()
-        change_name.setupUi(self.change_name_widget)
-        change_name.buttonBox.accepted.connect(self.change_image_name)
-        self.change_name_dlg = change_name
+        # #==================================
+        # # CHANGE NAME DIALOG
+        # #==================================
+        #! CHANGE IMPORT 
+        # self.change_name_widget = QDialog(self.dlg)
+        # change_name = Ui_ChangeDialog()
+        # change_name.setupUi(self.change_name_widget)
+        # change_name.buttonBox.accepted.connect(self.change_image_name)
+        # self.change_name_dlg = change_name
         
         #==================================
         # ORTHOPHOTO DIALOG
         #==================================
-        self.create_ortho_widget = QDialog(self.dlg)
-        create_ortho = Ui_CreateOrthoDialog()
-        create_ortho.setupUi(self.create_ortho_widget)
-        create_ortho.buttonBox.accepted.disconnect()
-        create_ortho.buttonBox.accepted.connect(self.create_orthophoto)
-        create_ortho.radio_tif.toggled.connect(self.set_tif_options)
-        create_ortho.btn_out_path.clicked.connect(self.set_ortho_path)
-        self.create_ortho_dlg = create_ortho
+        #! CHANGE IMPORT
+        # self.create_ortho_widget = QDialog(self.dlg)
+        # create_ortho = Ui_CreateOrthoDialog()
+        # create_ortho.setupUi(self.create_ortho_widget)
+        # create_ortho.buttonBox.accepted.disconnect()
+        # create_ortho.buttonBox.accepted.connect(self.create_orthophoto)
+        # create_ortho.radio_tif.toggled.connect(self.set_tif_options)
+        # create_ortho.btn_out_path.clicked.connect(self.set_ortho_path)
+        # self.create_ortho_dlg = create_ortho
         
         #==================================
         # ORIENT DIALOG
         #==================================
-        self.orient_tool_widget = QDialog(self.dlg)
-        orient_tool = Ui_OrientDialog()
-        orient_tool.setupUi(self.orient_tool_widget)
-        self.orient_tool_dlg = orient_tool
+        # self.orient_tool_widget = QDialog(self.dlg)
+        # orient_tool = Ui_OrientDialog()
+        # orient_tool.setupUi(self.orient_tool_widget)
+        # self.orient_tool_dlg = orient_tool
         
-        self.orient_tool_dlg.combo_raster_lyrs.currentIndexChanged.connect(self.change_raster_src)
-        self.orient_tool_dlg.table_gcps.setColumnWidth(0, 10)
+        self.orient_dlg = OrientDialog()
+        
+        self.orient_dlg.closed.connect(self.close_orient_dlg)
+        
+        self.orient_dlg.combo_raster_lyrs.currentIndexChanged.connect(self.change_raster_src)
+        self.orient_dlg.table_gcps.setColumnWidth(0, 5)
         # self.orient_tool_dlg.table_gcps.setColumnWidth(1, 75)
-        self.orient_tool_dlg.table_gcps.setColumnWidth(2, 80)
-        self.orient_tool_dlg.table_gcps.setColumnWidth(3, 80)
-        self.orient_tool_dlg.table_gcps.setColumnWidth(4, 80)
-        self.orient_tool_dlg.table_gcps.setColumnWidth(5, 80)
-        self.orient_tool_dlg.table_gcps.setColumnWidth(6, 80)
-        header = self.orient_tool_dlg.table_gcps.horizontalHeader()       
+        self.orient_dlg.table_gcps.setColumnWidth(2, 85)
+        self.orient_dlg.table_gcps.setColumnWidth(3, 85)
+        self.orient_dlg.table_gcps.setColumnWidth(4, 85)
+        self.orient_dlg.table_gcps.setColumnWidth(5, 85)
+        self.orient_dlg.table_gcps.setColumnWidth(6, 85)
+        header = self.orient_dlg.table_gcps.horizontalHeader()       
         header.setSectionResizeMode(1, QHeaderView.Stretch)
         # header.setSectionResizeMode(1, QHeaderView.ResizeToContents)
         # header.setSectionResizeMode(2, QHeaderView.ResizeToContents)
-
 
         self.project_name = None
         self.curr_region = None
@@ -253,7 +261,7 @@ class MonoPlot:
         
         self.highlight_color = QColor(Qt.red)
         self.highlight_color.setAlpha(50)
-
+        
     def initGui(self):
         """Create the menu entries and toolbar icons inside the QGIS GUI."""
 
@@ -448,14 +456,24 @@ class MonoPlot:
 
         self.clear_highlighted_features()
     
-    def show_orient_tool_dialog(self):
+    def close_orient_dlg(self):
+        self.orient_dlg.combo_raster_lyrs.clear()
+        self.orient_dlg.table_gcps.setRowCount(0)
         
-        self.orient_tool_dlg.combo_raster_lyrs.clear()
+        self.dlg.btn_oritool.setChecked(False)
+
+        self.map_canvas.setMapTool(QgsMapToolPan(self.map_canvas))
+        self.img_canvas.setMapTool(self.pan_tool)
+        self.dlg.btn_pan.setChecked(True)
+        
+    def show_orient_dlg(self):
+        
+        self.dlg.btn_pan.setChecked(False)
         
         layers = self.iface.mapCanvas().layers()
         for lyr in layers:
             if lyr.type() == QgsMapLayerType.RasterLayer:
-                self.orient_tool_dlg.combo_raster_lyrs.addItem(lyr.name(), lyr.id())
+                self.orient_dlg.combo_raster_lyrs.addItem(lyr.name(), lyr.id())
 
         gcps_dict = {}
         
@@ -464,7 +482,7 @@ class MonoPlot:
             
             curr_gid = feat_dict["gid"]
             if curr_gid not in gcps_dict.keys():
-                gcps_dict[curr_gid] = {"x":None, "y":None, "X":None, "Y":None, "Z":None, "active":None}
+                gcps_dict[curr_gid] = {"x":None, "y":None, "X":None, "Y":None, "H":None, "active":None}
             
             gcps_dict[curr_gid]["x"] = feat_dict["x"]
             gcps_dict[curr_gid]["y"] = feat_dict["y"]
@@ -475,7 +493,7 @@ class MonoPlot:
             
             curr_gid = feat_dict["gid"]
             if curr_gid not in gcps_dict.keys():
-                gcps_dict[curr_gid] = {"x":None, "y":None, "X":None, "Y":None, "Z":None, "active":None}
+                gcps_dict[curr_gid] = {"x":None, "y":None, "X":None, "Y":None, "H":None, "active":None}
             
             gcps_dict[curr_gid]["X"] = feat_dict["X"]
             gcps_dict[curr_gid]["Y"] = feat_dict["Y"]
@@ -483,8 +501,8 @@ class MonoPlot:
         
         gcps_dict = OrderedDict(sorted(gcps_dict.items()))
         for ix, (gid,vals) in enumerate(gcps_dict.items()):
-            self.orient_tool_dlg.table_gcps.insertRow(ix)
-            self.orient_tool_dlg.table_gcps.setRowHeight(ix, 20)
+            self.orient_dlg.table_gcps.insertRow(ix)
+            self.orient_dlg.table_gcps.setRowHeight(ix, 20)
 
             chkBoxItem = QTableWidgetItem()
             chkBoxItem.setFlags(Qt.ItemIsUserCheckable | Qt.ItemIsEnabled)
@@ -494,16 +512,16 @@ class MonoPlot:
             else:
                 chkBoxItem.setCheckState(Qt.Unchecked)   
                     
-            self.orient_tool_dlg.table_gcps.setItem(ix,0,chkBoxItem)
+            self.orient_dlg.table_gcps.setItem(ix,0,chkBoxItem)
             
-            self.orient_tool_dlg.table_gcps.setItem(ix , 1, QTableWidgetItem(gid))
-            self.orient_tool_dlg.table_gcps.setItem(ix , 2, QTableWidgetItem("%.1f" % vals["X"]))
-            self.orient_tool_dlg.table_gcps.setItem(ix , 3, QTableWidgetItem("%.1f" % vals["Y"]))
-            self.orient_tool_dlg.table_gcps.setItem(ix , 4, QTableWidgetItem("%.1f" % vals["H"]))
-            self.orient_tool_dlg.table_gcps.setItem(ix , 5, QTableWidgetItem("%.1f" % vals["x"]))
-            self.orient_tool_dlg.table_gcps.setItem(ix , 6, QTableWidgetItem("%.1f" % vals["y"]))
+            self.orient_dlg.table_gcps.setItem(ix , 1, QTableWidgetItem(gid))
+            self.orient_dlg.table_gcps.setItem(ix , 2, QTableWidgetItem("%.1f" % vals["X"] if vals["X"] is not None else ""))
+            self.orient_dlg.table_gcps.setItem(ix , 3, QTableWidgetItem("%.1f" % vals["Y"] if vals["Y"] is not None else ""))
+            self.orient_dlg.table_gcps.setItem(ix , 4, QTableWidgetItem("%.1f" % vals["H"] if vals["H"] is not None else ""))
+            self.orient_dlg.table_gcps.setItem(ix , 5, QTableWidgetItem("%.1f" % vals["x"] if vals["x"] is not None else ""))
+            self.orient_dlg.table_gcps.setItem(ix , 6, QTableWidgetItem("%.1f" % vals["y"] if vals["y"] is not None else ""))
             
-        self.orient_tool_widget.show()
+        self.orient_dlg.show()
         self.img_canvas.setMapTool(self.img_picker_tool)
         self.map_canvas.setMapTool(self.map_picker_tool)
         
@@ -511,8 +529,8 @@ class MonoPlot:
         self.map_picker_tool.set_camera(self.active_camera)
     
     def change_raster_src(self, ix):
-        sel_lyr_id = self.orient_tool_dlg.combo_raster_lyrs.itemData(ix)
-        sel_lyr_name = self.orient_tool_dlg.combo_raster_lyrs.itemText(ix)
+        sel_lyr_id = self.orient_dlg.combo_raster_lyrs.itemData(ix)
+        sel_lyr_name = self.orient_dlg.combo_raster_lyrs.itemText(ix)
         
         sel_lyr =  QgsProject.instance().mapLayer(sel_lyr_id)
         self.map_picker_tool.set_dhm_src(sel_lyr)
@@ -1130,6 +1148,18 @@ class MonoPlot:
         self.map_gcps_lyr = map_gcps_lyr
         self.map_gcps_lyr.loadNamedStyle(map_gcps_qml_path)       
 
+        gcps_h_src = []
+        
+        for feat in self.map_gcps_lyr.getFeatures():
+            feat_dict = json.loads(QgsJsonUtils.exportAttributes(feat))
+            gcps_h_src.append(feat_dict["H_src"])
+        gcps_h_src = list(set(gcps_h_src))
+        
+        for src in gcps_h_src:
+            if os.path.isfile(src):
+                src_lyr = QgsRasterLayer(src, os.path.basename(src).rsplit(".")[0])
+                QgsProject.instance().addMapLayer(src_lyr)
+        
         gpkg_img_gcps_lyr = path + "|layername=gcps_img"
         img_gcps_lyr = QgsVectorLayer(gpkg_img_gcps_lyr, "gcps_img", "ogr")
         self.img_gcps_lyr = img_gcps_lyr
@@ -1153,6 +1183,11 @@ class MonoPlot:
         monoGroup.addLayer(self.map_gcps_lyr)
         monoGroup.addLayer(self.img_gcps_lyr)
 
+        expression = "iid = 'sth_not_existing'"
+        self.img_line_lyr.setSubsetString(expression) #show only those lines which correspond to the currently selected image
+        self.img_gcps_lyr.setSubsetString(expression)
+        self.map_gcps_lyr.setSubsetString(expression)
+        
         #define layers which should be shown/considered in which canvas
         self.map_canvas.setLayers([self.map_line_lyr, self.cam_lyr, self.cam_hfov_lyr, self.reg_lyr, self.map_gcps_lyr])
         self.map_canvas.setExtent(self.reg_lyr.extent())
@@ -1599,22 +1634,22 @@ class MonoPlot:
         self.img_tree.expandItem(l1)
            
     def clear_meta_fiels(self):
-        self.dlg.line_cam_e.clear()
-        self.dlg.line_cam_n.clear()
+        self.dlg.line_cam_x.clear()
+        self.dlg.line_cam_y.clear()
         self.dlg.line_cam_h.clear()
         self.dlg.line_cam_dh.clear()
-        self.dlg.line_cam_a.clear()
-        self.dlg.line_cam_z.clear()
-        self.dlg.line_cam_k.clear()
+        self.dlg.line_cam_alpha.clear()
+        self.dlg.line_cam_zeta.clear()
+        self.dlg.line_cam_kappa.clear()
         
     def fill_meta_fields(self, camera):
-        self.dlg.line_cam_e.setText("%.2f" % (camera.prc[0]))
-        self.dlg.line_cam_n.setText("%.2f" % (camera.prc[1]))
+        self.dlg.line_cam_x.setText("%.2f" % (camera.prc[0]))
+        self.dlg.line_cam_y.setText("%.2f" % (camera.prc[1]))
         self.dlg.line_cam_h.setText("%.2f" % (camera.prc[2]))
         self.dlg.line_cam_dh.setText("-1")
-        self.dlg.line_cam_a.setText("%.3f" % (camera.euler[0]*180/np.pi))
-        self.dlg.line_cam_z.setText("%.3f" % (camera.euler[1]*180/np.pi))
-        self.dlg.line_cam_k.setText("%.3f" % (camera.euler[2]*180/np.pi))
+        self.dlg.line_cam_alpha.setText("%.3f" % (camera.euler[0]*180/np.pi))
+        self.dlg.line_cam_zeta.setText("%.3f" % (camera.euler[1]*180/np.pi))
+        self.dlg.line_cam_kappa.setText("%.3f" % (camera.euler[2]*180/np.pi))
     
     def clear_highlighted_features(self):
         if self.cam_h is not None:

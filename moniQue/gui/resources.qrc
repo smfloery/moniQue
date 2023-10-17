@@ -1,0 +1,19 @@
+<RCC>
+  <qresource prefix="newPrefix">
+    <file>../gfx/icon/icon.png</file>
+    <file>../gfx/icon/mActionAddImage.png</file>
+    <file>../gfx/icon/mActionAddPolyline.png</file>
+    <file>../gfx/icon/mActionCapturePoint.png</file>
+    <file>../gfx/icon/mActionDeleteSelected.png</file>
+    <file>../gfx/icon/mActionDeleteSelectedFeatures.png</file>
+    <file>../gfx/icon/mActionFileNew.png</file>
+    <file>../gfx/icon/mActionFileOpen.png</file>
+    <file>../gfx/icon/mActionFileSave.png</file>
+    <file>../gfx/icon/mActionFileSaveAs.png</file>
+    <file>../gfx/icon/mActionPan.png</file>
+    <file>../gfx/icon/mActionSelectRectangle.png</file>
+    <file>../gfx/icon/mActionToggleEditing.png</file>
+    <file>../gfx/icon/mActionVertexToolActiveLayer.png</file>
+    <file>../gfx/icon/mActionZoomFullExtent.png</file>
+  </qresource>
+</RCC>

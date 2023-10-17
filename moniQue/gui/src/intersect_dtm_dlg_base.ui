@@ -47,13 +47,13 @@
     <set>QDialogButtonBox::Cancel|QDialogButtonBox::Save</set>
    </property>
   </widget>
-  <widget class="QWidget" name="">
+  <widget class="QWidget" name="layoutWidget">
    <property name="geometry">
     <rect>
      <x>10</x>
      <y>10</y>
      <width>481</width>
-     <height>101</height>
+     <height>105</height>
     </rect>
    </property>
    <layout class="QVBoxLayout" name="verticalLayout">

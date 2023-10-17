@@ -9,14 +9,14 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>627</width>
-    <height>767</height>
+    <width>600</width>
+    <height>600</height>
    </rect>
   </property>
   <property name="minimumSize">
    <size>
-    <width>627</width>
-    <height>0</height>
+    <width>600</width>
+    <height>600</height>
    </size>
   </property>
   <property name="contextMenuPolicy">
@@ -26,8 +26,8 @@
    <string>SEHAG Monoplot</string>
   </property>
   <property name="windowIcon">
-   <iconset resource="resources.qrc">
-    <normaloff>:/plugins/mono_plot/icon.png</normaloff>:/plugins/mono_plot/icon.png</iconset>
+   <iconset>
+    <normaloff>:/plugins/monoplot/gfx/icon/icon.png</normaloff>:/plugins/monoplot/gfx/icon/icon.png</iconset>
   </property>
   <layout class="QVBoxLayout" name="verticalLayout">
    <property name="spacing">
@@ -65,8 +65,8 @@
         <string/>
        </property>
        <property name="icon">
-        <iconset resource="resources.qrc">
-         <normaloff>:/plugins/mono_plot/gfx/icon/mActionFileNew.png</normaloff>:/plugins/mono_plot/gfx/icon/mActionFileNew.png</iconset>
+        <iconset resource="../resources.qrc">
+         <normaloff>:/newPrefix/gfx/icon/mActionFileNew.png</normaloff>:/newPrefix/gfx/icon/mActionFileNew.png</iconset>
        </property>
       </widget>
      </item>
@@ -85,42 +85,34 @@
         <string/>
        </property>
        <property name="icon">
-        <iconset resource="resources.qrc">
-         <normaloff>:/plugins/mono_plot/gfx/icon/mActionFileOpen.png</normaloff>:/plugins/mono_plot/gfx/icon/mActionFileOpen.png</iconset>
+        <iconset resource="../resources.qrc">
+         <normaloff>:/newPrefix/gfx/icon/mActionFileOpen.png</normaloff>:/newPrefix/gfx/icon/mActionFileOpen.png</iconset>
        </property>
       </widget>
      </item>
      <item>
-      <widget class="QPushButton" name="btn_save">
+      <widget class="QPushButton" name="btn_add_images">
        <property name="enabled">
         <bool>false</bool>
        </property>
-       <property name="toolTip">
-        <string>Save project</string>
+       <property name="maximumSize">
+        <size>
+         <width>28</width>
+         <height>24</height>
+        </size>
        </property>
        <property name="text">
         <string/>
        </property>
        <property name="icon">
-        <iconset resource="resources.qrc">
-         <normaloff>:/plugins/mono_plot/gfx/icon/mActionFileSave.png</normaloff>:/plugins/mono_plot/gfx/icon/mActionFileSave.png</iconset>
+        <iconset resource="../resources.qrc">
+         <normaloff>:/newPrefix/gfx/icon/mActionAddImage.png</normaloff>:/newPrefix/gfx/icon/mActionAddImage.png</iconset>
        </property>
-      </widget>
-     </item>
-     <item>
-      <widget class="QPushButton" name="btn_save_as">
-       <property name="enabled">
-        <bool>false</bool>
-       </property>
-       <property name="toolTip">
-        <string>Save project as</string>
-       </property>
-       <property name="text">
-        <string/>
-       </property>
-       <property name="icon">
-        <iconset resource="resources.qrc">
-         <normaloff>:/plugins/mono_plot/gfx/icon/mActionFileSaveAs.png</normaloff>:/plugins/mono_plot/gfx/icon/mActionFileSaveAs.png</iconset>
+       <property name="iconSize">
+        <size>
+         <width>20</width>
+         <height>20</height>
+        </size>
        </property>
       </widget>
      </item>
@@ -149,8 +141,8 @@
         <string/>
        </property>
        <property name="icon">
-        <iconset resource="resources.qrc">
-         <normaloff>:/plugins/mono_plot/gfx/icon/mActionPan.png</normaloff>:/plugins/mono_plot/gfx/icon/mActionPan.png</iconset>
+        <iconset resource="../resources.qrc">
+         <normaloff>:/newPrefix/gfx/icon/mActionPan.png</normaloff>:/newPrefix/gfx/icon/mActionPan.png</iconset>
        </property>
        <property name="checkable">
         <bool>true</bool>
@@ -169,8 +161,8 @@
         <string/>
        </property>
        <property name="icon">
-        <iconset resource="resources.qrc">
-         <normaloff>:/plugins/mono_plot/gfx/icon/mActionZoomFullExtent.png</normaloff>:/plugins/mono_plot/gfx/icon/mActionZoomFullExtent.png</iconset>
+        <iconset resource="../resources.qrc">
+         <normaloff>:/newPrefix/gfx/icon/mActionZoomFullExtent.png</normaloff>:/newPrefix/gfx/icon/mActionZoomFullExtent.png</iconset>
        </property>
       </widget>
      </item>
@@ -181,6 +173,45 @@
        </property>
        <property name="sizeType">
         <enum>QSizePolicy::Fixed</enum>
+       </property>
+       <property name="sizeHint" stdset="0">
+        <size>
+         <width>20</width>
+         <height>20</height>
+        </size>
+       </property>
+      </spacer>
+     </item>
+     <item>
+      <widget class="QPushButton" name="btn_oritool">
+       <property name="enabled">
+        <bool>false</bool>
+       </property>
+       <property name="maximumSize">
+        <size>
+         <width>28</width>
+         <height>24</height>
+        </size>
+       </property>
+       <property name="text">
+        <string/>
+       </property>
+       <property name="icon">
+        <iconset resource="../resources.qrc">
+         <normaloff>:/newPrefix/gfx/icon/mActionCapturePoint.png</normaloff>:/newPrefix/gfx/icon/mActionCapturePoint.png</iconset>
+       </property>
+       <property name="checkable">
+        <bool>true</bool>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <spacer name="horizontalSpacer">
+       <property name="orientation">
+        <enum>Qt::Horizontal</enum>
+       </property>
+       <property name="sizeType">
+        <enum>QSizePolicy::Maximum</enum>
        </property>
        <property name="sizeHint" stdset="0">
         <size>
@@ -202,8 +233,8 @@
         <string/>
        </property>
        <property name="icon">
-        <iconset resource="resources.qrc">
-         <normaloff>:/plugins/mono_plot/gfx/icon/mActionAddPolyline.png</normaloff>:/plugins/mono_plot/gfx/icon/mActionAddPolyline.png</iconset>
+        <iconset resource="../resources.qrc">
+         <normaloff>:/newPrefix/gfx/icon/mActionAddPolyline.png</normaloff>:/newPrefix/gfx/icon/mActionAddPolyline.png</iconset>
        </property>
        <property name="checkable">
         <bool>true</bool>
@@ -238,8 +269,8 @@
         <string/>
        </property>
        <property name="icon">
-        <iconset resource="resources.qrc">
-         <normaloff>:/plugins/mono_plot/gfx/icon/mActionSelectRectangle.png</normaloff>:/plugins/mono_plot/gfx/icon/mActionSelectRectangle.png</iconset>
+        <iconset resource="../resources.qrc">
+         <normaloff>:/newPrefix/gfx/icon/mActionSelectRectangle.png</normaloff>:/newPrefix/gfx/icon/mActionSelectRectangle.png</iconset>
        </property>
        <property name="checkable">
         <bool>true</bool>
@@ -255,25 +286,11 @@
         <string/>
        </property>
        <property name="icon">
-        <iconset resource="resources.qrc">
-         <normaloff>:/plugins/mono_plot/gfx/icon/mActionVertexToolActiveLayer.png</normaloff>:/plugins/mono_plot/gfx/icon/mActionVertexToolActiveLayer.png</iconset>
+        <iconset resource="../resources.qrc">
+         <normaloff>:/newPrefix/gfx/icon/mActionVertexToolActiveLayer.png</normaloff>:/newPrefix/gfx/icon/mActionVertexToolActiveLayer.png</iconset>
        </property>
        <property name="checkable">
         <bool>true</bool>
-       </property>
-      </widget>
-     </item>
-     <item>
-      <widget class="QPushButton" name="btn_delete">
-       <property name="enabled">
-        <bool>false</bool>
-       </property>
-       <property name="text">
-        <string/>
-       </property>
-       <property name="icon">
-        <iconset resource="resources.qrc">
-         <normaloff>:/plugins/mono_plot/gfx/icon/mActionDeleteSelectedFeatures.png</normaloff>:/plugins/mono_plot/gfx/icon/mActionDeleteSelectedFeatures.png</iconset>
        </property>
       </widget>
      </item>
@@ -300,25 +317,12 @@
        </property>
        <property name="sizeHint" stdset="0">
         <size>
-         <width>40</width>
+         <width>30</width>
          <height>20</height>
         </size>
        </property>
       </spacer>
      </item>
-    </layout>
-   </item>
-   <item>
-    <layout class="QHBoxLayout" name="horizontalLayout" stretch="0,0,0,0">
-     <property name="spacing">
-      <number>2</number>
-     </property>
-     <property name="sizeConstraint">
-      <enum>QLayout::SetFixedSize</enum>
-     </property>
-     <property name="rightMargin">
-      <number>221</number>
-     </property>
      <item>
       <widget class="QLineEdit" name="line_id">
        <property name="enabled">
@@ -329,6 +333,18 @@
          <horstretch>0</horstretch>
          <verstretch>0</verstretch>
         </sizepolicy>
+       </property>
+       <property name="minimumSize">
+        <size>
+         <width>120</width>
+         <height>0</height>
+        </size>
+       </property>
+       <property name="maximumSize">
+        <size>
+         <width>120</width>
+         <height>16777215</height>
+        </size>
        </property>
        <property name="text">
         <string/>
@@ -357,38 +373,35 @@
        </property>
       </widget>
      </item>
-     <item>
-      <spacer name="verticalSpacer">
-       <property name="orientation">
-        <enum>Qt::Vertical</enum>
-       </property>
-       <property name="sizeType">
-        <enum>QSizePolicy::Fixed</enum>
-       </property>
-       <property name="sizeHint" stdset="0">
-        <size>
-         <width>20</width>
-         <height>20</height>
-        </size>
-       </property>
-      </spacer>
-     </item>
-     <item>
-      <spacer name="horizontalSpacer">
-       <property name="orientation">
-        <enum>Qt::Horizontal</enum>
-       </property>
-       <property name="sizeType">
-        <enum>QSizePolicy::MinimumExpanding</enum>
-       </property>
-       <property name="sizeHint" stdset="0">
-        <size>
-         <width>0</width>
-         <height>0</height>
-        </size>
-       </property>
-      </spacer>
-     </item>
+    </layout>
+   </item>
+   <item>
+    <spacer name="verticalSpacer">
+     <property name="orientation">
+      <enum>Qt::Vertical</enum>
+     </property>
+     <property name="sizeType">
+      <enum>QSizePolicy::Fixed</enum>
+     </property>
+     <property name="sizeHint" stdset="0">
+      <size>
+       <width>20</width>
+       <height>5</height>
+      </size>
+     </property>
+    </spacer>
+   </item>
+   <item>
+    <layout class="QHBoxLayout" name="horizontalLayout">
+     <property name="spacing">
+      <number>2</number>
+     </property>
+     <property name="sizeConstraint">
+      <enum>QLayout::SetFixedSize</enum>
+     </property>
+     <property name="rightMargin">
+      <number>221</number>
+     </property>
     </layout>
    </item>
    <item>
@@ -486,7 +499,7 @@ QTreeWidget::item:!has-children{
    <item>
     <layout class="QHBoxLayout" name="horizontalLayout_4">
      <item>
-      <widget class="QLineEdit" name="line_cam_von">
+      <widget class="QLineEdit" name="line_cam_x">
        <property name="sizePolicy">
         <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
          <horstretch>0</horstretch>
@@ -501,55 +514,36 @@ QTreeWidget::item:!has-children{
        </property>
        <property name="maximumSize">
         <size>
-         <width>100</width>
+         <width>80</width>
          <height>16777215</height>
         </size>
        </property>
+       <property name="focusPolicy">
+        <enum>Qt::NoFocus</enum>
+       </property>
+       <property name="contextMenuPolicy">
+        <enum>Qt::NoContextMenu</enum>
+       </property>
        <property name="toolTip">
-        <string>Zeitraum von</string>
+        <string>Easting</string>
+       </property>
+       <property name="styleSheet">
+        <string notr="true">background-color: rgb(236, 236, 236);</string>
        </property>
        <property name="text">
         <string/>
+       </property>
+       <property name="frame">
+        <bool>true</bool>
+       </property>
+       <property name="dragEnabled">
+        <bool>false</bool>
        </property>
        <property name="readOnly">
         <bool>true</bool>
        </property>
        <property name="placeholderText">
-        <string>Von</string>
-       </property>
-      </widget>
-     </item>
-     <item>
-      <widget class="QLineEdit" name="line_cam_bis">
-       <property name="sizePolicy">
-        <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
-         <horstretch>0</horstretch>
-         <verstretch>0</verstretch>
-        </sizepolicy>
-       </property>
-       <property name="minimumSize">
-        <size>
-         <width>75</width>
-         <height>0</height>
-        </size>
-       </property>
-       <property name="maximumSize">
-        <size>
-         <width>100</width>
-         <height>16777215</height>
-        </size>
-       </property>
-       <property name="toolTip">
-        <string>Zeitraum bis</string>
-       </property>
-       <property name="text">
-        <string/>
-       </property>
-       <property name="readOnly">
-        <bool>true</bool>
-       </property>
-       <property name="placeholderText">
-        <string>Bis</string>
+        <string>X [m]</string>
        </property>
        <property name="clearButtonEnabled">
         <bool>false</bool>
@@ -557,7 +551,7 @@ QTreeWidget::item:!has-children{
       </widget>
      </item>
      <item>
-      <widget class="QLineEdit" name="line_cam_name">
+      <widget class="QLineEdit" name="line_cam_y">
        <property name="sizePolicy">
         <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
          <horstretch>0</horstretch>
@@ -566,18 +560,27 @@ QTreeWidget::item:!has-children{
        </property>
        <property name="minimumSize">
         <size>
-         <width>150</width>
+         <width>75</width>
          <height>0</height>
         </size>
        </property>
        <property name="maximumSize">
         <size>
-         <width>200</width>
+         <width>80</width>
          <height>16777215</height>
         </size>
        </property>
+       <property name="focusPolicy">
+        <enum>Qt::NoFocus</enum>
+       </property>
+       <property name="contextMenuPolicy">
+        <enum>Qt::NoContextMenu</enum>
+       </property>
        <property name="toolTip">
-        <string>Bildname</string>
+        <string>Northing</string>
+       </property>
+       <property name="styleSheet">
+        <string notr="true">background-color: rgb(236, 236, 236);</string>
        </property>
        <property name="text">
         <string/>
@@ -586,37 +589,15 @@ QTreeWidget::item:!has-children{
         <bool>true</bool>
        </property>
        <property name="placeholderText">
-        <string>Name</string>
+        <string>Y [m]</string>
+       </property>
+       <property name="clearButtonEnabled">
+        <bool>false</bool>
        </property>
       </widget>
      </item>
      <item>
-      <widget class="QLineEdit" name="line_cam_archiv">
-       <property name="minimumSize">
-        <size>
-         <width>150</width>
-         <height>0</height>
-        </size>
-       </property>
-       <property name="maximumSize">
-        <size>
-         <width>200</width>
-         <height>16777215</height>
-        </size>
-       </property>
-       <property name="toolTip">
-        <string>Archiv</string>
-       </property>
-       <property name="readOnly">
-        <bool>true</bool>
-       </property>
-       <property name="placeholderText">
-        <string>Archiv</string>
-       </property>
-      </widget>
-     </item>
-     <item>
-      <widget class="QLineEdit" name="line_cam_traeger">
+      <widget class="QLineEdit" name="line_cam_h">
        <property name="sizePolicy">
         <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
          <horstretch>0</horstretch>
@@ -625,35 +606,198 @@ QTreeWidget::item:!has-children{
        </property>
        <property name="minimumSize">
         <size>
-         <width>125</width>
+         <width>50</width>
          <height>0</height>
         </size>
        </property>
        <property name="maximumSize">
         <size>
-         <width>150</width>
+         <width>80</width>
          <height>16777215</height>
         </size>
        </property>
+       <property name="focusPolicy">
+        <enum>Qt::NoFocus</enum>
+       </property>
+       <property name="contextMenuPolicy">
+        <enum>Qt::NoContextMenu</enum>
+       </property>
        <property name="toolTip">
-        <string>Bildträger</string>
+        <string>Height</string>
+       </property>
+       <property name="styleSheet">
+        <string notr="true">background-color: rgb(236, 236, 236);</string>
+       </property>
+       <property name="text">
+        <string/>
        </property>
        <property name="readOnly">
         <bool>true</bool>
        </property>
        <property name="placeholderText">
-        <string>Bildträger</string>
+        <string>H [m]</string>
        </property>
       </widget>
      </item>
      <item>
-      <spacer name="horizontalSpacer_5">
+      <widget class="QLineEdit" name="line_cam_dh">
+       <property name="minimumSize">
+        <size>
+         <width>50</width>
+         <height>0</height>
+        </size>
+       </property>
+       <property name="maximumSize">
+        <size>
+         <width>80</width>
+         <height>16777215</height>
+        </size>
+       </property>
+       <property name="focusPolicy">
+        <enum>Qt::NoFocus</enum>
+       </property>
+       <property name="contextMenuPolicy">
+        <enum>Qt::NoContextMenu</enum>
+       </property>
+       <property name="toolTip">
+        <string>Height above ground</string>
+       </property>
+       <property name="styleSheet">
+        <string notr="true">background-color: rgb(236, 236, 236);</string>
+       </property>
+       <property name="text">
+        <string/>
+       </property>
+       <property name="readOnly">
+        <bool>true</bool>
+       </property>
+       <property name="placeholderText">
+        <string>dH [m]</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QLineEdit" name="line_cam_alpha">
+       <property name="sizePolicy">
+        <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
+         <horstretch>0</horstretch>
+         <verstretch>0</verstretch>
+        </sizepolicy>
+       </property>
+       <property name="minimumSize">
+        <size>
+         <width>50</width>
+         <height>0</height>
+        </size>
+       </property>
+       <property name="maximumSize">
+        <size>
+         <width>70</width>
+         <height>16777215</height>
+        </size>
+       </property>
+       <property name="focusPolicy">
+        <enum>Qt::NoFocus</enum>
+       </property>
+       <property name="contextMenuPolicy">
+        <enum>Qt::NoContextMenu</enum>
+       </property>
+       <property name="toolTip">
+        <string>Alpha</string>
+       </property>
+       <property name="styleSheet">
+        <string notr="true">background-color: rgb(236, 236, 236);</string>
+       </property>
+       <property name="text">
+        <string/>
+       </property>
+       <property name="readOnly">
+        <bool>true</bool>
+       </property>
+       <property name="placeholderText">
+        <string>Alpha [°]</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QLineEdit" name="line_cam_zeta">
+       <property name="minimumSize">
+        <size>
+         <width>50</width>
+         <height>0</height>
+        </size>
+       </property>
+       <property name="maximumSize">
+        <size>
+         <width>70</width>
+         <height>16777215</height>
+        </size>
+       </property>
+       <property name="focusPolicy">
+        <enum>Qt::NoFocus</enum>
+       </property>
+       <property name="contextMenuPolicy">
+        <enum>Qt::NoContextMenu</enum>
+       </property>
+       <property name="toolTip">
+        <string>Zeta</string>
+       </property>
+       <property name="styleSheet">
+        <string notr="true">background-color: rgb(236, 236, 236);</string>
+       </property>
+       <property name="text">
+        <string/>
+       </property>
+       <property name="placeholderText">
+        <string>Zeta [°]</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QLineEdit" name="line_cam_kappa">
+       <property name="minimumSize">
+        <size>
+         <width>50</width>
+         <height>0</height>
+        </size>
+       </property>
+       <property name="maximumSize">
+        <size>
+         <width>70</width>
+         <height>50</height>
+        </size>
+       </property>
+       <property name="focusPolicy">
+        <enum>Qt::NoFocus</enum>
+       </property>
+       <property name="contextMenuPolicy">
+        <enum>Qt::NoContextMenu</enum>
+       </property>
+       <property name="toolTip">
+        <string>Kappa</string>
+       </property>
+       <property name="styleSheet">
+        <string notr="true">background-color: rgb(236, 236, 236);</string>
+       </property>
+       <property name="text">
+        <string/>
+       </property>
+       <property name="placeholderText">
+        <string>Kappa [°]</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <spacer name="horizontalSpacer_9">
        <property name="orientation">
         <enum>Qt::Horizontal</enum>
        </property>
+       <property name="sizeType">
+        <enum>QSizePolicy::Expanding</enum>
+       </property>
        <property name="sizeHint" stdset="0">
         <size>
-         <width>40</width>
+         <width>13</width>
          <height>20</height>
         </size>
        </property>
@@ -672,7 +816,7 @@ QTreeWidget::item:!has-children{
   </customwidget>
  </customwidgets>
  <resources>
-  <include location="resources.qrc"/>
+  <include location="../resources.qrc"/>
  </resources>
  <connections/>
 </ui>

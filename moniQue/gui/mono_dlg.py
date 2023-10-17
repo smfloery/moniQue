@@ -26,8 +26,7 @@ import os
 
 from PyQt5 import uic
 from PyQt5 import QtWidgets
-from .mono_plot_dialog_base import Ui_MonoPlotDialogBase
-
+from .src.mono_dlg_base import Ui_MonoPlotDialogBase
 
 #as we create new ui.py file, these lines need to be commented
 # https://gis-ops.com/qgis-3-plugin-tutorial-plugin-development-explained-part-2/
@@ -35,10 +34,11 @@ from .mono_plot_dialog_base import Ui_MonoPlotDialogBase
 #     os.path.dirname(__file__), 'mono_plot_dialog_base.ui'))
 
 
-class MonoPlotDialog(QtWidgets.QDialog, Ui_MonoPlotDialogBase):
+class MonoDialog(QtWidgets.QDialog, Ui_MonoPlotDialogBase):
+    
     def __init__(self, parent=None):
         """Constructor."""
-        super(MonoPlotDialog, self).__init__(parent)
+        super(MonoDialog, self).__init__(parent)
         # Set up the user interface from Designer.
         # After setupUI you can access any designer object by doing
         # self.<objectname>, and you can use autoconnect slots - see

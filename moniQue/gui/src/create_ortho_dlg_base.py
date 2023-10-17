@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Form implementation generated from reading ui file '.\gui\mono_plot_create_ortho_dialog.ui'
+# Form implementation generated from reading ui file '.\gui\src\create_ortho_dlg_base.ui'
 #
 # Created by: PyQt5 UI code generator 5.15.4
 #

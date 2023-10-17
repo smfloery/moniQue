@@ -29,8 +29,8 @@
    <property name="geometry">
     <rect>
      <x>5</x>
-     <y>40</y>
-     <width>541</width>
+     <y>60</y>
+     <width>551</width>
      <height>301</height>
     </rect>
    </property>
@@ -91,8 +91,8 @@
   <widget class="QGroupBox" name="groupBox">
    <property name="geometry">
     <rect>
-     <x>553</x>
-     <y>40</y>
+     <x>560</x>
+     <y>60</y>
      <width>190</width>
      <height>190</height>
     </rect>
@@ -121,13 +121,13 @@
    <property name="checkable">
     <bool>false</bool>
    </property>
-   <widget class="QWidget" name="">
+   <widget class="QWidget" name="layoutWidget">
     <property name="geometry">
      <rect>
       <x>10</x>
       <y>23</y>
       <width>176</width>
-      <height>161</height>
+      <height>164</height>
      </rect>
     </property>
     <layout class="QVBoxLayout" name="verticalLayout">
@@ -509,8 +509,8 @@
   <widget class="QGroupBox" name="groupBox_2">
    <property name="geometry">
     <rect>
-     <x>553</x>
-     <y>230</y>
+     <x>560</x>
+     <y>250</y>
      <width>190</width>
      <height>110</height>
     </rect>
@@ -533,7 +533,7 @@
    <property name="flat">
     <bool>true</bool>
    </property>
-   <widget class="QWidget" name="">
+   <widget class="QWidget" name="layoutWidget">
     <property name="geometry">
      <rect>
       <x>11</x>
@@ -736,7 +736,7 @@
    <property name="geometry">
     <rect>
      <x>5</x>
-     <y>10</y>
+     <y>30</y>
      <width>541</width>
      <height>22</height>
     </rect>
@@ -780,11 +780,11 @@
     </item>
    </layout>
   </widget>
-  <widget class="QWidget" name="">
+  <widget class="QWidget" name="layoutWidget">
    <property name="geometry">
     <rect>
-     <x>580</x>
-     <y>350</y>
+     <x>590</x>
+     <y>370</y>
      <width>158</width>
      <height>25</height>
     </rect>
@@ -805,6 +805,19 @@
      </widget>
     </item>
    </layout>
+  </widget>
+  <widget class="QPushButton" name="btn_initial_eor">
+   <property name="geometry">
+    <rect>
+     <x>4</x>
+     <y>4</y>
+     <width>75</width>
+     <height>23</height>
+    </rect>
+   </property>
+   <property name="text">
+    <string>Initial EOR</string>
+   </property>
   </widget>
  </widget>
  <resources/>

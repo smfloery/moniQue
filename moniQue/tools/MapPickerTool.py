@@ -29,41 +29,42 @@ class MapPickerTool(QgsMapTool):
 
             click_pos = self.toMapCoordinates(e.pos())            
             mx, my = float(click_pos.x()), float(click_pos.y())
+            if self.dhm_src is not None:
             
-            click_h = self.dhm_src.dataProvider().identify(QgsPointXY(mx, my), QgsRaster.IdentifyFormatValue).results()[1]
-            if click_h is not None:
-    
-                img_gids = [feat.attributes()[self.img_lyr_gix] for feat in self.img_lyr.getFeatures()]
-                map_gids = [feat.attributes()[self.map_lyr_gix] for feat in self.map_lyr.getFeatures()]
-                pot_gids = list(set(img_gids).difference(map_gids))
-                
-                self.meta_window.combo_gid.clear()
-                self.meta_window.combo_gid.addItems(pot_gids)
-                
-                self.meta_window.line_iid.setText(self.camera.iid)
-                self.meta_window.line_obj_x.setText(str(mx))
-                self.meta_window.line_obj_y.setText(str(my))
-                self.meta_window.line_obj_h.setText(str(click_h))
-                
-                result = self.meta_window.exec_() 
-                if result:
+                click_h = self.dhm_src.dataProvider().identify(QgsPointXY(mx, my), QgsRaster.IdentifyFormatValue).results()[1]
+                if click_h is not None:
+        
+                    img_gids = [feat.attributes()[self.img_lyr_gix] for feat in self.img_lyr.getFeatures()]
+                    map_gids = [feat.attributes()[self.map_lyr_gix] for feat in self.map_lyr.getFeatures()]
+                    pot_gids = list(set(img_gids).difference(map_gids))
                     
-                    feat = QgsFeature(self.map_lyr.fields())
-                    feat.setGeometry(QgsPoint(mx, my))
-                    feat["iid"] = self.camera.iid
-                    feat["gid"] = self.meta_window.combo_gid.currentText() 
-                    feat["X"] = mx
-                    feat["Y"] = my
-                    feat["H"] = click_h
-                    feat["desc"] = self.meta_window.line_desc.text() 
-                    feat["H_src"] = self.dhm_src.name()
+                    self.meta_window.combo_gid.clear()
+                    self.meta_window.combo_gid.addItems(pot_gids)
                     
-                    self.map_lyr.dataProvider().addFeatures([feat])
+                    self.meta_window.line_iid.setText(self.camera.iid)
+                    self.meta_window.line_obj_x.setText(str(mx))
+                    self.meta_window.line_obj_y.setText(str(my))
+                    self.meta_window.line_obj_h.setText(str(click_h))
                     
-                    self.map_lyr.commitChanges()
-                    self.map_lyr.triggerRepaint()
-                    self.map_lyr.reload()
-                    self.canvas.refresh()
+                    result = self.meta_window.exec_() 
+                    if result:
+                        
+                        feat = QgsFeature(self.map_lyr.fields())
+                        feat.setGeometry(QgsPoint(mx, my))
+                        feat["iid"] = self.camera.iid
+                        feat["gid"] = self.meta_window.combo_gid.currentText() 
+                        feat["X"] = mx
+                        feat["Y"] = my
+                        feat["H"] = click_h
+                        feat["desc"] = self.meta_window.line_desc.text() 
+                        feat["H_src"] = self.dhm_src.dataProvider().dataSourceUri()
+                        
+                        self.map_lyr.dataProvider().addFeatures([feat])
+                        
+                        self.map_lyr.commitChanges()
+                        self.map_lyr.triggerRepaint()
+                        self.map_lyr.reload()
+                        self.canvas.refresh()
                     
     def reset(self):
         pass
