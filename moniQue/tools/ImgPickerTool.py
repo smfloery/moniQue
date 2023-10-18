@@ -53,6 +53,7 @@ class ImgPickerTool(QgsMapTool):
                         feat["x"] = mx
                         feat["y"] = my
                         feat["desc"] = self.meta_window.line_desc.text() 
+                        feat["active"] = 1
                         
                         #img_feat.setAttributes([self.camera.id, self.camera.meta["von"], self.camera.meta["bis"], feat_attr["type"], feat_attr["comment"]])
                         self.img_lyr.dataProvider().addFeatures([feat])

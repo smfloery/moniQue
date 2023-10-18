@@ -161,9 +161,6 @@ class MonoPlot:
         self.img_picker_tool = ImgPickerTool(self.img_canvas, self.gcp_meta_window)
         self.map_picker_tool = MapPickerTool(self.map_canvas, self.gcp_meta_window)
         
-        self.init_ori_tool = InitOriTool(self.map_canvas)
-        
-        
         self.dlg.btn_extent.clicked.connect(self.set_extent)
         
         # self.dlg.btn_load_mono3d.clicked.connect(lambda: self.load_camera())
@@ -175,6 +172,7 @@ class MonoPlot:
         
         self.dlg.btn_oritool.clicked.connect(self.show_orient_dlg)
         
+                
         self.dlg.btn_pan.clicked.connect(self.activate_panning)
         self.dlg.btn_monotool.clicked.connect(self.activate_plotting)
         self.dlg.btn_select.clicked.connect(self.activate_select)
@@ -237,17 +235,22 @@ class MonoPlot:
         # self.orient_tool_dlg = orient_tool
         
         self.orient_dlg = OrientDialog()
+        self.init_ori_tool = InitOriTool(self.map_canvas, self.orient_dlg)
         
         self.orient_dlg.closed.connect(self.close_orient_dlg)
         self.orient_dlg.btn_initial_eor.clicked.connect(self.set_init_ori_tool)
+        self.orient_dlg.btn_calc_ori.clicked.connect(self.estimate_ori)
         self.orient_dlg.combo_raster_lyrs.currentIndexChanged.connect(self.change_raster_src)
-        self.orient_dlg.table_gcps.setColumnWidth(0, 5)
+        
+        self.orient_dlg.table_gcps.setColumnWidth(0, 0)
         # self.orient_tool_dlg.table_gcps.setColumnWidth(1, 75)
-        self.orient_dlg.table_gcps.setColumnWidth(2, 85)
-        self.orient_dlg.table_gcps.setColumnWidth(3, 85)
-        self.orient_dlg.table_gcps.setColumnWidth(4, 85)
-        self.orient_dlg.table_gcps.setColumnWidth(5, 85)
-        self.orient_dlg.table_gcps.setColumnWidth(6, 85)
+        self.orient_dlg.table_gcps.setColumnWidth(2, 75)
+        self.orient_dlg.table_gcps.setColumnWidth(3, 75)
+        self.orient_dlg.table_gcps.setColumnWidth(4, 75)
+        self.orient_dlg.table_gcps.setColumnWidth(5, 55)
+        self.orient_dlg.table_gcps.setColumnWidth(6, 55)
+        self.orient_dlg.table_gcps.setColumnWidth(7, 55)
+        self.orient_dlg.table_gcps.setColumnWidth(8, 55)
         header = self.orient_dlg.table_gcps.horizontalHeader()       
         header.setSectionResizeMode(1, QHeaderView.Stretch)
         # header.setSectionResizeMode(1, QHeaderView.ResizeToContents)
@@ -272,8 +275,25 @@ class MonoPlot:
         sel_lyr_id = self.orient_dlg.combo_raster_lyrs.currentData()
         sel_lyr =  QgsProject.instance().mapLayer(sel_lyr_id)
         self.init_ori_tool.set_dhm_src(sel_lyr)
-        
     
+    def estimate_ori(self):
+        #if any of the init values is empty float() throws an error;
+        #hence, with the try/except we also check if all values are set...
+        try:
+            init_cam_params = {"X":float(self.orient_dlg.line_X.text()),
+                               "Y":float(self.orient_dlg.line_Y.text()),
+                               "Z":float(self.orient_dlg.line_Z.text()),
+                               "alpha":float(self.orient_dlg.line_alpha.text()),
+                               "zeta":float(self.orient_dlg.line_zeta.text()),
+                               "kappa":float(self.orient_dlg.line_kappa.text()),
+                               "f":float(self.orient_dlg.line_f.text()),
+                               "x0":float(self.orient_dlg.line_x0.text()),
+                               "y0":float(self.orient_dlg.line_y0.text())}
+        except:
+            pass
+        
+        #TODO - get GCPS
+        
     def initGui(self):
         """Create the menu entries and toolbar icons inside the QGIS GUI."""
 
@@ -513,6 +533,7 @@ class MonoPlot:
             gcps_dict[curr_gid]["H"] = feat_dict["H"]
         
         gcps_dict = OrderedDict(sorted(gcps_dict.items()))
+        print(gcps_dict)
         for ix, (gid,vals) in enumerate(gcps_dict.items()):
             self.orient_dlg.table_gcps.insertRow(ix)
             self.orient_dlg.table_gcps.setRowHeight(ix, 20)
@@ -540,7 +561,8 @@ class MonoPlot:
         
         self.img_picker_tool.set_camera(self.active_camera)
         self.map_picker_tool.set_camera(self.active_camera)
-    
+        self.init_ori_tool.set_camera(self.active_camera)
+        
     def change_raster_src(self, ix):
         sel_lyr_id = self.orient_dlg.combo_raster_lyrs.itemData(ix)
         sel_lyr_name = self.orient_dlg.combo_raster_lyrs.itemText(ix)
@@ -1169,8 +1191,10 @@ class MonoPlot:
         
         for src in gcps_h_src:
             if os.path.isfile(src):
-                src_lyr = QgsRasterLayer(src, os.path.basename(src).rsplit(".")[0])
-                QgsProject.instance().addMapLayer(src_lyr)
+                src_name = os.path.basename(src).rsplit(".")[0]
+                if QgsProject.instance().mapLayersByName(src_name) == 0:
+                    src_lyr = QgsRasterLayer(src, src_name)
+                    QgsProject.instance().addMapLayer(src_lyr)
         
         gpkg_img_gcps_lyr = path + "|layername=gcps_img"
         img_gcps_lyr = QgsVectorLayer(gpkg_img_gcps_lyr, "gcps_img", "ogr")

@@ -2,11 +2,13 @@ from qgis.gui import QgsMapTool, QgsRubberBand
 from qgis.core import QgsPointXY, QgsFeature, QgsPoint, QgsGeometry, QgsRaster, QgsWkbTypes
 from qgis.PyQt.QtCore import Qt
 import json
+import math
 
 class InitOriTool(QgsMapTool):
     
-    def __init__(self, canvas):        
+    def __init__(self, canvas, dlg):        
         self.canvas = canvas
+        self.dlg = dlg
         self.is_drawing = False
         
         QgsMapTool.__init__(self, self.canvas)
@@ -52,7 +54,7 @@ class InitOriTool(QgsMapTool):
                         
                     self.rubberOri.show()
                     
-                    self.ori_pnts.append([mx, my, click_h])
+                    self.ori_pnts.append(QgsPoint(mx, my, click_h))
                     self.is_drawing = True
                     
                     if len(self.ori_pnts) == 1:
@@ -63,8 +65,27 @@ class InitOriTool(QgsMapTool):
                         self.store_ori()
     
     def store_ori(self):
-        print("Whoop")
-        print(self.ori_pnts)
+        
+        init_azi = self.ori_pnts[0].azimuth(self.ori_pnts[1])
+        init_f = math.sqrt(self.camera.w**2 + self.camera.h**2)
+        
+        self.dlg.line_X.setText("%.1f" % (self.ori_pnts[0].x()))
+        self.dlg.line_Y.setText("%.1f" % (self.ori_pnts[0].y()))
+        self.dlg.line_Z.setText("%.1f" % (self.ori_pnts[0].z()))
+        
+        self.dlg.line_alpha.setText("%.1f" % (init_azi))
+    
+        if self.camera.w > self.camera.h:
+            self.dlg.line_zeta.setText("%.1f" % (0))
+            self.dlg.line_kappa.setText("%.1f" % (90))
+        else:
+            self.dlg.line_zeta.setText("%.1f" % (90))
+            self.dlg.line_kappa.setText("%.1f" % (0))
+        
+        self.dlg.line_f.setText("%.1f" % (init_f))
+        self.dlg.line_x0.setText("%.1f" % (self.camera.w/2.))
+        self.dlg.line_y0.setText("-%.1f" % (self.camera.h/2.))
+        
         self.is_drawing = False
         self.rubberOri.reset()
         self.rubberPnt.reset(QgsWkbTypes.PointGeometry)

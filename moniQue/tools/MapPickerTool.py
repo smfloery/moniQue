@@ -58,7 +58,7 @@ class MapPickerTool(QgsMapTool):
                         feat["H"] = click_h
                         feat["desc"] = self.meta_window.line_desc.text() 
                         feat["H_src"] = self.dhm_src.dataProvider().dataSourceUri()
-                        
+                        feat["active"] = 1
                         self.map_lyr.dataProvider().addFeatures([feat])
                         
                         self.map_lyr.commitChanges()
