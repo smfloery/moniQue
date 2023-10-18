@@ -240,6 +240,8 @@ class MonoPlot:
         self.orient_dlg.closed.connect(self.close_orient_dlg)
         self.orient_dlg.btn_initial_eor.clicked.connect(self.set_init_ori_tool)
         self.orient_dlg.btn_calc_ori.clicked.connect(self.estimate_ori)
+        self.orient_dlg.btn_add_gcps.clicked.connect(self.set_gcp_tool)
+        
         self.orient_dlg.combo_raster_lyrs.currentIndexChanged.connect(self.change_raster_src)
         
         self.orient_dlg.table_gcps.setColumnWidth(0, 0)
@@ -292,7 +294,25 @@ class MonoPlot:
         except:
             pass
         
-        #TODO - get GCPS
+        nr_rows = self.orient_dlg.table_gcps.rowCount()
+        nr_cols = self.orient_dlg.table_gcps.columnCount()
+        
+        gcp_data = {}
+        
+        for rix in range(nr_rows):
+            
+            gcp_data[rix] = {}
+            
+            if self.orient_dlg.table_gcps.item(rix, 0).checkState() == Qt.Checked:
+                for cix in range(1, nr_cols):
+                    curr_label = self.orient_dlg.table_gcps.horizontalHeaderItem(cix).text()
+                    curr_value = self.orient_dlg.table_gcps.item(rix, cix).text()   
+                    
+                    gcp_data[rix][curr_label] = float(curr_value) if curr_value != "" else None
+        
+        if len(gcp_data.keys()) < 4:
+            pass
+        
         
     def initGui(self):
         """Create the menu entries and toolbar icons inside the QGIS GUI."""
@@ -501,7 +521,7 @@ class MonoPlot:
         
     def show_orient_dlg(self):
         
-        self.dlg.btn_pan.setChecked(False)
+        # self.dlg.btn_pan.setChecked(False)
         
         layers = self.iface.mapCanvas().layers()
         for lyr in layers:
@@ -515,10 +535,12 @@ class MonoPlot:
             
             curr_gid = feat_dict["gid"]
             if curr_gid not in gcps_dict.keys():
-                gcps_dict[curr_gid] = {"x":None, "y":None, "X":None, "Y":None, "H":None, "active":None}
+                gcps_dict[curr_gid] = {"x":None, "y":None, "dx":None, "dy":None, "X":None, "Y":None, "H":None, "active":None}
             
             gcps_dict[curr_gid]["x"] = feat_dict["x"]
             gcps_dict[curr_gid]["y"] = feat_dict["y"]
+            gcps_dict[curr_gid]["dx"] = feat_dict["dx"]
+            gcps_dict[curr_gid]["dy"] = feat_dict["dy"]
             gcps_dict[curr_gid]["active"] = feat_dict["active"]
             
         for feat in self.map_gcps_lyr.getFeatures():
@@ -526,14 +548,14 @@ class MonoPlot:
             
             curr_gid = feat_dict["gid"]
             if curr_gid not in gcps_dict.keys():
-                gcps_dict[curr_gid] = {"x":None, "y":None, "X":None, "Y":None, "H":None, "active":None}
+                gcps_dict[curr_gid] = {"x":None, "y":None, "dx":None, "dy":None, "X":None, "Y":None, "H":None, "active":None}
             
             gcps_dict[curr_gid]["X"] = feat_dict["X"]
             gcps_dict[curr_gid]["Y"] = feat_dict["Y"]
             gcps_dict[curr_gid]["H"] = feat_dict["H"]
         
         gcps_dict = OrderedDict(sorted(gcps_dict.items()))
-        print(gcps_dict)
+        
         for ix, (gid,vals) in enumerate(gcps_dict.items()):
             self.orient_dlg.table_gcps.insertRow(ix)
             self.orient_dlg.table_gcps.setRowHeight(ix, 20)
@@ -554,15 +576,28 @@ class MonoPlot:
             self.orient_dlg.table_gcps.setItem(ix , 4, QTableWidgetItem("%.1f" % vals["H"] if vals["H"] is not None else ""))
             self.orient_dlg.table_gcps.setItem(ix , 5, QTableWidgetItem("%.1f" % vals["x"] if vals["x"] is not None else ""))
             self.orient_dlg.table_gcps.setItem(ix , 6, QTableWidgetItem("%.1f" % vals["y"] if vals["y"] is not None else ""))
+            self.orient_dlg.table_gcps.setItem(ix , 7, QTableWidgetItem("%.1f" % vals["dx"] if vals["dx"] is not None else ""))
+            self.orient_dlg.table_gcps.setItem(ix , 8, QTableWidgetItem("%.1f" % vals["dy"] if vals["dy"] is not None else ""))
             
         self.orient_dlg.show()
-        self.img_canvas.setMapTool(self.img_picker_tool)
-        self.map_canvas.setMapTool(self.map_picker_tool)
         
+        # self.img_canvas.setMapTool(self.img_picker_tool)
+        # self.map_canvas.setMapTool(self.map_picker_tool)
         self.img_picker_tool.set_camera(self.active_camera)
         self.map_picker_tool.set_camera(self.active_camera)
         self.init_ori_tool.set_camera(self.active_camera)
-        
+    
+    def set_gcp_tool(self):
+        if self.orient_dlg.btn_add_gcps.isChecked():
+            self.img_canvas.setMapTool(self.img_picker_tool)
+            self.map_canvas.setMapTool(self.map_picker_tool)
+            self.orient_dlg.btn_add_gcps.setChecked(True)
+        else:
+            self.img_canvas.unsetMapTool(self.img_picker_tool)
+            self.map_canvas.unsetMapTool(self.map_picker_tool)
+            self.img_canvas.setMapTool(self.pan_tool)
+            self.orient_dlg.btn_add_gcps.setChecked(False)
+            
     def change_raster_src(self, ix):
         sel_lyr_id = self.orient_dlg.combo_raster_lyrs.itemData(ix)
         sel_lyr_name = self.orient_dlg.combo_raster_lyrs.itemText(ix)
@@ -1027,8 +1062,8 @@ class MonoPlot:
                               QgsField("desc", QVariant.String),
                               QgsField("x", QVariant.Double, "double", 10, 1),
                               QgsField("y", QVariant.Double, "double", 10, 1),
-                              QgsField("x_res", QVariant.Double, "double", 10, 1),
-                              QgsField("y_res", QVariant.Double, "double", 10, 1),
+                              QgsField("dx", QVariant.Double, "double", 10, 1),
+                              QgsField("dy", QVariant.Double, "double", 10, 1),
                               QgsField("active", QVariant.String)])
         gcps_img_lyr.updateFields()
         
@@ -1181,7 +1216,8 @@ class MonoPlot:
         map_gcps_lyr = QgsVectorLayer(gpkg_map_gcps_lyr, "gcps", "ogr")
         self.map_gcps_lyr = map_gcps_lyr
         self.map_gcps_lyr.loadNamedStyle(map_gcps_qml_path)       
-
+        self.map_gcps_lyr.featureAdded.connect(self.map_gcp_added)
+        
         gcps_h_src = []
         
         for feat in self.map_gcps_lyr.getFeatures():
@@ -1200,6 +1236,7 @@ class MonoPlot:
         img_gcps_lyr = QgsVectorLayer(gpkg_img_gcps_lyr, "gcps_img", "ogr")
         self.img_gcps_lyr = img_gcps_lyr
         self.img_gcps_lyr.loadNamedStyle(img_gcps_qml_path)       
+        self.img_gcps_lyr.featureAdded.connect(self.img_gcp_added)
         
         # QgsProject.instance().addMapLayer(self.img_line_lyr, False)
         # QgsProject.instance().addMapLayer(self.map_line_lyr, False)
@@ -1252,6 +1289,12 @@ class MonoPlot:
         self.crs = self.cam_lyr.crs()
         
         QApplication.instance().restoreOverrideCursor()
+    
+    def map_gcp_added(self, fid):
+        print(fid)
+    
+    def img_gcp_added(self, fid):
+        print(fid)
     
     def load_cameras_from_gpkg(self):
         

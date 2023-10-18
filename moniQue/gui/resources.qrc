@@ -1,5 +1,6 @@
 <RCC>
   <qresource prefix="newPrefix">
+    <file>../gfx/icon/camera.png</file>
     <file>../gfx/icon/icon.png</file>
     <file>../gfx/icon/mActionAddImage.png</file>
     <file>../gfx/icon/mActionAddPolyline.png</file>

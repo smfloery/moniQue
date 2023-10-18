@@ -193,12 +193,15 @@
          <height>24</height>
         </size>
        </property>
+       <property name="toolTip">
+        <string>Set/edit orientation</string>
+       </property>
        <property name="text">
         <string/>
        </property>
        <property name="icon">
         <iconset resource="../resources.qrc">
-         <normaloff>:/newPrefix/gfx/icon/mActionCapturePoint.png</normaloff>:/newPrefix/gfx/icon/mActionCapturePoint.png</iconset>
+         <normaloff>:/newPrefix/gfx/icon/camera.png</normaloff>:/newPrefix/gfx/icon/camera.png</iconset>
        </property>
        <property name="checkable">
         <bool>true</bool>

@@ -58,7 +58,6 @@ class InitOriTool(QgsMapTool):
                     self.is_drawing = True
                     
                     if len(self.ori_pnts) == 1:
-                        print("Wohoooo")
                         self.rubberPnt.addPoint(QgsPointXY(mx, my), True)
                         self.rubberPnt.show()
                     elif len(self.ori_pnts) == 2:

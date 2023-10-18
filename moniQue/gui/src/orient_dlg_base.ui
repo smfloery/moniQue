@@ -29,9 +29,9 @@
    <property name="geometry">
     <rect>
      <x>5</x>
-     <y>60</y>
+     <y>36</y>
      <width>551</width>
-     <height>301</height>
+     <height>295</height>
     </rect>
    </property>
    <property name="sizeAdjustPolicy">
@@ -102,7 +102,7 @@
    <property name="geometry">
     <rect>
      <x>560</x>
-     <y>60</y>
+     <y>33</y>
      <width>190</width>
      <height>190</height>
     </rect>
@@ -520,7 +520,7 @@
    <property name="geometry">
     <rect>
      <x>560</x>
-     <y>250</y>
+     <y>223</y>
      <width>190</width>
      <height>110</height>
     </rect>
@@ -745,9 +745,9 @@
   <widget class="QWidget" name="layoutWidget">
    <property name="geometry">
     <rect>
-     <x>5</x>
-     <y>30</y>
-     <width>541</width>
+     <x>404</x>
+     <y>7</y>
+     <width>341</width>
      <height>22</height>
     </rect>
    </property>
@@ -775,25 +775,12 @@
       </property>
      </widget>
     </item>
-    <item>
-     <spacer name="horizontalSpacer">
-      <property name="orientation">
-       <enum>Qt::Horizontal</enum>
-      </property>
-      <property name="sizeHint" stdset="0">
-       <size>
-        <width>40</width>
-        <height>20</height>
-       </size>
-      </property>
-     </spacer>
-    </item>
    </layout>
   </widget>
   <widget class="QWidget" name="layoutWidget">
    <property name="geometry">
     <rect>
-     <x>590</x>
+     <x>587</x>
      <y>370</y>
      <width>158</width>
      <height>25</height>
@@ -820,16 +807,72 @@
    <property name="geometry">
     <rect>
      <x>4</x>
-     <y>4</y>
-     <width>75</width>
-     <height>23</height>
+     <y>6</y>
+     <width>28</width>
+     <height>24</height>
     </rect>
    </property>
+   <property name="minimumSize">
+    <size>
+     <width>28</width>
+     <height>24</height>
+    </size>
+   </property>
+   <property name="maximumSize">
+    <size>
+     <width>28</width>
+     <height>24</height>
+    </size>
+   </property>
+   <property name="toolTip">
+    <string>Set initial orientation</string>
+   </property>
    <property name="text">
-    <string>Initial EOR</string>
+    <string/>
+   </property>
+   <property name="icon">
+    <iconset resource="../resources_orient.qrc">
+     <normaloff>:/newPrefix/gfx/icon/mActionMeasureBearing.png</normaloff>:/newPrefix/gfx/icon/mActionMeasureBearing.png</iconset>
+   </property>
+  </widget>
+  <widget class="QPushButton" name="btn_add_gcps">
+   <property name="geometry">
+    <rect>
+     <x>40</x>
+     <y>6</y>
+     <width>28</width>
+     <height>24</height>
+    </rect>
+   </property>
+   <property name="minimumSize">
+    <size>
+     <width>28</width>
+     <height>24</height>
+    </size>
+   </property>
+   <property name="maximumSize">
+    <size>
+     <width>28</width>
+     <height>24</height>
+    </size>
+   </property>
+   <property name="toolTip">
+    <string>Add new GCPs</string>
+   </property>
+   <property name="text">
+    <string/>
+   </property>
+   <property name="icon">
+    <iconset resource="../resources_orient.qrc">
+     <normaloff>:/newPrefix/gfx/icon/mActionCapturePoint.png</normaloff>:/newPrefix/gfx/icon/mActionCapturePoint.png</iconset>
+   </property>
+   <property name="checkable">
+    <bool>true</bool>
    </property>
   </widget>
  </widget>
- <resources/>
+ <resources>
+  <include location="../resources_orient.qrc"/>
+ </resources>
  <connections/>
 </ui>
