@@ -63,6 +63,8 @@ from qgis.gui import QgsMapToolPan, QgsMessageBar, QgsHighlight
 from .tools.MonoMapTool import MonoMapTool
 from .tools.SelectTool import SelectTool
 from .tools.VertexTool import VertexTool
+from .tools.InitOriTool import InitOriTool
+
 # from .tools.OrientTool import OrientTool
 
 from .tools.ImgPickerTool import ImgPickerTool
@@ -159,6 +161,8 @@ class MonoPlot:
         self.img_picker_tool = ImgPickerTool(self.img_canvas, self.gcp_meta_window)
         self.map_picker_tool = MapPickerTool(self.map_canvas, self.gcp_meta_window)
         
+        self.init_ori_tool = InitOriTool(self.map_canvas)
+        
         
         self.dlg.btn_extent.clicked.connect(self.set_extent)
         
@@ -235,7 +239,7 @@ class MonoPlot:
         self.orient_dlg = OrientDialog()
         
         self.orient_dlg.closed.connect(self.close_orient_dlg)
-        
+        self.orient_dlg.btn_initial_eor.clicked.connect(self.set_init_ori_tool)
         self.orient_dlg.combo_raster_lyrs.currentIndexChanged.connect(self.change_raster_src)
         self.orient_dlg.table_gcps.setColumnWidth(0, 5)
         # self.orient_tool_dlg.table_gcps.setColumnWidth(1, 75)
@@ -261,7 +265,15 @@ class MonoPlot:
         
         self.highlight_color = QColor(Qt.red)
         self.highlight_color.setAlpha(50)
+    
+    def set_init_ori_tool(self):
+        self.map_canvas.setMapTool(self.init_ori_tool)
+
+        sel_lyr_id = self.orient_dlg.combo_raster_lyrs.currentData()
+        sel_lyr =  QgsProject.instance().mapLayer(sel_lyr_id)
+        self.init_ori_tool.set_dhm_src(sel_lyr)
         
+    
     def initGui(self):
         """Create the menu entries and toolbar icons inside the QGIS GUI."""
 
@@ -462,6 +474,7 @@ class MonoPlot:
         
         self.dlg.btn_oritool.setChecked(False)
 
+        self.map_canvas.unsetMapTool(self.init_ori_tool)
         self.map_canvas.setMapTool(QgsMapToolPan(self.map_canvas))
         self.img_canvas.setMapTool(self.pan_tool)
         self.dlg.btn_pan.setChecked(True)
@@ -535,7 +548,6 @@ class MonoPlot:
         sel_lyr =  QgsProject.instance().mapLayer(sel_lyr_id)
         self.map_picker_tool.set_dhm_src(sel_lyr)
 
-    
     def show_change_name_dialog(self, cam_id):
         
         root = self.img_tree.invisibleRootItem()
