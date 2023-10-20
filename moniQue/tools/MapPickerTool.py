@@ -1,9 +1,13 @@
 from qgis.gui import QgsMapTool, QgsRubberBand
 from qgis.core import QgsPointXY, QgsFeature, QgsPoint, QgsGeometry, QgsRaster
 from qgis.PyQt.QtCore import Qt
+from PyQt5.QtCore import pyqtSignal
+
 import json
 class MapPickerTool(QgsMapTool):
     
+    featAdded = pyqtSignal(object)
+
     def __init__(self, canvas, meta_window):
         
         self.canvas = canvas
@@ -59,9 +63,10 @@ class MapPickerTool(QgsMapTool):
                         feat["desc"] = self.meta_window.line_desc.text() 
                         feat["H_src"] = self.dhm_src.dataProvider().dataSourceUri()
                         feat["active"] = 1
-                        self.map_lyr.dataProvider().addFeatures([feat])
-                        
+                        (res, afeat) = self.map_lyr.dataProvider().addFeatures([feat])
                         self.map_lyr.commitChanges()
+                        
+                        self.featAdded.emit({"fid":afeat[0].id(), "gid":feat["gid"]})
                         self.map_lyr.triggerRepaint()
                         self.map_lyr.reload()
                         self.canvas.refresh()

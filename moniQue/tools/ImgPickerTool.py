@@ -2,7 +2,12 @@ from qgis.gui import QgsMapTool, QgsRubberBand
 from qgis.core import QgsPointXY, QgsFeature, QgsPoint, QgsGeometry, QgsJsonUtils
 from qgis.PyQt.QtCore import Qt
 import json
+from PyQt5.QtCore import pyqtSignal
+
 class ImgPickerTool(QgsMapTool):
+    
+    featAdded = pyqtSignal(object)
+
     
     def __init__(self, canvas, meta_window):
         
@@ -56,9 +61,11 @@ class ImgPickerTool(QgsMapTool):
                         feat["active"] = 1
                         
                         #img_feat.setAttributes([self.camera.id, self.camera.meta["von"], self.camera.meta["bis"], feat_attr["type"], feat_attr["comment"]])
-                        self.img_lyr.dataProvider().addFeatures([feat])
-                        
+                        (res, afeat) = self.img_lyr.dataProvider().addFeatures([feat])
+                                                
                         self.img_lyr.commitChanges()
+                        self.featAdded.emit({"fid":afeat[0].id(), "gid":feat["gid"]})
+                        
                         self.img_lyr.triggerRepaint()
                         self.img_lyr.reload()
                         self.canvas.refresh()

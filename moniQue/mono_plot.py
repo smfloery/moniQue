@@ -159,7 +159,10 @@ class MonoPlot:
         
         # self.orient_tool = OrientTool(self.img_canvas, self.map_canvas)
         self.img_picker_tool = ImgPickerTool(self.img_canvas, self.gcp_meta_window)
+        self.img_picker_tool.featAdded.connect(self.img_gcp_added)
+        
         self.map_picker_tool = MapPickerTool(self.map_canvas, self.gcp_meta_window)
+        self.map_picker_tool.featAdded.connect(self.map_gcp_added)
         
         self.dlg.btn_extent.clicked.connect(self.set_extent)
         
@@ -1214,9 +1217,9 @@ class MonoPlot:
 
         gpkg_map_gcps_lyr = path + "|layername=gcps"
         map_gcps_lyr = QgsVectorLayer(gpkg_map_gcps_lyr, "gcps", "ogr")
+        # map_gcps_lyr.committedFeaturesAdded.connect(self.map_gcp_added)
         self.map_gcps_lyr = map_gcps_lyr
         self.map_gcps_lyr.loadNamedStyle(map_gcps_qml_path)       
-        self.map_gcps_lyr.featureAdded.connect(self.map_gcp_added)
         
         gcps_h_src = []
         
@@ -1234,9 +1237,9 @@ class MonoPlot:
         
         gpkg_img_gcps_lyr = path + "|layername=gcps_img"
         img_gcps_lyr = QgsVectorLayer(gpkg_img_gcps_lyr, "gcps_img", "ogr")
+        # img_gcps_lyr.committedFeaturesAdded.connect(self.img_gcp_added)
         self.img_gcps_lyr = img_gcps_lyr
         self.img_gcps_lyr.loadNamedStyle(img_gcps_qml_path)       
-        self.img_gcps_lyr.featureAdded.connect(self.img_gcp_added)
         
         # QgsProject.instance().addMapLayer(self.img_line_lyr, False)
         # QgsProject.instance().addMapLayer(self.map_line_lyr, False)
@@ -1290,11 +1293,11 @@ class MonoPlot:
         
         QApplication.instance().restoreOverrideCursor()
     
-    def map_gcp_added(self, fid):
-        print(fid)
+    def map_gcp_added(self, data):
+        print("whoop", data)
     
-    def img_gcp_added(self, fid):
-        print(fid)
+    def img_gcp_added(self, data):
+        print("whoop", data)
     
     def load_cameras_from_gpkg(self):
         
