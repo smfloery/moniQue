@@ -27,6 +27,8 @@ import os
 from PyQt5 import uic
 from PyQt5 import QtWidgets
 from PyQt5.QtCore import pyqtSignal
+from qgis.PyQt.QtCore import Qt
+
 from .src.orient_dlg_base import Ui_Dialog
 
 #as we create new ui.py file, these lines need to be commented
@@ -48,6 +50,65 @@ class OrientDialog(QtWidgets.QDialog, Ui_Dialog):
         # http://qt-project.org/doc/qt-4.8/designer-using-a-ui-file.html
         # #widgets-and-dialogs-with-auto-connect
         self.setupUi(self)
-
+        
+        self.name2ix = {"gid":1,
+                        "X":2,
+                        "Y":3,
+                        "H":4,
+                        "x":5,
+                        "y":6,
+                        "dx":7,
+                        "dy":8}
+        
     def closeEvent(self, event):
         self.closed.emit()
+        
+    def add_gcp_to_table(self, data, gcp_type=None):
+        nr_rows = self.table_gcps.rowCount()
+        nr_cols = self.table_gcps.columnCount()
+        
+        gcp_exists = False
+                
+        for rix in range(nr_rows):
+            if self.table_gcps.item(rix, 1).text() == data["gid"]:
+                
+                if gcp_type == "map":
+                    self.table_gcps.setItem(rix, self.name2ix["X"], QtWidgets.QTableWidgetItem("%.1f" % (data["X"])))
+                    self.table_gcps.setItem(rix, self.name2ix["Y"], QtWidgets.QTableWidgetItem("%.1f" % (data["Y"])))
+                    self.table_gcps.setItem(rix, self.name2ix["H"], QtWidgets.QTableWidgetItem("%.1f" % (data["H"])))
+                
+                elif gcp_type == "img":
+                    self.table_gcps.setItem(rix, self.name2ix["x"], QtWidgets.QTableWidgetItem("%.1f" % (data["x"])))
+                    self.table_gcps.setItem(rix, self.name2ix["y"], QtWidgets.QTableWidgetItem("%.1f" % (data["y"])))
+                
+                self.table_gcps.item(rix, 0).setCheckState(Qt.Checked)
+                self.table_gcps.item(rix, 0).setFlags(Qt.ItemIsUserCheckable | Qt.ItemIsEnabled)
+
+                gcp_exists = True
+                
+                break
+            
+        if not gcp_exists:
+            self.table_gcps.insertRow(nr_rows)
+            self.table_gcps.setRowHeight(nr_rows, 25)
+
+            chkBoxItem = QtWidgets.QTableWidgetItem()
+            chkBoxItem.setFlags(Qt.ItemIsUserCheckable)# | Qt.ItemIsEnabled)
+            chkBoxItem.setCheckState(Qt.Unchecked)
+                    
+            self.table_gcps.setItem(nr_rows, 0, chkBoxItem)
+            self.table_gcps.setItem(nr_rows, self.name2ix["gid"], QtWidgets.QTableWidgetItem(str(data["gid"])))
+
+            if gcp_type == "map":
+                self.table_gcps.setItem(nr_rows, self.name2ix["X"], QtWidgets.QTableWidgetItem("%.1f" % (data["X"])))
+                self.table_gcps.setItem(nr_rows, self.name2ix["Y"], QtWidgets.QTableWidgetItem("%.1f" % (data["Y"])))
+                self.table_gcps.setItem(nr_rows, self.name2ix["H"], QtWidgets.QTableWidgetItem("%.1f" % (data["H"])))
+            elif gcp_type == "img":
+                self.table_gcps.setItem(nr_rows, self.name2ix["x"], QtWidgets.QTableWidgetItem("%.1f" % (data["x"])))
+                self.table_gcps.setItem(nr_rows, self.name2ix["y"], QtWidgets.QTableWidgetItem("%.1f" % (data["y"])))
+                        
+                # for cix in range(1, nr_cols):
+                #     curr_label = self.orient_dlg.table_gcps.horizontalHeaderItem(cix).text()
+                #     curr_value = self.orient_dlg.table_gcps.item(rix, cix).text()   
+                    
+                #     gcp_data[rix][curr_label] = float(curr_value) if curr_value != "" else None

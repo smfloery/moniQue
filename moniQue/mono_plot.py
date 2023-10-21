@@ -311,10 +311,13 @@ class MonoPlot:
                     curr_label = self.orient_dlg.table_gcps.horizontalHeaderItem(cix).text()
                     curr_value = self.orient_dlg.table_gcps.item(rix, cix).text()   
                     
-                    gcp_data[rix][curr_label] = float(curr_value) if curr_value != "" else None
+                    if curr_label != "gid":
+                        gcp_data[rix][curr_label] = float(curr_value) if curr_value != "" else None
         
         if len(gcp_data.keys()) < 4:
             pass
+        
+        print(gcp_data)
         
         
     def initGui(self):
@@ -559,19 +562,29 @@ class MonoPlot:
         
         gcps_dict = OrderedDict(sorted(gcps_dict.items()))
         
-        for ix, (gid,vals) in enumerate(gcps_dict.items()):
+        for ix, (gid, vals) in enumerate(gcps_dict.items()):
+            
+            #check if any value in dict is None; then the checkbox is deactivated
+            has_none = any(v is None for v in [vals["x"], vals["y"], vals["X"], vals["Y"], vals["H"]])
+
             self.orient_dlg.table_gcps.insertRow(ix)
-            self.orient_dlg.table_gcps.setRowHeight(ix, 20)
+            self.orient_dlg.table_gcps.setRowHeight(ix, 25)
 
             chkBoxItem = QTableWidgetItem()
-            chkBoxItem.setFlags(Qt.ItemIsUserCheckable | Qt.ItemIsEnabled)
             
-            if vals["active"] == "1":
-                chkBoxItem.setCheckState(Qt.Checked)       
+            if not has_none:
+                chkBoxItem.setFlags(Qt.ItemIsUserCheckable | Qt.ItemIsEnabled)
+                
+                if vals["active"] == "1":
+                    chkBoxItem.setCheckState(Qt.Checked)       
+                else:
+                    chkBoxItem.setCheckState(Qt.Unchecked)   
+                
             else:
-                chkBoxItem.setCheckState(Qt.Unchecked)   
-                    
-            self.orient_dlg.table_gcps.setItem(ix,0,chkBoxItem)
+                chkBoxItem.setFlags(Qt.ItemIsUserCheckable)# | Qt.ItemIsEnabled)
+                chkBoxItem.setCheckState(Qt.Unchecked)
+                
+            self.orient_dlg.table_gcps.setItem(ix, 0, chkBoxItem)
             
             self.orient_dlg.table_gcps.setItem(ix , 1, QTableWidgetItem(gid))
             self.orient_dlg.table_gcps.setItem(ix , 2, QTableWidgetItem("%.1f" % vals["X"] if vals["X"] is not None else ""))
@@ -1294,10 +1307,10 @@ class MonoPlot:
         QApplication.instance().restoreOverrideCursor()
     
     def map_gcp_added(self, data):
-        print("whoop", data)
-    
+        self.orient_dlg.add_gcp_to_table(data, gcp_type="map")
+        
     def img_gcp_added(self, data):
-        print("whoop", data)
+        self.orient_dlg.add_gcp_to_table(data, gcp_type="img")
     
     def load_cameras_from_gpkg(self):
         

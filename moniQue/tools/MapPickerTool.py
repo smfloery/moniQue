@@ -62,11 +62,11 @@ class MapPickerTool(QgsMapTool):
                         feat["H"] = click_h
                         feat["desc"] = self.meta_window.line_desc.text() 
                         feat["H_src"] = self.dhm_src.dataProvider().dataSourceUri()
-                        feat["active"] = 1
+                        feat["active"] = 0
                         (res, afeat) = self.map_lyr.dataProvider().addFeatures([feat])
                         self.map_lyr.commitChanges()
                         
-                        self.featAdded.emit({"fid":afeat[0].id(), "gid":feat["gid"]})
+                        self.featAdded.emit({"fid":afeat[0].id(), "gid":feat["gid"], "X":mx, "Y":my, "H":click_h, "active":0})
                         self.map_lyr.triggerRepaint()
                         self.map_lyr.reload()
                         self.canvas.refresh()

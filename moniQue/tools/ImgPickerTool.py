@@ -58,13 +58,13 @@ class ImgPickerTool(QgsMapTool):
                         feat["x"] = mx
                         feat["y"] = my
                         feat["desc"] = self.meta_window.line_desc.text() 
-                        feat["active"] = 1
+                        feat["active"] = 0
                         
                         #img_feat.setAttributes([self.camera.id, self.camera.meta["von"], self.camera.meta["bis"], feat_attr["type"], feat_attr["comment"]])
                         (res, afeat) = self.img_lyr.dataProvider().addFeatures([feat])
                                                 
                         self.img_lyr.commitChanges()
-                        self.featAdded.emit({"fid":afeat[0].id(), "gid":feat["gid"]})
+                        self.featAdded.emit({"fid":afeat[0].id(), "gid":feat["gid"], "x":mx, "y":my, "active":0})
                         
                         self.img_lyr.triggerRepaint()
                         self.img_lyr.reload()
