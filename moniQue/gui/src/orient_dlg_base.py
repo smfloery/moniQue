@@ -22,7 +22,7 @@ class Ui_Dialog(object):
         self.table_gcps.setSizeAdjustPolicy(QtWidgets.QAbstractScrollArea.AdjustToContentsOnFirstShow)
         self.table_gcps.setEditTriggers(QtWidgets.QAbstractItemView.NoEditTriggers)
         self.table_gcps.setAlternatingRowColors(True)
-        self.table_gcps.setSelectionMode(QtWidgets.QAbstractItemView.NoSelection)
+        self.table_gcps.setSelectionMode(QtWidgets.QAbstractItemView.SingleSelection)
         self.table_gcps.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectRows)
         self.table_gcps.setObjectName("table_gcps")
         self.table_gcps.setColumnCount(9)

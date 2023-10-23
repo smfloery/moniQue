@@ -241,6 +241,8 @@ class MonoPlot:
         self.init_ori_tool = InitOriTool(self.map_canvas, self.orient_dlg)
         
         self.orient_dlg.closed.connect(self.close_orient_dlg)
+        self.orient_dlg.table_gcps.itemSelectionChanged.connect(self.gcp_selected)
+        
         self.orient_dlg.btn_initial_eor.clicked.connect(self.set_init_ori_tool)
         self.orient_dlg.btn_calc_ori.clicked.connect(self.estimate_ori)
         self.orient_dlg.btn_add_gcps.clicked.connect(self.set_gcp_tool)
@@ -273,6 +275,11 @@ class MonoPlot:
         
         self.highlight_color = QColor(Qt.red)
         self.highlight_color.setAlpha(50)
+    
+    def gcp_selected(self):
+        print(self.orient_dlg.table_gcps.currentRow())
+        # sel_ix = self.orient_dlg.table_gcps.selectedItems()
+        # print(sel_ix)
     
     def set_init_ori_tool(self):
         self.map_canvas.setMapTool(self.init_ori_tool)
@@ -1233,6 +1240,9 @@ class MonoPlot:
         # map_gcps_lyr.committedFeaturesAdded.connect(self.map_gcp_added)
         self.map_gcps_lyr = map_gcps_lyr
         self.map_gcps_lyr.loadNamedStyle(map_gcps_qml_path)       
+        self.map_gcps_lyr.selectionChanged.connect(self.map_gcp_selected)
+        self.map_gcps_lyr.featuresDeleted.connect(self.map_gcp_deleted)
+        self.map_gcps_lyr.geometryChanged.connect(self.map_gcp_changed)
         
         gcps_h_src = []
         
@@ -1250,7 +1260,6 @@ class MonoPlot:
         
         gpkg_img_gcps_lyr = path + "|layername=gcps_img"
         img_gcps_lyr = QgsVectorLayer(gpkg_img_gcps_lyr, "gcps_img", "ogr")
-        # img_gcps_lyr.committedFeaturesAdded.connect(self.img_gcp_added)
         self.img_gcps_lyr = img_gcps_lyr
         self.img_gcps_lyr.loadNamedStyle(img_gcps_qml_path)       
         
@@ -1305,6 +1314,15 @@ class MonoPlot:
         self.crs = self.cam_lyr.crs()
         
         QApplication.instance().restoreOverrideCursor()
+    
+    def map_gcp_changed(self, fid, geom):
+        print("changed", fid, geom)
+    
+    def map_gcp_deleted(self, fids):
+        print("deleted", fids)
+    
+    def map_gcp_selected(self, new_fids, old_fids, cas):
+        print("selected", new_fids, old_fids)
     
     def map_gcp_added(self, data):
         self.orient_dlg.add_gcp_to_table(data, gcp_type="map")
