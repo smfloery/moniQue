@@ -870,6 +870,26 @@
     <bool>true</bool>
    </property>
   </widget>
+  <widget class="QPushButton" name="btn_delete_gcps">
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="geometry">
+    <rect>
+     <x>75</x>
+     <y>6</y>
+     <width>28</width>
+     <height>24</height>
+    </rect>
+   </property>
+   <property name="text">
+    <string/>
+   </property>
+   <property name="icon">
+    <iconset resource="../resources_orient.qrc">
+     <normaloff>:/newPrefix/gfx/icon/mActionDeleteSelected.png</normaloff>:/newPrefix/gfx/icon/mActionDeleteSelected.png</iconset>
+   </property>
+  </widget>
  </widget>
  <resources>
   <include location="../resources_orient.qrc"/>

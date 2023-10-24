@@ -26,7 +26,7 @@ import os
 
 from PyQt5 import uic
 from PyQt5 import QtWidgets
-from PyQt5.QtCore import pyqtSignal
+from PyQt5.QtCore import pyqtSignal, QModelIndex
 from qgis.PyQt.QtCore import Qt
 
 from .src.orient_dlg_base import Ui_Dialog
@@ -59,6 +59,8 @@ class OrientDialog(QtWidgets.QDialog, Ui_Dialog):
                         "y":6,
                         "dx":7,
                         "dy":8}
+        
+        self.prev_row = -1
         
     def closeEvent(self, event):
         self.closed.emit()

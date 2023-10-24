@@ -1,5 +1,6 @@
 <RCC>
   <qresource prefix="newPrefix">
+    <file>../gfx/icon/mActionDeleteSelected.png</file>
     <file>../gfx/icon/mActionCapturePoint.png</file>
     <file>../gfx/icon/mActionMeasureBearing.png</file>
   </qresource>
