@@ -23,7 +23,7 @@
 """
 from PyQt5.QtCore import QSettings, QTranslator, qVersion, QCoreApplication, QVariant, QModelIndex
 from PyQt5.QtCore import Qt
-from PyQt5.QtGui import QIcon, QColor
+from PyQt5.QtGui import QIcon, QColor, QBrush
 from PyQt5.QtWidgets import QApplication, QAction, QTreeWidgetItem,QTableWidgetItem, QFileDialog, QDialog, QMenu, QStyle, QDialogButtonBox, QHeaderView
 
 # Initialize Qt resources from file resources.py
@@ -139,8 +139,11 @@ class MonoPlot:
         
         #img_tree is the tree-like structure where the loaded images are shown in the plugin window
         self.img_tree = self.dlg.ImageTree
+        self.img_tree.setStyleSheet("QTreeWidget::item { padding: 3px }")
+        
         self.img_tree.itemChanged.connect(self.tree_item_changed)
-                
+        # self.img_tree.itemSelectionChanged.connect(self.tree_sel_changed)
+        
         self.meta_window = MetaWindow()
         self.gcp_meta_window = GcpMetaWindow()
          
@@ -840,36 +843,36 @@ class MonoPlot:
         item = self.dlg.ImageTree.itemAt(point)
         
         if not item.parent(): #only add context menu for top level items
-        
-            name = item.text(0)  # The text of the node.
-            
-            img_menue = QMenu()
-            action = img_menue.addAction(name)
-            action.setEnabled(False)
-            
-            img_menue.addSeparator()
-            
-            # action_orient = img_menue.addAction("Orient image")
-            # action_orient.triggered.connect(lambda: self.start_orientation(name))
+            if item.checkState(0) == Qt.Checked:
+                name = item.text(0)  # The text of the node.
+                
+                img_menue = QMenu()
+                action = img_menue.addAction(name)
+                action.setEnabled(False)
+                
+                img_menue.addSeparator()
+                
+                # action_orient = img_menue.addAction("Orient image")
+                # action_orient.triggered.connect(lambda: self.start_orientation(name))
 
-            img_menue.addSeparator()
+                img_menue.addSeparator()
 
-            action_zoom = img_menue.addAction("Center canvas on camera")
-            action_zoom.triggered.connect(lambda: self.center_on_camera(name))
-            
-            # action_update = img_menue.addAction("Update camera from Mono3D")
-            # action_update.triggered.connect(lambda: self.update_camera(name))
-            
-            action_change = img_menue.addAction("Change image name")
-            action_change.triggered.connect(lambda: self.show_change_name_dialog(name))
-            
-            action_ortho = img_menue.addAction("Create Orthophoto")
-            action_ortho.triggered.connect(lambda: self.show_create_ortho_dialog(name))
-                         
-            action_remove = img_menue.addAction("Remove camera from project")
-            action_remove.triggered.connect(lambda: self.remove_camera_from_project(name))
-            
-            img_menue.exec_(self.dlg.ImageTree.mapToGlobal(point))
+                action_zoom = img_menue.addAction("Center canvas on camera")
+                action_zoom.triggered.connect(lambda: self.center_on_camera(name))
+                
+                # action_update = img_menue.addAction("Update camera from Mono3D")
+                # action_update.triggered.connect(lambda: self.update_camera(name))
+                
+                # action_change = img_menue.addAction("Change image name")
+                # action_change.triggered.connect(lambda: self.show_change_name_dialog(name))
+                
+                action_ortho = img_menue.addAction("Create Orthophoto")
+                action_ortho.triggered.connect(lambda: self.show_create_ortho_dialog(name))
+                            
+                action_remove = img_menue.addAction("Remove camera from project")
+                action_remove.triggered.connect(lambda: self.remove_camera_from_project(name))
+                
+                img_menue.exec_(self.dlg.ImageTree.mapToGlobal(point))
     
     def create_orthophoto(self):
         
@@ -1781,20 +1784,20 @@ class MonoPlot:
                         
         l1 = QTreeWidgetItem([camera.iid])
         l1.setCheckState(0, Qt.Unchecked)  
-        l1.setFlags(l1.flags() & ~Qt.ItemIsSelectable)
+        l1.setFlags(l1.flags() & ~Qt.ItemIsSelectable)#& ~Qt.ItemIsUserCheckable)
         
-        l1_child = QTreeWidgetItem([camera.iid])
+        # l1_child = QTreeWidgetItem([camera.iid])
         
         # if self.check_for_update(camera.name):
         #     l1_child.setIcon(0, QApplication.style().standardIcon(QStyle.SP_BrowserReload))  
         # else:
         #     l1_child.setIcon(0, QApplication.style().standardIcon(QStyle.SP_DialogApplyButton))      
         
-        l1_child.setFlags(l1.flags() & ~Qt.ItemIsSelectable) #child showing image name is no selectable
-        l1.addChild(l1_child)
+        # l1_child.setFlags(l1.flags() & ~Qt.ItemIsSelectable) #child showing image name is no selectable
+        # l1.addChild(l1_child)
     
         self.img_tree.addTopLevelItem(l1)
-        self.img_tree.expandItem(l1)
+        # self.img_tree.expandItem(l1)
            
     def clear_meta_fiels(self):
         self.dlg.line_cam_x.clear()
@@ -1838,99 +1841,107 @@ class MonoPlot:
         self.map_line_lyr.commitChanges()
         self.img_line_lyr.commitChanges()
     
+    # def tree_sel_changed(self):
+    #     curr_sel = self.img_tree.selectedItems()
+    #     print(curr_sel)
+    
     def tree_item_changed(self, item, column):
         
         #if the name of the image in the treewidget is changed this signal is also emitted; as we only want to run this
         #function if the main item (img_id) was checked or not checked we look for the parent. for the main item the parent is None
         #whereas when the image name changes the parent is not None.
-        if not item.parent():
         
-            # Get his status when the check status changes.
-            if item.checkState(column) == Qt.Checked:
+        #only necessary if item has child; currently deactivated
+        # if not item.parent():
+        
+        # Get his status when the check status changes.
+        if item.checkState(column) == Qt.Checked:
+            # item.setCheckState(0, Qt.Checked)
+            # item.setBackground(0, QBrush(QColor("#14aaff")))
+            iid = item.text(column)
+                        
+            expression = "iid = '%s'" % (iid)
+            request = QgsFeatureRequest ().setFilterExpression(expression)
+            cam_feat = list(self.cam_hfov_lyr.getFeatures(request))[0]
                 
-                item.setSelected(True)            
-                iid = item.text(column)
-                
-                expression = "iid = '%s'" % (iid)
-                request = QgsFeatureRequest ().setFilterExpression(expression)
-                cam_feat = list(self.cam_hfov_lyr.getFeatures(request))[0]
-                 
-                iid_path = cam_feat.attribute("path")
-                
-                self.uncheck_items_in_tree(item)
-                self.load_terr_img(iid, iid_path)
-                self.active_camera = self.camera_collection[iid]
-                
-                # self.fill_meta_fields(self.active_camera)
-                
-                #highlight currently selected camera
-                #clear previously highlighter cameras
-                self.clear_highlighted_features()
-                self.clear_vertex_markers()
+            iid_path = cam_feat.attribute("path")
+            
+            self.uncheck_items_in_tree(item)
+            self.load_terr_img(iid, iid_path)
+            self.active_camera = self.camera_collection[iid]
+            
+            # self.fill_meta_fields(self.active_camera)
+            
+            #highlight currently selected camera
+            #clear previously highlighter cameras
+            self.clear_highlighted_features()
+            self.clear_vertex_markers()
 
-                # cam_feat = list(self.cam_lyr.getFeatures(request))[0]
-                # self.cam_h = QgsHighlight(self.map_canvas, cam_feat, self.cam_lyr)
-                # self.cam_h.setColor(self.highlight_color)
-                # self.cam_h.setFillColor(self.highlight_color)
-                # self.cam_h.show()
-                    
-                # cam_hfov_feat = list(self.cam_hfov_lyr.getFeatures(request))[0]
-                # self.hfov_h = QgsHighlight(self.map_canvas, cam_hfov_feat, self.cam_hfov_lyr)
-                # self.hfov_h.setColor(self.highlight_color)
-                # self.hfov_h.setFillColor(self.highlight_color)
-                # self.hfov_h.show()
+            # cam_feat = list(self.cam_lyr.getFeatures(request))[0]
+            # self.cam_h = QgsHighlight(self.map_canvas, cam_feat, self.cam_lyr)
+            # self.cam_h.setColor(self.highlight_color)
+            # self.cam_h.setFillColor(self.highlight_color)
+            # self.cam_h.show()
                 
-                self.img_line_lyr.setSubsetString(expression) #show only those lines which correspond to the currently selected image
-                self.img_gcps_lyr.setSubsetString(expression)
-                self.map_gcps_lyr.setSubsetString(expression)
-                
-                # self.mono_tool.set_camera(self.active_camera)
-                # self.vertex_tool.set_camera(self.active_camera)
-                # self.orient_tool.set_camera(self.active_camera)
-                
-                if self.active_camera.is_oriented:
-                
-                    self.dlg.btn_monotool.setEnabled(True)
-                    self.dlg.btn_select.setEnabled(True)
-                    self.dlg.btn_oritool.setEnabled(True)
-                    # self.dlg.btn_delete.setEnabled(True)
-                    self.dlg.btn_vertex.setEnabled(True)
-                else:
-                    self.dlg.btn_oritool.setEnabled(True)
-                
-                
-            if item.checkState(column) == Qt.Unchecked:
-                item.setSelected(False)
-                QgsProject.instance().removeMapLayer(self.curr_img_lyr.id())
-                
-                self.img_canvas.refresh()
-                self.active_camera = None
-                self.curr_img_lyr = None
-                
-                self.dlg.btn_monotool.setEnabled(False)
-                self.dlg.btn_monotool.setChecked(False)
-                self.deactivate_plotting()
-                
-                self.dlg.btn_oritool.setEnabled(False)
-                self.dlg.btn_oritool.setChecked(False)
-                
-                self.dlg.btn_select.setEnabled(False)
-                self.dlg.btn_select.setChecked(False)
-                
-                self.dlg.btn_vertex.setEnabled(False)
-                self.dlg.btn_vertex.setChecked(False)
-                
-                # self.dlg.btn_delete.setEnabled(False)
-                            
-                self.clear_highlighted_features()
-                
-                self.clear_meta_fiels()
+            # cam_hfov_feat = list(self.cam_hfov_lyr.getFeatures(request))[0]
+            # self.hfov_h = QgsHighlight(self.map_canvas, cam_hfov_feat, self.cam_hfov_lyr)
+            # self.hfov_h.setColor(self.highlight_color)
+            # self.hfov_h.setFillColor(self.highlight_color)
+            # self.hfov_h.show()
+            
+            self.img_line_lyr.setSubsetString(expression) #show only those lines which correspond to the currently selected image
+            self.img_gcps_lyr.setSubsetString(expression)
+            self.map_gcps_lyr.setSubsetString(expression)
+            
+            # self.mono_tool.set_camera(self.active_camera)
+            # self.vertex_tool.set_camera(self.active_camera)
+            # self.orient_tool.set_camera(self.active_camera)
+            
+            if self.active_camera.is_oriented:
+            
+                self.dlg.btn_monotool.setEnabled(True)
+                self.dlg.btn_select.setEnabled(True)
+                self.dlg.btn_oritool.setEnabled(True)
+                # self.dlg.btn_delete.setEnabled(True)
+                self.dlg.btn_vertex.setEnabled(True)
+            else:
+                self.dlg.btn_oritool.setEnabled(True)
 
-                #use a filter which is not available to not show any lines in img canvas if no image is currently selected
-                expression = "iid = 'sth_not_existing'"
-                self.img_line_lyr.setSubsetString(expression) #show only those lines which correspond to the currently selected image
-                self.img_gcps_lyr.setSubsetString(expression)
-                self.map_gcps_lyr.setSubsetString(expression)
+        elif item.checkState(column) == Qt.Unchecked:
+            # item.setBackground(0, QBrush(QColor("white")))
+            # item.setBackground(0, "")
+            # item.setCheckState(0, Qt.Unchecked)
+            # item.setSelected(False)
+            QgsProject.instance().removeMapLayer(self.curr_img_lyr.id())
+            
+            self.img_canvas.refresh()
+            self.active_camera = None
+            self.curr_img_lyr = None
+            
+            self.dlg.btn_monotool.setEnabled(False)
+            self.dlg.btn_monotool.setChecked(False)
+            self.deactivate_plotting()
+            
+            self.dlg.btn_oritool.setEnabled(False)
+            self.dlg.btn_oritool.setChecked(False)
+            
+            self.dlg.btn_select.setEnabled(False)
+            self.dlg.btn_select.setChecked(False)
+            
+            self.dlg.btn_vertex.setEnabled(False)
+            self.dlg.btn_vertex.setChecked(False)
+            
+            # self.dlg.btn_delete.setEnabled(False)
+                        
+            self.clear_highlighted_features()
+            
+            self.clear_meta_fiels()
+
+            #use a filter which is not available to not show any lines in img canvas if no image is currently selected
+            expression = "iid = 'sth_not_existing'"
+            self.img_line_lyr.setSubsetString(expression) #show only those lines which correspond to the currently selected image
+            self.img_gcps_lyr.setSubsetString(expression)
+            self.map_gcps_lyr.setSubsetString(expression)
                 
     def run(self):
         
