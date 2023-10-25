@@ -21,7 +21,7 @@
  *                                                                         *
  ***************************************************************************/
 """
-from PyQt5.QtCore import QSettings, QTranslator, qVersion, QCoreApplication, QVariant
+from PyQt5.QtCore import QSettings, QTranslator, qVersion, QCoreApplication, QVariant, QModelIndex
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QIcon, QColor
 from PyQt5.QtWidgets import QApplication, QAction, QTreeWidgetItem,QTableWidgetItem, QFileDialog, QDialog, QMenu, QStyle, QDialogButtonBox, QHeaderView
@@ -179,7 +179,7 @@ class MonoPlot:
         self.dlg.btn_pan.clicked.connect(self.activate_panning)
         self.dlg.btn_monotool.clicked.connect(self.activate_plotting)
         self.dlg.btn_select.clicked.connect(self.activate_select)
-        # self.dlg.btn_delete.clicked.connect(self.delete_selected_features)
+        
         self.dlg.btn_vertex.clicked.connect(self.activate_edit_vertices)
         
         self.dlg.rejected.connect(self.clear)
@@ -238,14 +238,19 @@ class MonoPlot:
         # self.orient_tool_dlg = orient_tool
         
         self.orient_dlg = OrientDialog()
+        # self.orient_dlg.table_gcps.setCurrentIndex(QModelIndex())
+
         self.init_ori_tool = InitOriTool(self.map_canvas, self.orient_dlg)
         
         self.orient_dlg.closed.connect(self.close_orient_dlg)
-        self.orient_dlg.table_gcps.itemSelectionChanged.connect(self.gcp_selected)
+        # self.orient_dlg.table_gcps.itemSelectionChanged.connect(self.gcp_selected)
+        self.orient_dlg.table_gcps.cellClicked.connect(self.gcp_selected)
+        # self.orient_dlg.table_gcps.currentCellChanged.connect(self.gcp_selected)
         
         self.orient_dlg.btn_initial_eor.clicked.connect(self.set_init_ori_tool)
         self.orient_dlg.btn_calc_ori.clicked.connect(self.estimate_ori)
         self.orient_dlg.btn_add_gcps.clicked.connect(self.set_gcp_tool)
+        self.orient_dlg.btn_delete_gcps.clicked.connect(self.delete_selected_gcps)
         
         self.orient_dlg.combo_raster_lyrs.currentIndexChanged.connect(self.change_raster_src)
         
@@ -276,10 +281,53 @@ class MonoPlot:
         self.highlight_color = QColor(Qt.red)
         self.highlight_color.setAlpha(50)
     
-    def gcp_selected(self):
-        print(self.orient_dlg.table_gcps.currentRow())
-        # sel_ix = self.orient_dlg.table_gcps.selectedItems()
-        # print(sel_ix)
+    def delete_selected_gcps(self):
+
+        if self.map_gcps_lyr.selectedFeatureCount() > 0:
+            self.map_gcps_lyr.startEditing()
+            self.map_gcps_lyr.deleteSelectedFeatures() 
+            self.map_gcps_lyr.commitChanges()
+        
+        if self.img_gcps_lyr.selectedFeatureCount() > 0:
+            self.img_gcps_lyr.startEditing()
+            self.img_gcps_lyr.deleteSelectedFeatures()
+            self.img_gcps_lyr.commitChanges()
+
+        self.orient_dlg.table_gcps.removeRow(self.orient_dlg.table_gcps.currentRow())
+        self.orient_dlg.prev_row = -1
+        self.orient_dlg.btn_delete_gcps.setEnabled(False)
+        
+    def gcp_selected(self, rix, cix):
+        
+        
+        if cix != 0:
+        
+            #row was already selected; hence only deselect
+            if rix == self.orient_dlg.prev_row:
+                self.orient_dlg.btn_delete_gcps.setEnabled(False)
+                self.orient_dlg.table_gcps.clearSelection()
+                self.orient_dlg.prev_row = -1
+                self.map_gcps_lyr.removeSelection()
+                self.img_gcps_lyr.removeSelection()
+
+            else:
+                self.orient_dlg.btn_delete_gcps.setEnabled(True)
+                self.orient_dlg.table_gcps.setCurrentCell(rix, cix)
+                self.orient_dlg.prev_row = rix
+
+                sel_gid = self.orient_dlg.table_gcps.item(rix, 1).text()
+                
+                self.map_gcps_lyr.selectByExpression("\"gid\"=%s"%(sel_gid))
+                self.img_gcps_lyr.selectByExpression("\"gid\"=%s"%(sel_gid))
+        
+        
+        # print(self.orient_dlg.table_gcps.currentRow())
+        
+        # self.orient_dlg.btn_delete_gcps.setEnabled(True)
+        # print(self.orient_dlg.table_gcps.currentRow())
+        # #TODO: i) delete selected GCP; ii) select GCPS in img and map canvas;
+        # # sel_ix = self.orient_dlg.table_gcps.selectedItems()
+        # # print(sel_ix)
     
     def set_init_ori_tool(self):
         self.map_canvas.setMapTool(self.init_ori_tool)
@@ -533,6 +581,8 @@ class MonoPlot:
         self.dlg.btn_pan.setChecked(True)
         
     def show_orient_dlg(self):
+        
+        self.orient_dlg.prev_row = -1
         
         # self.dlg.btn_pan.setChecked(False)
         
@@ -1240,8 +1290,8 @@ class MonoPlot:
         # map_gcps_lyr.committedFeaturesAdded.connect(self.map_gcp_added)
         self.map_gcps_lyr = map_gcps_lyr
         self.map_gcps_lyr.loadNamedStyle(map_gcps_qml_path)       
-        self.map_gcps_lyr.selectionChanged.connect(self.map_gcp_selected)
-        self.map_gcps_lyr.featuresDeleted.connect(self.map_gcp_deleted)
+        # self.map_gcps_lyr.selectionChanged.connect(self.map_gcp_selected)
+        # self.map_gcps_lyr.featuresDeleted.connect(self.map_gcp_deleted)
         self.map_gcps_lyr.geometryChanged.connect(self.map_gcp_changed)
         
         gcps_h_src = []
