@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 #
-# MonoPlot documentation build configuration file, created by
+# MoniQue documentation build configuration file, created by
 # sphinx-quickstart on Sun Feb 12 17:11:03 2012.
 #
 # This file is execfile()d with the current directory set to its containing dir.
@@ -25,7 +25,7 @@ import sys, os
 
 # Add any Sphinx extension module names here, as strings. They can be extensions
 # coming with Sphinx (named 'sphinx.ext.*') or your custom ones.
-extensions = ['sphinx.ext.todo', 'sphinx.ext.pngmath', 'sphinx.ext.viewcode']
+extensions = ['sphinx.ext.todo', 'sphinx.ext.imgmath', 'sphinx.ext.viewcode']
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
@@ -40,7 +40,7 @@ source_suffix = '.rst'
 master_doc = 'index'
 
 # General information about the project.
-project = u'MonoPlot'
+project = u'MoniQue'
 copyright = u'2013, Sebastian Mikolka-Flöry'
 
 # The version info for the project you're documenting, acts as replacement for
@@ -178,7 +178,7 @@ htmlhelp_basename = 'TemplateClassdoc'
 # Grouping the document tree into LaTeX files. List of tuples
 # (source start file, target name, title, author, documentclass [howto/manual]).
 latex_documents = [
-  ('index', 'MonoPlot.tex', u'MonoPlot Documentation',
+  ('index', 'MoniQue.tex', u'MoniQue Documentation',
    u'Sebastian Mikolka-Flöry', 'manual'),
 ]
 
@@ -211,6 +211,6 @@ latex_documents = [
 # One entry per manual page. List of tuples
 # (source start file, name, description, authors, manual section).
 man_pages = [
-    ('index', 'TemplateClass', u'MonoPlot Documentation',
+    ('index', 'TemplateClass', u'MoniQue Documentation',
      [u'Sebastian Mikolka-Flöry'], 1)
 ]

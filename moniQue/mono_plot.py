@@ -27,7 +27,7 @@ from PyQt5.QtGui import QIcon, QColor, QBrush
 from PyQt5.QtWidgets import QApplication, QAction, QTreeWidgetItem,QTableWidgetItem, QFileDialog, QDialog, QMenu, QStyle, QDialogButtonBox, QHeaderView
 
 # Initialize Qt resources from file resources.py
-from .resources import *
+# from .src.resources import *
 from .camera import Camera
 
 # Import the code for the dialog
@@ -39,6 +39,7 @@ from .gui.gcp_meta_dlg import MetaWindow as GcpMetaWindow
 from .gui.src.create_dlg_base import Ui_Dialog as Ui_CreateDialog
 from .gui.src.change_name_dlg_base import Ui_ChangeDialog 
 from .gui.src.create_ortho_dlg_base import Ui_Dialog as Ui_CreateOrthoDialog
+from .gui.scene3d_widget import Scene3D
 
 import os.path
 
@@ -176,7 +177,8 @@ class MonoPlot:
         
         self.dlg.btn_add_images.clicked.connect(self.add_images_dialog)
         
-        self.dlg.btn_oritool.clicked.connect(self.show_orient_dlg)
+        # self.dlg.btn_oritool.clicked.connect(self.show_orient_dlg)
+        self.dlg.btn_oritool.clicked.connect(self.show_scene_3d)
         
                 
         self.dlg.btn_pan.clicked.connect(self.activate_panning)
@@ -283,7 +285,7 @@ class MonoPlot:
         
         self.highlight_color = QColor(Qt.red)
         self.highlight_color.setAlpha(50)
-    
+        
     def delete_selected_gcps(self):
 
         if self.map_gcps_lyr.selectedFeatureCount() > 0:
@@ -377,6 +379,10 @@ class MonoPlot:
         
         print(gcp_data)
         
+    def show_scene_3d(self):
+        self.scene_3d = Scene3D()
+        self.scene_3d.closed.connect(self.close_scene_3d)
+        self.scene_3d.show()
         
     def initGui(self):
         """Create the menu entries and toolbar icons inside the QGIS GUI."""
@@ -571,6 +577,13 @@ class MonoPlot:
         root.removeChild(item_to_delete)
 
         self.clear_highlighted_features()
+    
+    def close_scene_3d(self):
+        self.scene_3d.close()
+        self.dlg.btn_oritool.setChecked(False)
+        self.map_canvas.setMapTool(QgsMapToolPan(self.map_canvas))
+        self.img_canvas.setMapTool(self.pan_tool)
+        self.dlg.btn_pan.setChecked(True)
     
     def close_orient_dlg(self):
         self.orient_dlg.combo_raster_lyrs.clear()

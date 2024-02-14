@@ -8,17 +8,17 @@
 
 """
 
-__author__ = 'sebastian.floery@geo.tuwien.ac.at'
-__date__ = '2021-02-12'
-__copyright__ = 'Copyright 2021, Sebastian Mikolka-Flöry'
+__author__ = 's.floery@gmx.at'
+__date__ = '2024-02-07'
+__copyright__ = 'Copyright 2024, Sebastian Mikolka-Flöry'
 
 import unittest
 
-from PyQt5.QtGui import QIcon
+from qgis.PyQt.QtGui import QIcon
 
 
 
-class MonoPlotDialogTest(unittest.TestCase):
+class MoniQueDialogTest(unittest.TestCase):
     """Test rerources work."""
 
     def setUp(self):
@@ -31,12 +31,12 @@ class MonoPlotDialogTest(unittest.TestCase):
 
     def test_icon_png(self):
         """Test we can click OK."""
-        path = ':/plugins/MonoPlot/icon.png'
+        path = ':/plugins/MoniQue/icon.png'
         icon = QIcon(path)
         self.assertFalse(icon.isNull())
 
 if __name__ == "__main__":
-    suite = unittest.makeSuite(MonoPlotResourcesTest)
+    suite = unittest.makeSuite(MoniQueResourcesTest)
     runner = unittest.TextTestRunner(verbosity=2)
     runner.run(suite)
 

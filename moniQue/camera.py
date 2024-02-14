@@ -4,50 +4,70 @@ import urllib.request
 import json
 import ssl
 
-context = ssl._create_unverified_context()
-            
 class Camera():
     
-    def __init__(self, name, path, ext, is_oriented=False):
+    def __init__(self, iid, path, ext, is_oriented=False, s0=None, X=None, Y=None, H=None, X_std=None, Y_std=None, H_std=None,
+                 alpha=None, alpha_std=None, kappa=None, kappa_std=None, zeta = None, zeta_std=None, x0=None, y0=None, f=None, f_std=None, 
+                 gcps=None, img_gcps=None, obj_gcps=None, hfov=None, vfov=None, img_h=None, img_w=None):
         
         self.is_oriented=is_oriented
         
-        self.iid = name
+        self.iid = iid
         self.path = path
         self.ext = ext
         
-        self.s0 = None
+        self.s0 = s0
         
-        self.prc = None
-        self.prc_std = None
-        self.rmat = None
+        self.X = X
+        self.X_std = X_std
+        self.Y = Y
+        self.Y_std = Y_std
+        self.H = H
+        self.H_std = H_std
+                
+        self.prc = [self.X, self.Y, self.H]
+        self.prc_std = [self.X_std, self.Y_std, self.H_std]
         
-        self.ior = None
-        self.ior_std = None
+        self.alpha = alpha
+        self.alpha_std = alpha_std
+        self.kappa = kappa
+        self.kappa_std = kappa_std
+        self.zeta = zeta
+        self.zeta_std = zeta_std
         
-        self.gcps = None
-        self.gcp_img_coords = None
-        self.gcp_obj_coords = None
+        self.alzeka = [alpha, zeta, kappa]
+        self.alzeka_std = [alpha_std, kappa_std, zeta_std]
         
-        self.alpha = None
-        self.zeta = None
-        self.kappa = None
+        # if alzeka is not None:
+        #     self.azimut = self.alpha2azi()
+        #     self.rmat = self.alzeka2rot()
+        # else:
+        #     self.azimut = None
+        #     self.rmat = None
         
-        self.alzeka = None
-        self.alzeka_std = None
+        self.x0 = x0
+        self.y0 = y0
+        self.f = f
+        self.f_std = f_std
         
-        self.meta = None
+        self.ior = [x0, y0, f]
         
-        self.w = None
-        self.h = None
+        self.gcps = gcps
+        self.gcp_img_coords = img_gcps
+        self.gcp_obj_coords = obj_gcps
         
-        self.hfov = None
-        self.vfov = None
+        self.img_w = img_w
+        self.img_h = img_h
         
-    def set_img_dim(self, h, w):
-        self.h = h
-        self.w = w
-          
+        self.hfov = hfov
+        self.vfov = vfov
+        
+    def alzeka2rot(self):
+        pass
+        
+    def alpha2azi(self):
+        pass
+    
     #     if not token:
     #         token = "40622e289e7005b3007a499eac4ecb3a"
         

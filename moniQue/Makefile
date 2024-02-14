@@ -1,12 +1,12 @@
 #/***************************************************************************
-# MonoPlot
+# MoniQue
 #
-# Monoplotting of images
+# Monoplotting oblique images.
 #							 -------------------
-#		begin				: 2021-02-12
+#		begin				: 2024-02-07
 #		git sha				: $Format:%H$
-#		copyright			: (C) 2021 by Sebastian Mikolka-Flöry
-#		email				: sebastian.floery@geo.tuwien.ac.at
+#		copyright			: (C) 2024 by Sebastian Mikolka-Flöry
+#		email				: s.floery@gmx.at
 # ***************************************************************************/
 #
 #/***************************************************************************
@@ -38,15 +38,15 @@ LOCALES =
 # translation
 SOURCES = \
 	__init__.py \
-	mono_plot.py mono_plot_dialog.py
+	monique.py monique_dialog.py
 
-PLUGINNAME = mono_plot
+PLUGINNAME = monique
 
 PY_FILES = \
 	__init__.py \
-	mono_plot.py mono_plot_dialog.py
+	monique.py monique_dialog.py
 
-UI_FILES = mono_plot_dialog_base.ui
+UI_FILES = monique_dialog_base.ui
 
 EXTRAS = metadata.txt icon.png
 
@@ -56,6 +56,16 @@ COMPILED_RESOURCE_FILES = resources.py
 
 PEP8EXCLUDE=pydev,resources.py,conf.py,third_party,ui
 
+# QGISDIR points to the location where your plugin should be installed.
+# This varies by platform, relative to your HOME directory:
+#	* Linux:
+#	  .local/share/QGIS/QGIS3/profiles/default/python/plugins/
+#	* Mac OS X:
+#	  Library/Application Support/QGIS/QGIS3/profiles/default/python/plugins
+#	* Windows:
+#	  AppData\Roaming\QGIS\QGIS3\profiles\default\python\plugins'
+
+QGISDIR=C:\Users\sfloery\AppData/Roaming/QGIS/QGIS3/profiles/default/python/plugins
 
 #################################################
 # Normally you would not need to edit below here
@@ -67,9 +77,14 @@ PLUGIN_UPLOAD = $(c)/plugin_upload.py
 
 RESOURCE_SRC=$(shell grep '^ *<file' resources.qrc | sed 's@</file>@@g;s/.*>//g' | tr '\n' ' ')
 
-QGISDIR=.qgis2
-
-default: compile
+.PHONY: default
+default:
+	@echo While you can use make to build and deploy your plugin, pb_tool
+	@echo is a much better solution.
+	@echo A Python script, pb_tool provides platform independent management of
+	@echo your plugins and runs anywhere.
+	@echo You can install pb_tool using: pip install pb_tool
+	@echo See https://g-sherman.github.io/plugin_build_tool/ for info. 
 
 compile: $(COMPILED_RESOURCE_FILES)
 
