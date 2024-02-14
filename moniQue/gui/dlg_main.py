@@ -34,8 +34,8 @@ from PIL import Image
 
 from qgis.core import QgsFeature, QgsFeatureRequest, QgsRasterLayer, QgsProject
 
-from .create_dialog import CreateDialog
-from .camera import Camera
+from .dlg_create import CreateDialog
+from ..camera import Camera
 
 class MainDialog(QtWidgets.QDialog):
     
@@ -54,6 +54,7 @@ class MainDialog(QtWidgets.QDialog):
         
         self.setWindowTitle("moniQue")
         self.setWindowFlag(QtCore.Qt.WindowMaximizeButtonHint, True)
+        self.setWindowIcon(QtGui.QIcon(os.path.join(self.plugin_dir, "icon.png")))
 
         self.menu = QtWidgets.QMenuBar(self)
         self.file_menu = QtWidgets.QMenu("&File", self)
@@ -79,37 +80,34 @@ class MainDialog(QtWidgets.QDialog):
         self.import_action.triggered.connect(self.import_images)
         self.img_menu.addAction(self.import_action)
         
-        # self.toolbar = QtWidgets.QToolBar("My main toolbar")
-        # self.toolbar.setIconSize(QtCore.QSize(24, 24))
-        
-        
-        # btn_obj_pan = QtWidgets.QAction("Pan (Obj)", self)
-        # # btn_img_pan.triggered.connect(self.load_mesh)
-        # self.toolbar.addAction(btn_obj_pan)
-        
-        # self.toolbar.addSeparator()
+        self.main_toolbar = QtWidgets.QToolBar("My main toolbar")
+        self.main_toolbar.setIconSize(QtCore.QSize(20, 20))
 
-        # btn_ori_tool = QtWidgets.QAction("Ori", self)
-        # btn_ori_tool.setIcon(QtGui.QIcon(os.path.join(self.icon_dir, "camera.png")))
-        # self.toolbar.addAction(btn_ori_tool)
+        self.btn_ori_tool = QtWidgets.QAction("Open orientation dialog", self)
+        self.btn_ori_tool.setIcon(QtGui.QIcon(os.path.join(self.icon_dir, "camera.png")))
+        # button_action.triggered.connect(self.load_mesh)
+        self.btn_ori_tool.setEnabled(False)
+        self.main_toolbar.addAction(self.btn_ori_tool)
         
-        # btn_mono_tool = QtWidgets.QAction("Mono", self)
-        # btn_mono_tool.setIcon(QtGui.QIcon(os.path.join(self.icon_dir, "mActionAddPolyline.png")))
-        # self.toolbar.addAction(btn_mono_tool)
+        self.main_toolbar.addSeparator()
         
-        # btn_mono_select = QtWidgets.QAction("Select", self)
-        # btn_mono_select.setIcon(QtGui.QIcon(os.path.join(self.icon_dir, "mActionSelectRectangle.png")))
-        # self.toolbar.addAction(btn_mono_select)
-        
-        # btn_mono_vertex = QtWidgets.QAction("Edit", self)
-        # btn_mono_vertex.setIcon(QtGui.QIcon(os.path.join(self.icon_dir, "mActionVertexToolActiveLayer.png")))
-        # self.toolbar.addAction(btn_mono_vertex)
-        
-        # # button_action = QtWidgets.QAction("Add mesh", self)
-        # # button_action.setStatusTip("This is your button")
-        # # button_action.setIcon(QtGui.QIcon("H:\\py_projects\\moniQue_dep\\moniQue\\gfx\\icon\\mActionAddImage.png"))
+        self.btn_mono_tool = QtWidgets.QAction("Activate monoplotting tool", self)
+        self.btn_mono_tool.setIcon(QtGui.QIcon(os.path.join(self.icon_dir, "mActionAddPolyline.png")))
+        self.btn_mono_tool.setEnabled(False)
         # # button_action.triggered.connect(self.load_mesh)
-        # # self.toolbar.addAction(button_action)
+        self.main_toolbar.addAction(self.btn_mono_tool)
+        
+        self.btn_mono_select = QtWidgets.QAction("Select monoplotted lines", self)
+        self.btn_mono_select.setIcon(QtGui.QIcon(os.path.join(self.icon_dir, "mActionSelectRectangle.png")))
+        self.btn_mono_select.setEnabled(False)
+        # button_action.triggered.connect(self.load_mesh)
+        self.main_toolbar.addAction(self.btn_mono_select)
+        
+        btn_mono_vertex = QtWidgets.QAction("Edit monoplotted lines", self)
+        btn_mono_vertex.setIcon(QtGui.QIcon(os.path.join(self.icon_dir, "mActionVertexToolActiveLayer.png")))
+        btn_mono_vertex.setEnabled(False)
+        # button_action.triggered.connect(self.load_mesh)
+        self.main_toolbar.addAction(btn_mono_vertex)
         
         self.img_toolbar = QtWidgets.QToolBar()
         self.img_toolbar.setIconSize(QtCore.QSize(20, 20))
@@ -124,8 +122,8 @@ class MainDialog(QtWidgets.QDialog):
         
         btn_img_extent = QtWidgets.QAction("Zoom to image extent.", self)
         btn_img_extent.setIcon(QtGui.QIcon(os.path.join(self.icon_dir, "mActionZoomFullExtent.png")))
+        btn_img_extent.triggered.connect(self.set_img_canvas_extent)
         self.img_toolbar.addAction(btn_img_extent)
-        # btn_img_pan.triggered.connect(self.load_mesh)
         
         self.obj_toolbar = QtWidgets.QToolBar()
         self.obj_toolbar.setIconSize(QtCore.QSize(20, 20))
@@ -145,13 +143,16 @@ class MainDialog(QtWidgets.QDialog):
         self.obj_canvas.request_draw(self.animate)
         self.obj_controller = gfx.TrackballController(self.obj_camera, register_events=self.obj_renderer)
         
+        self.list_toolbar = QtWidgets.QToolBar()
+        self.list_toolbar.setIconSize(QtCore.QSize(20, 20))
+        
         self.img_list = QtWidgets.QListWidget()
+        self.img_list.setAlternatingRowColors(True)
         self.img_list.setSelectionMode(QtWidgets.QAbstractItemView.SingleSelection)
         # self.img_list.itemChanged.connect(self.toggle_camera)
         self.img_list.itemSelectionChanged.connect(self.toggle_camera)
         self.img_list.setEnabled(False)
-        self.img_list.setMinimumSize(QtCore.QSize(150, 16777215))
-        self.img_list.setMaximumSize(QtCore.QSize(150, 16777215))
+        
 
         self.split_canvas = QtWidgets.QSplitter()
         split_max_width = QtWidgets.QApplication.primaryScreen().size().width()
@@ -176,17 +177,27 @@ class MainDialog(QtWidgets.QDialog):
         self.split_canvas.addWidget(self.obj_split)
         self.split_canvas.setSizes([split_max_width, split_max_width])
         
+        self.list_widget = QtWidgets.QWidget()
+        self.list_widget.setMinimumSize(QtCore.QSize(150, 16777215))
+        self.list_widget.setMaximumSize(QtCore.QSize(150, 16777215))
+        list_widget_layout = QtWidgets.QVBoxLayout()
+        list_widget_layout.setSpacing(0)
+        list_widget_layout.setContentsMargins(0, 16, 0, 0)
+        list_widget_layout.addWidget(self.list_toolbar)
+        list_widget_layout.addWidget(self.img_list)
+        self.list_widget.setLayout(list_widget_layout)
+        
         main_layout = QtWidgets.QHBoxLayout()
         main_layout.setSpacing(0)
         main_layout.setContentsMargins(5, 0, 5, 0)
         main_layout.addWidget(self.split_canvas)
-        main_layout.addWidget(self.img_list)
+        main_layout.addWidget(self.list_widget)
 
         layout = QtWidgets.QVBoxLayout()
         layout.setSpacing(0)
         layout.setContentsMargins(0, 0, 0, 5)
         layout.setMenuBar(self.menu)
-        # layout.addWidget(self.toolbar)
+        layout.addWidget(self.main_toolbar)
         layout.addLayout(main_layout)
         self.setLayout(layout)
         
@@ -277,6 +288,7 @@ class MainDialog(QtWidgets.QDialog):
         """
         
         item = QtWidgets.QListWidgetItem(camera.iid)
+        item.setSizeHint(QtCore.QSize(24, 24))
         item.setFlags(item.flags() ^ QtCore.Qt.ItemIsUserCheckable)
         item.setCheckState(QtCore.Qt.Unchecked)
         self.img_list.addItem(item)
@@ -323,7 +335,17 @@ class MainDialog(QtWidgets.QDialog):
             self.img_canvas.refresh()
             self.img_lyr = img_lyr
     
+    def set_img_canvas_extent(self):
+        self.img_canvas.setExtent(self.img_lyr.extent())
+        self.img_canvas.refresh()
+    
     def toggle_camera(self):
+        
+        #before for the first time an image is loaded
+        #into to canvas self.img_lyr is None; Hence, until
+        #than the button shall be disabled
+        if self.img_lyr is None:
+            self.btn_ori_tool.setEnabled(True)
         
         item = self.img_list.selectedItems()[0]
         item.setCheckState(QtCore.Qt.Checked)
@@ -411,33 +433,6 @@ class MainDialog(QtWidgets.QDialog):
         self.img_list.setEnabled(True)
         self.img_menu.setEnabled(True)
         self.project_name = self.windowTitle()
-        
-    # def load_mesh(self):
-    #     mesh_path = QtWidgets.QFileDialog.getOpenFileName(None, "Open mesh", "", ("Mesh (*.ply)"))[0]
-        
-    #     if mesh_path:
-    #         if os.path.exists(mesh_path):
-                
-    #             print("Reading mesh...")
-    #             o3d_mesh = o3d.io.read_triangle_mesh(mesh_path)
-    #             o3d_mesh.compute_vertex_normals()
-                
-    #             verts = np.asarray(o3d_mesh.vertices)
-    #             faces = np.asarray(o3d_mesh.triangles).astype(np.uint32)
-    #             norms = np.asarray(o3d_mesh.vertex_normals).astype(np.float32)
-                
-    #             verts_loc = verts - np.min(verts, axis=0)
-                                
-    #             print("Loading mesh...")
-    #             mesh_geom = gfx.geometries.Geometry(indices=faces, positions=verts_loc.astype(np.float32), normals=norms)
-    #             mesh_material = gfx.MeshPhongMaterial(color="#BEBEBE", side="FRONT", shininess=10)
-
-    #             mesh = gfx.Mesh(mesh_geom, mesh_material)
-    #             mesh.add_event_handler(self.mesh_picking, "pointer_down")
-    #             self.obj_scene.add(mesh)
-                
-    #             self.obj_scene.add(gfx.AmbientLight(intensity=1), gfx.DirectionalLight())
-    #             self.obj_camera.show_object(self.obj_scene)
                 
     # def mesh_picking(self, event):
         
