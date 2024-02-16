@@ -8,7 +8,6 @@ class ImgPickerTool(QgsMapTool):
     
     featAdded = pyqtSignal(object)
 
-    
     def __init__(self, canvas, meta_window):
         
         self.canvas = canvas
@@ -33,8 +32,8 @@ class ImgPickerTool(QgsMapTool):
             click_pos = self.toMapCoordinates(e.pos())            
             mx, my = float(click_pos.x()), float(click_pos.y())
             
-            if (mx >= 0) and (mx <= self.camera.w):
-                if (my <= 0) and (my >= self.camera.h*(-1)):
+            if (mx >= 0) and (mx <= self.camera.img_w):
+                if (my <= 0) and (my >= self.camera.img_h*(-1)):
                                                            
                     img_gids = [feat.attributes()[self.img_lyr_gix] for feat in self.img_lyr.getFeatures()]
                     map_gids = [feat.attributes()[self.map_lyr_gix] for feat in self.map_lyr.getFeatures()]
@@ -44,8 +43,8 @@ class ImgPickerTool(QgsMapTool):
                     self.meta_window.combo_gid.addItems(pot_gids)
                     
                     self.meta_window.line_iid.setText(self.camera.iid)
-                    self.meta_window.line_img_x.setText(str(mx))
-                    self.meta_window.line_img_y.setText(str(my))
+                    self.meta_window.line_img_x.setText("%.2f" % (mx))
+                    self.meta_window.line_img_y.setText("%.2f" % (my))
                     
                     result = self.meta_window.exec_() 
                     if result:
@@ -55,8 +54,8 @@ class ImgPickerTool(QgsMapTool):
                         feat.setGeometry(QgsPoint(mx, my))
                         feat["iid"] = self.camera.iid
                         feat["gid"] = self.meta_window.combo_gid.currentText() 
-                        feat["x"] = mx
-                        feat["y"] = my
+                        feat["x"] = "%.2f" % (mx)
+                        feat["y"] = "%.2f" % (my)
                         feat["desc"] = self.meta_window.line_desc.text() 
                         feat["active"] = 0
                         

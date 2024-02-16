@@ -43,11 +43,13 @@ class CreateDialog(QtWidgets.QDialog):
     
     created_signal = QtCore.pyqtSignal(object)
 
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, icon_dir=None):
         """Constructor."""
         super(CreateDialog, self).__init__()
-    
-        self.setObjectName("Create new project...")
+        
+        self.icon_dir = icon_dir
+
+        self.setWindowTitle("Create new project...")
         self.resize(500, 150)
         self.setMinimumSize(QtCore.QSize(500, 150))
         self.setMaximumSize(QtCore.QSize(500, 150))
@@ -59,6 +61,7 @@ class CreateDialog(QtWidgets.QDialog):
         self.gpkg_line = QtWidgets.QLineEdit()
         self.gpkg_line.setEnabled(False)
         self.gpkg_btn = QtWidgets.QPushButton()
+        self.gpkg_btn.setIcon(QtGui.QIcon(os.path.join(self.icon_dir, "mActionFileOpen.png")))
         self.gpkg_btn.clicked.connect(self.set_gpkg_path)
         
         gpkg_layout.addWidget(gpkg_label)
@@ -70,6 +73,7 @@ class CreateDialog(QtWidgets.QDialog):
         self.mesh_line = QtWidgets.QLineEdit()
         self.mesh_line.setEnabled(False)
         self.mesh_btn = QtWidgets.QPushButton()
+        self.mesh_btn.setIcon(QtGui.QIcon(os.path.join(self.icon_dir, "mActionFileOpen.png")))
         self.mesh_btn.clicked.connect(self.set_mesh_path)
 
         mesh_layout.addWidget(mesh_label)

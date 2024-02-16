@@ -35,6 +35,10 @@ from PIL import Image
 from qgis.core import QgsFeature, QgsFeatureRequest, QgsRasterLayer, QgsProject
 
 from .dlg_create import CreateDialog
+from .dlg_orient import OrientDialog
+from .dlg_meta_gcp import GcpMetaDialog
+from ..tools.ImgPickerTool import ImgPickerTool
+
 from ..camera import Camera
 
 class MainDialog(QtWidgets.QDialog):
@@ -85,7 +89,8 @@ class MainDialog(QtWidgets.QDialog):
 
         self.btn_ori_tool = QtWidgets.QAction("Open orientation dialog", self)
         self.btn_ori_tool.setIcon(QtGui.QIcon(os.path.join(self.icon_dir, "camera.png")))
-        # button_action.triggered.connect(self.load_mesh)
+        self.btn_ori_tool.triggered.connect(self.show_orient_dlg)
+        self.btn_ori_tool.setCheckable(True)
         self.btn_ori_tool.setEnabled(False)
         self.main_toolbar.addAction(self.btn_ori_tool)
         
@@ -135,7 +140,6 @@ class MainDialog(QtWidgets.QDialog):
         self.obj_toolbar.addAction(btn_obj_extent)
         # btn_img_pan.triggered.connect(self.load_mesh)
         
-        
         self.obj_renderer = gfx.WgpuRenderer(self.obj_canvas)
         self.obj_scene = gfx.Scene()
         self.obj_camera = gfx.PerspectiveCamera()
@@ -153,7 +157,6 @@ class MainDialog(QtWidgets.QDialog):
         self.img_list.itemSelectionChanged.connect(self.toggle_camera)
         self.img_list.setEnabled(False)
         
-
         self.split_canvas = QtWidgets.QSplitter()
         split_max_width = QtWidgets.QApplication.primaryScreen().size().width()
         
@@ -211,10 +214,15 @@ class MainDialog(QtWidgets.QDialog):
         self.map_gcps_lyr = lyr_dict["map_gcps_lyr"]
         
     def show_create_dlg(self):
-        self.create_dlg = CreateDialog(parent=self)
+        self.create_dlg = CreateDialog(parent=self, icon_dir=self.icon_dir)
         self.create_dlg.created_signal.connect(self.on_created_signal)
         self.create_dlg.show()
     
+    def show_orient_dlg(self):
+        if self.btn_ori_tool.isChecked():
+            self.orient_dlg = OrientDialog(parent=self, icon_dir=self.icon_dir, active_iid=self.active_camera.iid)
+            self.orient_dlg.show()
+
     def on_created_signal(self, data):
         self.load_project(gpkg_path=data["gpkg_path"])
     
@@ -434,6 +442,18 @@ class MainDialog(QtWidgets.QDialog):
         self.img_menu.setEnabled(True)
         self.project_name = self.windowTitle()
                 
+    def activate_gcp_picking(self):
+
+        self.img_picker_tool = ImgPickerTool(self.img_canvas, GcpMetaDialog())
+        self.img_picker_tool.set_camera(self.active_camera)
+        self.img_picker_tool.set_layers(img_lyr=self.img_gcps_lyr, map_lyr=self.map_gcps_lyr)
+        self.img_canvas.setMapTool(self.img_picker_tool)
+
+        # self.img_picker_tool.featAdded.connect(self.img_gcp_added)
+
+    
+    def deactivate_gcp_picking(self):
+        print("Buuuuh")
     # def mesh_picking(self, event):
         
         # if event.button == 1 and "Control" in event.modifiers:
