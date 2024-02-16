@@ -130,9 +130,7 @@ class CreateDialog(QtWidgets.QDialog):
         mesh = o3d.io.read_triangle_mesh(mesh_path)
         nr_verts = int(np.asarray(mesh.vertices).shape[0])
         nr_faces = int(np.asarray(mesh.triangles).shape[0])
-        
-        print(nr_verts, nr_faces)
-        
+                
         mesh_bbox = mesh.get_axis_aligned_bounding_box()
         mesh_centroid = mesh_bbox.get_center()
         mesh_cx = mesh_centroid[0]

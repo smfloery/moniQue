@@ -274,7 +274,7 @@ class MainDialog(QtWidgets.QDialog):
                 img_h = img.height
                 img_w = img.width
                                 
-                cam = Camera(name=img_name, path=path, ext=img_ext, is_oriented=False, h=img_h, w=img_w)
+                cam = Camera(iid=img_name, path=path, ext=img_ext, is_oriented=False, img_h=img_h, img_w=img_w)
                 self.camera_collection[cam.iid] = cam
                 
                 self.add_camera_to_list(cam)
@@ -303,8 +303,8 @@ class MainDialog(QtWidgets.QDialog):
         feat["iid"] = camera.iid
         feat["path"] = camera.path
         feat["ext"] = camera.ext
-        feat["img_w"] = camera.w
-        feat["img_h"] = camera.h
+        feat["img_w"] = camera.img_w
+        feat["img_h"] = camera.img_h
         
         pr = self.cam_lyr.dataProvider()
         pr.addFeatures([feat])
