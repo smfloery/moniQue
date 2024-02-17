@@ -32,5 +32,5 @@ def classFactory(iface):  # pylint: disable=invalid-name
     :type iface: QgsInterface
     """
     #
-    from .mono_plot import MonoPlot
+    from .main import MonoPlot
     return MonoPlot(iface)

@@ -29,6 +29,7 @@ from PyQt5.QtWidgets import QApplication, QAction, QTreeWidgetItem,QTableWidgetI
 # Initialize Qt resources from file resources.py
 from .resources import *
 from .camera import Camera
+from .lsq import srs_lm
 
 # Import the code for the dialog
 from .gui.mono_dlg import MonoDialog
@@ -353,30 +354,57 @@ class MonoPlot:
                                "x0":float(self.orient_dlg.line_x0.text()),
                                "y0":float(self.orient_dlg.line_y0.text())}
         except:
-            pass
-        
-        nr_rows = self.orient_dlg.table_gcps.rowCount()
-        nr_cols = self.orient_dlg.table_gcps.columnCount()
-        
-        gcp_data = {}
-        
-        for rix in range(nr_rows):
+            print("No initial parameters provided.")
             
-            gcp_data[rix] = {}
+        else:
+            nr_rows = self.orient_dlg.table_gcps.rowCount()
+            nr_cols = self.orient_dlg.table_gcps.columnCount()
             
-            if self.orient_dlg.table_gcps.item(rix, 0).checkState() == Qt.Checked:
-                for cix in range(1, nr_cols):
-                    curr_label = self.orient_dlg.table_gcps.horizontalHeaderItem(cix).text()
-                    curr_value = self.orient_dlg.table_gcps.item(rix, cix).text()   
+            obj_gcps = []
+            img_gcps = []
+            gids = []
+            
+            table_map = self.orient_dlg.name2ix
+            
+            for rix in range(nr_rows):
+                
+                if self.orient_dlg.table_gcps.item(rix, 0).checkState() == Qt.Checked:
                     
-                    if curr_label != "gid":
-                        gcp_data[rix][curr_label] = float(curr_value) if curr_value != "" else None
-        
-        if len(gcp_data.keys()) < 4:
-            pass
-        
-        print(gcp_data)
-        
+                    curr_gid = self.orient_dlg.table_gcps.item(rix, table_map["gid"]).text()
+                    gids.append(curr_gid)
+                    
+                    curr_obj_x = self.orient_dlg.table_gcps.item(rix, table_map["X"]).text()
+                    curr_obj_y = self.orient_dlg.table_gcps.item(rix, table_map["Y"]).text()
+                    curr_obj_z = self.orient_dlg.table_gcps.item(rix, table_map["H"]).text()
+                    obj_gcps.append([float(curr_obj_x), float(curr_obj_y), float(curr_obj_z)])
+                    
+                    curr_img_x = self.orient_dlg.table_gcps.item(rix, table_map["x"]).text()
+                    curr_img_y = self.orient_dlg.table_gcps.item(rix, table_map["y"]).text()
+                    img_gcps.append([float(curr_img_x), float(curr_img_y)])
+
+            if len(gids) >= 4:
+            
+                obj_gcps = np.asarray(obj_gcps).squeeze()
+                assert obj_gcps.shape[1] == 3
+                
+                img_gcps = np.asarray(img_gcps).squeeze()
+                assert img_gcps.shape[1] == 2
+                        
+                lm_res = srs_lm(init_cam_params, obj_gcps, img_gcps)
+                
+                if lm_res is None:
+                    print("Calculation of camera parameters did not work!")
+                else:
+                    est_x = lm_res[0]
+                    est_cxx = lm_res[1]
+                    est_cxx_names = lm_res[2]
+                    est_res = lm_res[3]
+                    
+                    print(est_x)
+                    print(est_cxx)
+                    print(est_res)
+            else:
+                print("Not enough GCPs available.")
         
     def initGui(self):
         """Create the menu entries and toolbar icons inside the QGIS GUI."""
@@ -1305,9 +1333,11 @@ class MonoPlot:
         gcps_h_src = list(set(gcps_h_src))
         
         for src in gcps_h_src:
+            print(src)
             if os.path.isfile(src):
                 src_name = os.path.basename(src).rsplit(".")[0]
-                if QgsProject.instance().mapLayersByName(src_name) == 0:
+                print(src_name)
+                if len(QgsProject.instance().mapLayersByName(src_name)) == 0:
                     src_lyr = QgsRasterLayer(src, src_name)
                     QgsProject.instance().addMapLayer(src_lyr)
         
