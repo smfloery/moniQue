@@ -47,6 +47,17 @@ class OrientDialog(QtWidgets.QDialog):
         """Constructor."""
         super(OrientDialog, self).__init__()
 
+        self.name2ix = {"gid":1,
+                "X":2,
+                "Y":3,
+                "Z":4,
+                "x":5,
+                "y":6,
+                "dx":7,
+                "dy":8}
+        
+        self.prev_row = -1
+        
         self.parent = parent
         self.parent.img_list.setEnabled(False)
         self.parent.activate_gcp_picking()
@@ -223,6 +234,90 @@ class OrientDialog(QtWidgets.QDialog):
         # main_layout.addLayout(btn_layout)
         # main_layout.addStretch(1)
         # self.setLayout(main_layout)
+    
+    def add_gcp_to_table(self, data, gcp_type=None):
+        
+        nr_rows = self.table_gcps.rowCount()
+        nr_cols = self.table_gcps.columnCount()
+        
+        gcp_exists = False
+                
+        for rix in range(nr_rows):
+            if self.table_gcps.item(rix, 1).text() == data["gid"]:
+                
+                if gcp_type == "obj_space":
+                    self.table_gcps.setItem(rix, self.name2ix["X"], QtWidgets.QTableWidgetItem("%.1f" % (data["obj_x"])))
+                    self.table_gcps.setItem(rix, self.name2ix["Y"], QtWidgets.QTableWidgetItem("%.1f" % (data["obj_y"])))
+                    self.table_gcps.setItem(rix, self.name2ix["Z"], QtWidgets.QTableWidgetItem("%.1f" % (data["obj_z"])))
+                
+                elif gcp_type == "img_space":
+                    self.table_gcps.setItem(rix, self.name2ix["x"], QtWidgets.QTableWidgetItem("%.1f" % (data["img_x"])))
+                    self.table_gcps.setItem(rix, self.name2ix["y"], QtWidgets.QTableWidgetItem("%.1f" % (data["img_y"])))
+                
+                self.table_gcps.item(rix, 0).setCheckState(QtCore.Qt.Checked)
+                self.table_gcps.item(rix, 0).setFlags(QtCore.Qt.ItemIsUserCheckable | QtCore.Qt.ItemIsEnabled)
+
+                gcp_exists = True
+                
+                break
+            
+        if not gcp_exists:
+            self.table_gcps.insertRow(nr_rows)
+            self.table_gcps.setRowHeight(nr_rows, 25)
+
+            chkBoxItem = QtWidgets.QTableWidgetItem()
+            chkBoxItem.setFlags(QtCore.Qt.ItemIsUserCheckable)# | Qt.ItemIsEnabled)
+            chkBoxItem.setCheckState(QtCore.Qt.Unchecked)
+                    
+            self.table_gcps.setItem(nr_rows, 0, chkBoxItem)
+            self.table_gcps.setItem(nr_rows, self.name2ix["gid"], QtWidgets.QTableWidgetItem(str(data["gid"])))
+
+            if gcp_type == "obj_space":
+                self.table_gcps.setItem(nr_rows, self.name2ix["X"], QtWidgets.QTableWidgetItem("%.1f" % (data["obj_x"])))
+                self.table_gcps.setItem(nr_rows, self.name2ix["Y"], QtWidgets.QTableWidgetItem("%.1f" % (data["obj_y"])))
+                self.table_gcps.setItem(nr_rows, self.name2ix["Z"], QtWidgets.QTableWidgetItem("%.1f" % (data["obj_z"])))
+            elif gcp_type == "img_space":
+                self.table_gcps.setItem(nr_rows, self.name2ix["x"], QtWidgets.QTableWidgetItem("%.1f" % (data["img_x"])))
+                self.table_gcps.setItem(nr_rows, self.name2ix["y"], QtWidgets.QTableWidgetItem("%.1f" % (data["img_y"])))
+        
+    def add_gcps_from_lyr(self, gcps):
+        
+        nr_gcps = len(gcps)
+        
+        for rx, (gid, data) in enumerate(gcps.items()):
+            
+            self.table_gcps.insertRow(rx)
+            self.table_gcps.setRowHeight(rx, 25)
+
+            chkBoxItem = QtWidgets.QTableWidgetItem()
+            chkBoxItem.setFlags(QtCore.Qt.ItemIsUserCheckable)# | Qt.ItemIsEnabled)
+            if data["active"] == 0:
+                chkBoxItem.setCheckState(QtCore.Qt.Unchecked)
+            else:
+                chkBoxItem.setCheckState(QtCore.Qt.Unchecked)
+            
+            self.table_gcps.setItem(rx, 0, chkBoxItem)
+            self.table_gcps.setItem(rx, self.name2ix["gid"], QtWidgets.QTableWidgetItem(gid))
+            if data["obj_x"]:
+                self.table_gcps.setItem(rx, self.name2ix["X"], QtWidgets.QTableWidgetItem("%.1f" % data["obj_x"]))
+            
+            if data["obj_y"]:
+                self.table_gcps.setItem(rx, self.name2ix["Y"], QtWidgets.QTableWidgetItem("%.1f" % data["obj_y"]))
+            
+            if data["obj_z"]:
+                self.table_gcps.setItem(rx, self.name2ix["Z"], QtWidgets.QTableWidgetItem("%.1f" % data["obj_z"]))
+            
+            if data["img_x"]:
+                self.table_gcps.setItem(rx, self.name2ix["x"], QtWidgets.QTableWidgetItem("%.1f" % data["img_x"]))
+            
+            if data["img_y"]:                                        
+                self.table_gcps.setItem(rx, self.name2ix["y"], QtWidgets.QTableWidgetItem("%.1f" % data["img_y"]))
+            
+            if data["img_dx"]:
+                self.table_gcps.setItem(rx, self.name2ix["dx"], QtWidgets.QTableWidgetItem("%.1f" % data["img_dx"]))
+            
+            if data["img_dy"]:
+                self.table_gcps.setItem(rx, self.name2ix["dy"], QtWidgets.QTableWidgetItem("%.1f" % data["img_dy"]))
     
     # def set_gpkg_path(self):
     #     gpkg_path = QtWidgets.QFileDialog.getSaveFileName(None, "GPKG path", "", ("Geopackage (*.gpkg)"))[0]

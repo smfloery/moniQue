@@ -6,7 +6,7 @@ from PyQt5.QtCore import pyqtSignal
 
 class ImgPickerTool(QgsMapTool):
     
-    featAdded = pyqtSignal(object)
+    gcpAdded = pyqtSignal(object)
 
     def __init__(self, canvas, meta_window):
         
@@ -27,7 +27,7 @@ class ImgPickerTool(QgsMapTool):
                 
     def canvasPressEvent(self, e):
         
-        if e.button() == Qt.LeftButton:
+        if (e.button() == Qt.LeftButton) & (e.modifiers() == Qt.ControlModifier):
 
             click_pos = self.toMapCoordinates(e.pos())            
             mx, my = float(click_pos.x()), float(click_pos.y())
@@ -39,12 +39,13 @@ class ImgPickerTool(QgsMapTool):
                     map_gids = [feat.attributes()[self.map_lyr_gix] for feat in self.map_lyr.getFeatures()]
                     pot_gids = list(set(map_gids).difference(img_gids))
                     
-                    self.meta_window.combo_gid.clear()
+                    # self.meta_window.combo_gid.clear()
+                    self.meta_window.combo_gid.clearEditText()
                     self.meta_window.combo_gid.addItems(pot_gids)
                     
                     self.meta_window.line_iid.setText(self.camera.iid)
-                    self.meta_window.line_img_x.setText("%.2f" % (mx))
-                    self.meta_window.line_img_y.setText("%.2f" % (my))
+                    self.meta_window.line_img_x.setText("%.1f" % (mx))
+                    self.meta_window.line_img_y.setText("%.1f" % (my))
                     
                     result = self.meta_window.exec_() 
                     if result:
@@ -52,18 +53,18 @@ class ImgPickerTool(QgsMapTool):
                         feat = QgsFeature(self.img_lyr.fields())
                 
                         feat.setGeometry(QgsPoint(mx, my))
-                        feat["iid"] = self.camera.iid
-                        feat["gid"] = self.meta_window.combo_gid.currentText() 
-                        feat["x"] = "%.2f" % (mx)
-                        feat["y"] = "%.2f" % (my)
-                        feat["desc"] = self.meta_window.line_desc.text() 
-                        feat["active"] = 0
+                        feat.setAttribute("iid", self.camera.iid)
+                        feat.setAttribute("gid", self.meta_window.combo_gid.currentText())
+                        feat.setAttribute("img_x", "%.1f" % (mx))
+                        feat.setAttribute("img_y", "%.1f" % (my))
+                        feat.setAttribute("desc", self.meta_window.line_desc.text())
+                        feat.setAttribute("active", 0)
                         
                         #img_feat.setAttributes([self.camera.id, self.camera.meta["von"], self.camera.meta["bis"], feat_attr["type"], feat_attr["comment"]])
                         (res, afeat) = self.img_lyr.dataProvider().addFeatures([feat])
                                                 
                         self.img_lyr.commitChanges()
-                        self.featAdded.emit({"fid":afeat[0].id(), "gid":feat["gid"], "x":mx, "y":my, "active":0})
+                        self.gcpAdded.emit({"fid":afeat[0].id(), "gid":feat["gid"], "img_x":mx, "img_y":my, "active":0})
                         
                         self.img_lyr.triggerRepaint()
                         self.img_lyr.reload()

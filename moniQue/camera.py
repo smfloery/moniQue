@@ -6,9 +6,11 @@ import ssl
 
 class Camera():
     
-    def __init__(self, iid, path, ext, is_oriented=False, s0=None, X=None, Y=None, H=None, X_std=None, Y_std=None, H_std=None,
-                 alpha=None, alpha_std=None, kappa=None, kappa_std=None, zeta = None, zeta_std=None, x0=None, y0=None, f=None, f_std=None, 
-                 gcps=None, img_gcps=None, obj_gcps=None, hfov=None, vfov=None, img_h=None, img_w=None):
+    def __init__(self, iid, path, ext, is_oriented=False, hfov=None, vfov=None, img_h=None, img_w=None,
+                 obj_x0=None, obj_y0=None, obj_z0=None, obj_x0_std=None, obj_y0_std=None, obj_z0_std=None, 
+                 alpha=None, alpha_std=None, kappa=None, kappa_std=None, zeta = None, zeta_std=None, 
+                 s0=None, img_x0=None, img_y0=None, f=None, f_std=None, 
+                 gcps=None, img_gcps=None, obj_gcps=None):
         
         self.is_oriented=is_oriented
         
@@ -18,15 +20,15 @@ class Camera():
         
         self.s0 = s0
         
-        self.X = X
-        self.X_std = X_std
-        self.Y = Y
-        self.Y_std = Y_std
-        self.H = H
-        self.H_std = H_std
+        self.obj_x0 = obj_x0
+        self.obj_x0_std = obj_x0_std
+        self.obj_y0 = obj_y0
+        self.obj_y0_std = obj_y0_std
+        self.obj_z0 = obj_z0
+        self.obj_z0_std = obj_z0_std
                 
-        self.prc = [self.X, self.Y, self.H]
-        self.prc_std = [self.X_std, self.Y_std, self.H_std]
+        self.prc = [self.obj_x0, self.obj_y0, self.obj_z0]
+        self.prc_std = [self.obj_x0_std, self.obj_y0_std, self.obj_z0_std]
         
         self.alpha = alpha
         self.alpha_std = alpha_std
@@ -45,12 +47,12 @@ class Camera():
         #     self.azimut = None
         #     self.rmat = None
         
-        self.x0 = x0
-        self.y0 = y0
+        self.img_x0 = img_x0
+        self.img_y0 = img_y0
         self.f = f
         self.f_std = f_std
         
-        self.ior = [x0, y0, f]
+        self.ior = [img_x0, img_y0, f]
         
         self.gcps = gcps
         self.gcp_img_coords = img_gcps

@@ -1,4 +1,5 @@
 from PyQt5.QtWidgets import QDialog, QGroupBox, QLineEdit, QDialogButtonBox, QVBoxLayout, QFormLayout, QLabel, QComboBox
+from PyQt5.QtGui import QIntValidator
 
 class GcpMetaDialog(QDialog):
   
@@ -24,7 +25,11 @@ class GcpMetaDialog(QDialog):
         self.combo_gid = QComboBox()
         self.combo_gid.setEditable(True)
         self.combo_gid.setInsertPolicy(QComboBox.InsertAtTop)
-
+        
+        combo_validator = QIntValidator()
+        combo_validator.setRange(1, 1000)
+        self.combo_gid.setValidator(combo_validator)
+        
         # creating a line edit
         self.line_img_x = QLineEdit()
         self.line_img_x.setReadOnly(True)
@@ -42,9 +47,9 @@ class GcpMetaDialog(QDialog):
         self.line_obj_y.setReadOnly(True)
         self.line_obj_y.setEnabled(False)
         
-        self.line_obj_h = QLineEdit()
-        self.line_obj_h.setReadOnly(True)
-        self.line_obj_h.setEnabled(False)
+        self.line_obj_z = QLineEdit()
+        self.line_obj_z.setReadOnly(True)
+        self.line_obj_z.setEnabled(False)
                             
         # creating a line edit
         self.line_desc = QLineEdit()
@@ -93,7 +98,7 @@ class GcpMetaDialog(QDialog):
         layout.addRow(QLabel("y"), self.line_img_y)
         layout.addRow(QLabel("X"), self.line_obj_x)
         layout.addRow(QLabel("Y"), self.line_obj_y)
-        layout.addRow(QLabel("H"), self.line_obj_h)
+        layout.addRow(QLabel("Z"), self.line_obj_z)
         layout.addRow(QLabel("Desc"), self.line_desc)
   
         # setting layout

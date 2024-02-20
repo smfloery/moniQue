@@ -65,17 +65,17 @@ class MoniQue:
         
         #map_canvas is the canvas of the QGIS main window
         self.map_canvas = iface.mapCanvas()
-        self.img_canvas = None              #will be set as soon as main_dlg launched
-        self.obj_canvas = None              #will be set as soon as main_dlg launched
+        # self.img_canvas = None              #will be set as soon as dlg_main launched
+        # self.obj_canvas = None              #will be set as soon as dlg_main launched
         
-        #predefine all gpkg layers
-        self.reg_lyr = None
-        self.cam_lyr = None
-        self.img_lyr = None
-        self.img_line_lyr = None
-        self.img_gcps_lyr = None
-        self.map_line_lyr = None
-        self.map_gcps_lyr = None
+        # #predefine all gpkg layers
+        # self.reg_lyr = None
+        # self.cam_lyr = None
+        # self.img_lyr = None
+        # self.img_line_lyr = None
+        # self.img_gcps_lyr = None
+        # self.map_line_lyr = None
+        # self.map_gcps_lyr = None
         
         self.camera_collection = {}
         
@@ -234,10 +234,10 @@ class MoniQue:
         monoGroup = root.insertGroup(0, self.project_name)
         monoGroup.addLayer(self.map_line_lyr) 
         monoGroup.addLayer(self.cam_lyr) 
-        monoGroup.addLayer(self.img_line_lyr) 
+        # monoGroup.addLayer(self.img_line_lyr) 
         monoGroup.addLayer(self.reg_lyr)
         monoGroup.addLayer(self.map_gcps_lyr)
-        monoGroup.addLayer(self.img_gcps_lyr)
+        # monoGroup.addLayer(self.img_gcps_lyr)
 
         expression = "iid = 'sth_not_existing'"
         self.img_line_lyr.setSubsetString(expression) #show only those lines which correspond to the currently selected image
@@ -249,10 +249,7 @@ class MoniQue:
         self.map_canvas.setExtent(self.reg_lyr.extent())
         self.map_canvas.refresh()
         
-        #define layers which should be shown/considered in which canvas
-        self.img_canvas.setLayers([self.img_line_lyr, self.img_gcps_lyr])
-        
-        self.main_dlg.setWindowTitle(self.project_name)
+        self.dlg_main.setWindowTitle(self.project_name)
         self.crs = self.cam_lyr.crs()
         # self.activate_buttons()
                
@@ -266,7 +263,6 @@ class MoniQue:
         
         self.layer_collection = {"reg_lyr":self.reg_lyr,
                                  "cam_lyr":self.cam_lyr,
-                                 "img_lyr":self.img_lyr, 
                                  "img_line_lyr":self.img_line_lyr,
                                  "img_gcps_lyr":self.img_gcps_lyr,
                                  "map_line_lyr":self.map_line_lyr,
@@ -274,8 +270,8 @@ class MoniQue:
         
         self.load_mesh()
         
-        self.main_dlg.activate_gui_elements()
-        self.main_dlg.set_layers(self.layer_collection)
+        self.dlg_main.activate_gui_elements()
+        self.dlg_main.set_layers(self.layer_collection)
         
         self.load_cameras_from_gpkg()
         
@@ -289,9 +285,9 @@ class MoniQue:
             feat_json = json.loads(QgsJsonUtils.exportAttributes(feat))
             del feat_json["fid"]
             cam = Camera(**feat_json)
-            print(cam)
+
             self.camera_collection[cam.iid] = cam
-            self.main_dlg.add_camera_to_list(cam)
+            self.dlg_main.add_camera_to_list(cam)
     
     def load_mesh(self):
             
@@ -308,7 +304,7 @@ class MoniQue:
         scene.add_triangles(o3d.t.geometry.TriangleMesh.from_legacy(self.o3d_mesh))
         
         self.ray_scene = scene
-        self.main_dlg.add_mesh_to_obj_canvas(self.o3d_mesh)
+        self.dlg_main.add_mesh_to_obj_canvas(self.o3d_mesh)
         
         # self.mono_tool.set_scene(scene)
         # self.vertex_tool.set_scene(scene)
@@ -321,43 +317,15 @@ class MoniQue:
         #if its not available than we don't have to do anything
         if self.project_name:
             monoGroup = root.findGroup(self.project_name)
-        
             if monoGroup:
                 root.removeChildNode(monoGroup)
             
             # # self.clear_highlighted_features()    
             
-            if self.img_lyr is not None:
-                QgsProject.instance().removeMapLayer(self.img_lyr.id())
-                self.img_lyr = None
-            
-            if self.cam_lyr is not None:
-                QgsProject.instance().removeMapLayer(self.cam_lyr.id())
-                self.cam_lyr = None
-            
-            if self.img_line_lyr is not None:
-                QgsProject.instance().removeMapLayer(self.img_line_lyr.id())
-                self.img_line_lyr = None
-            
-            if self.map_line_lyr is not None:
-                QgsProject.instance().removeMapLayer(self.map_line_lyr.id())
-                self.map_line_lyr = None
-            
-            if self.reg_lyr is not None:
-                QgsProject.instance().removeMapLayer(self.reg_lyr.id())
-                self.reg_lyr = None
-            
-            self.img_canvas.refresh()
-            self.map_canvas.refresh()
-            # self.img_tree.clear()
-            
-            # self.dlg.line_id.clear()
-            # self.deactivate_buttons()
-            
+            self.map_canvas.refresh()            
             self.map_canvas.setMapTool(self.map_pan_tool)
-            self.img_canvas.setMapTool(self.img_pan_tool)
             
-            self.main_dlg.setWindowTitle("moniQue")
+            self.dlg_main.setWindowTitle("moniQue")
             
     def run(self):
         """Run method that performs all the real work"""
@@ -367,17 +335,17 @@ class MoniQue:
         # if self.first_start == True:
         #     self.first_start = False
         
-        self.main_dlg = MainDialog(plugin_dir=self.plugin_dir)
-        self.main_dlg.camera_collection = self.camera_collection
-        self.main_dlg.load_project_signal.connect(self.on_load_project_signal)
-        self.main_dlg.close_dialog_signal.connect(self.reset_plugin)
+        self.dlg_main = MainDialog(plugin_dir=self.plugin_dir)
+        self.dlg_main.camera_collection = self.camera_collection
+        self.dlg_main.load_project_signal.connect(self.on_load_project_signal)
+        self.dlg_main.close_dialog_signal.connect(self.reset_plugin)
         
-        self.main_dlg.show()
+        self.dlg_main.show()
         
-        self.img_canvas = self.main_dlg.img_canvas
-        self.img_pan_tool = QgsMapToolPan(self.img_canvas)
+        # self.img_canvas = self.dlg_main.img_canvas
+        # self.img_pan_tool = QgsMapToolPan(self.img_canvas)
         
-        self.obj_canvas = self.main_dlg.obj_canvas
+        # self.obj_canvas = self.dlg_main.obj_canvas
                 
         # # Run the dialog event loop
         # result = self.dlg.exec_()

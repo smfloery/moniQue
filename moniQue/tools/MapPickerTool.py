@@ -48,7 +48,7 @@ class MapPickerTool(QgsMapTool):
                     self.meta_window.line_iid.setText(self.camera.iid)
                     self.meta_window.line_obj_x.setText(str(mx))
                     self.meta_window.line_obj_y.setText(str(my))
-                    self.meta_window.line_obj_h.setText(str(click_h))
+                    self.meta_window.line_obj_z.setText(str(click_h))
                     
                     result = self.meta_window.exec_() 
                     if result:
@@ -59,14 +59,14 @@ class MapPickerTool(QgsMapTool):
                         feat["gid"] = self.meta_window.combo_gid.currentText() 
                         feat["X"] = mx
                         feat["Y"] = my
-                        feat["H"] = click_h
+                        feat["Z"] = click_h
                         feat["desc"] = self.meta_window.line_desc.text() 
                         feat["H_src"] = self.dhm_src.dataProvider().dataSourceUri()
                         feat["active"] = 0
                         (res, afeat) = self.map_lyr.dataProvider().addFeatures([feat])
                         self.map_lyr.commitChanges()
                         
-                        self.featAdded.emit({"fid":afeat[0].id(), "gid":feat["gid"], "X":mx, "Y":my, "H":click_h, "active":0})
+                        self.featAdded.emit({"fid":afeat[0].id(), "gid":feat["gid"], "X":mx, "Y":my, "Z":click_h, "active":0})
                         self.map_lyr.triggerRepaint()
                         self.map_lyr.reload()
                         self.canvas.refresh()

@@ -31,8 +31,11 @@ import pygfx as gfx
 import open3d as o3d
 import numpy as np
 from PIL import Image
+import json
+from collections import OrderedDict
 
-from qgis.core import QgsFeature, QgsFeatureRequest, QgsRasterLayer, QgsProject
+from qgis.core import QgsFeature, QgsPoint, QgsFeatureRequest, QgsRasterLayer, QgsProject, QgsJsonUtils
+from qgis.gui import QgsMapToolPan
 
 from .dlg_create import CreateDialog
 from .dlg_orient import OrientDialog
@@ -69,7 +72,7 @@ class MainDialog(QtWidgets.QDialog):
         self.menu.addMenu(self.img_menu)
         
         self.create_action = QtWidgets.QAction("&New project", self)
-        self.create_action.triggered.connect(self.show_create_dlg)
+        self.create_action.triggered.connect(self.show_dlg_create)
         self.file_menu.addAction(self.create_action)
         
         self.load_action = QtWidgets.QAction("&Load project", self)
@@ -89,7 +92,7 @@ class MainDialog(QtWidgets.QDialog):
 
         self.btn_ori_tool = QtWidgets.QAction("Open orientation dialog", self)
         self.btn_ori_tool.setIcon(QtGui.QIcon(os.path.join(self.icon_dir, "camera.png")))
-        self.btn_ori_tool.triggered.connect(self.show_orient_dlg)
+        self.btn_ori_tool.triggered.connect(self.show_dlg_orient)
         self.btn_ori_tool.setCheckable(True)
         self.btn_ori_tool.setEnabled(False)
         self.main_toolbar.addAction(self.btn_ori_tool)
@@ -116,8 +119,12 @@ class MainDialog(QtWidgets.QDialog):
         
         self.img_toolbar = QtWidgets.QToolBar()
         self.img_toolbar.setIconSize(QtCore.QSize(20, 20))
+        
         self.img_canvas = QgsMapCanvas(parent=self)
         self.img_canvas.setMinimumSize(QtCore.QSize(300, 16777215))
+        
+        self.img_pan_tool = QgsMapToolPan(self.img_canvas)
+        
         
         btn_img_pan = QtWidgets.QAction("Pan (Image)", self)
         btn_img_pan.setIcon(QtGui.QIcon(os.path.join(self.icon_dir, "mActionPan.png")))
@@ -142,10 +149,15 @@ class MainDialog(QtWidgets.QDialog):
         
         self.obj_renderer = gfx.WgpuRenderer(self.obj_canvas)
         self.obj_scene = gfx.Scene()
-        self.obj_camera = gfx.PerspectiveCamera()
+        
+        light_gray = np.array((100, 100, 100, 255)) / 255
+        background = gfx.Background(None, gfx.BackgroundMaterial([1, 1, 1, 1]))
+        self.obj_scene.add(background)
+        
+        self.obj_camera = gfx.PerspectiveCamera(fov=45)#, depth_range=(10, 10000))
 
         self.obj_canvas.request_draw(self.animate)
-        self.obj_controller = gfx.TrackballController(self.obj_camera, register_events=self.obj_renderer)
+        self.obj_controller = gfx.TrackballController(self.obj_camera, register_events=self.obj_renderer, damping=0)
         
         self.list_toolbar = QtWidgets.QToolBar()
         self.list_toolbar.setIconSize(QtCore.QSize(20, 20))
@@ -207,21 +219,36 @@ class MainDialog(QtWidgets.QDialog):
     def set_layers(self, lyr_dict):
         self.reg_lyr = lyr_dict["reg_lyr"]
         self.cam_lyr = lyr_dict["cam_lyr"]        
-        self.img_lyr = lyr_dict["img_lyr"]
+        self.img_lyr = None                     #will be set layer when terrestrial image is loaded
+        
         self.img_line_lyr = lyr_dict["img_line_lyr"]
-        self.img_gcps_lyr = lyr_dict["img_gcps_lyr"]
         self.map_line_lyr = lyr_dict["map_line_lyr"]
+        
+        self.img_gcps_lyr = lyr_dict["img_gcps_lyr"]
         self.map_gcps_lyr = lyr_dict["map_gcps_lyr"]
         
-    def show_create_dlg(self):
-        self.create_dlg = CreateDialog(parent=self, icon_dir=self.icon_dir)
-        self.create_dlg.created_signal.connect(self.on_created_signal)
-        self.create_dlg.show()
+        self.img_gcps_gid_ix = self.img_gcps_lyr.dataProvider().fieldNameIndex('gid')
+        self.map_gcps_gid_ix = self.map_gcps_lyr.dataProvider().fieldNameIndex('gid')
+        
+        #define layers which should be shown/considered in which canvas
+        self.img_canvas.setLayers([self.img_line_lyr, self.img_gcps_lyr])
+        self.img_canvas.setMapTool(self.img_pan_tool)
+        
+    def show_dlg_create(self):
+        self.dlg_create = CreateDialog(parent=self, icon_dir=self.icon_dir)
+        self.dlg_create.created_signal.connect(self.on_created_signal)
+        self.dlg_create.show()
     
-    def show_orient_dlg(self):
+    def show_dlg_orient(self):
         if self.btn_ori_tool.isChecked():
-            self.orient_dlg = OrientDialog(parent=self, icon_dir=self.icon_dir, active_iid=self.active_camera.iid)
-            self.orient_dlg.show()
+            self.dlg_orient = OrientDialog(parent=self, icon_dir=self.icon_dir, active_iid=self.active_camera.iid)
+
+            gcps = self.get_gcps_from_gpkg()
+            print(gcps)
+            
+            self.dlg_orient.add_gcps_from_lyr(gcps)
+            
+            self.dlg_orient.show()
 
     def on_created_signal(self, data):
         self.load_project(gpkg_path=data["gpkg_path"])
@@ -238,6 +265,39 @@ class MainDialog(QtWidgets.QDialog):
         pass
     
     def closeEvent(self, event):
+        
+        print(self.img_lyr)
+        
+        if self.img_lyr is not None:
+            print("bluub")
+            QgsProject.instance().removeMapLayer(self.img_lyr.id())
+            self.img_lyr = None
+        
+        if self.cam_lyr is not None:
+            QgsProject.instance().removeMapLayer(self.cam_lyr.id())
+            self.cam_lyr = None
+        
+        if self.img_line_lyr is not None:
+            QgsProject.instance().removeMapLayer(self.img_line_lyr.id())
+            self.img_line_lyr = None
+        
+        if self.img_gcps_lyr is not None:
+            QgsProject.instance().removeMapLayer(self.img_gcps_lyr.id())
+            self.img_gcps_lyr = None
+        
+        if self.map_line_lyr is not None:
+            QgsProject.instance().removeMapLayer(self.map_line_lyr.id())
+            self.map_line_lyr = None
+        
+        if self.map_gcps_lyr is not None:
+            QgsProject.instance().removeMapLayer(self.map_gcps_lyr.id())
+            self.map_gcps_lyr = None
+        
+        if self.reg_lyr is not None:
+            QgsProject.instance().removeMapLayer(self.reg_lyr.id())
+            self.reg_lyr = None
+        
+        self.img_canvas.refresh()
         self.close_dialog_signal.emit()
     
     def add_mesh_to_obj_canvas(self, o3d_mesh):
@@ -253,9 +313,8 @@ class MainDialog(QtWidgets.QDialog):
         mesh_material = gfx.MeshPhongMaterial(color="#BEBEBE", side="FRONT", shininess=10)
 
         print("Adding mesh to canvas...")
-        mesh = gfx.Mesh(mesh_geom, mesh_material)
-        # # mesh.add_event_handler(self.mesh_picking, "pointer_down")
-        self.obj_scene.add(mesh)
+        self.mesh = gfx.Mesh(mesh_geom, mesh_material)
+        self.obj_scene.add(self.mesh)
         
         print("Adding lights...")
         self.obj_scene.add(gfx.AmbientLight(intensity=1), gfx.DirectionalLight())
@@ -287,7 +346,43 @@ class MainDialog(QtWidgets.QDialog):
                 
                 self.add_camera_to_list(cam)
                 self.add_camera_to_cam_lyr(cam)
+    
+    def get_gcps_from_gpkg(self):
+        gcps = OrderedDict()
+        gcp_data = {"obj_x":None, "obj_y":None, "obj_z":None, "img_x":None, "img_y":None, "img_dx":None, "img_dy":None, "active":None}
+        
+        for feat in self.img_gcps_lyr.getFeatures():
+            curr_gcp = gcp_data.copy()
+            img_gcp = json.loads(QgsJsonUtils.exportAttributes(feat))
+            curr_gid = img_gcp["gid"]
+            
+            curr_gcp["img_x"] = img_gcp["img_x"]
+            curr_gcp["img_y"] = img_gcp["img_y"]
+            curr_gcp["img_dx"] = img_gcp["img_dx"]
+            curr_gcp["img_dy"] = img_gcp["img_dy"]
+            curr_gcp["active"] = img_gcp["active"]
+            
+            gcps[curr_gid] = curr_gcp
+        
+        for feat in self.map_gcps_lyr.getFeatures():
+            map_gcp = json.loads(QgsJsonUtils.exportAttributes(feat))
+            curr_gid = map_gcp["gid"]
+            
+            if curr_gid in gcps.keys():
+                gcps[curr_gid]["obj_x"] = map_gcp["obj_x"]
+                gcps[curr_gid]["obj_y"] = map_gcp["obj_y"]
+                gcps[curr_gid]["obj_z"] = map_gcp["obj_z"]
+            else:
+                curr_gcp = gcp_data.copy()
+                curr_gcp["obj_x"] = map_gcp["obj_x"]
+                curr_gcp["obj_y"] = map_gcp["obj_y"]
+                curr_gcp["obj_z"] = map_gcp["obj_z"]
+                curr_gcp["active"] = map_gcp["active"]
                 
+                gcps[curr_gid] = curr_gcp
+
+        return gcps
+          
     def add_camera_to_list(self, camera):
         """Add camera to the image list.
 
@@ -336,13 +431,14 @@ class MainDialog(QtWidgets.QDialog):
         else:
             if self.img_lyr is not None:
                 QgsProject.instance().removeMapLayer(self.img_lyr.id())
-                
-            QgsProject.instance().addMapLayer(img_lyr, False) #False --> do not add layer to LayerTree --> not visible in qgis main canvas
-            self.img_canvas.setExtent(img_lyr.extent())
-            self.img_canvas.setLayers([self.img_gcps_lyr, self.img_line_lyr, img_lyr])
-            self.img_canvas.refresh()
+            
             self.img_lyr = img_lyr
-    
+                
+            # QgsProject.instance().addMapLayer(self.img_lyr, False) #False --> do not add layer to LayerTree --> not visible in qgis main canvas
+            self.img_canvas.setExtent(self.img_lyr.extent())
+            self.img_canvas.setLayers([self.img_gcps_lyr, self.img_line_lyr, self.img_lyr])
+            self.img_canvas.refresh()
+            
     def set_img_canvas_extent(self):
         self.img_canvas.setExtent(self.img_lyr.extent())
         self.img_canvas.refresh()
@@ -444,39 +540,90 @@ class MainDialog(QtWidgets.QDialog):
                 
     def activate_gcp_picking(self):
 
+        #GCP picking in image space
         self.img_picker_tool = ImgPickerTool(self.img_canvas, GcpMetaDialog())
         self.img_picker_tool.set_camera(self.active_camera)
         self.img_picker_tool.set_layers(img_lyr=self.img_gcps_lyr, map_lyr=self.map_gcps_lyr)
-        self.img_canvas.setMapTool(self.img_picker_tool)
-
-        # self.img_picker_tool.featAdded.connect(self.img_gcp_added)
-
-    
-    def deactivate_gcp_picking(self):
-        print("Buuuuh")
-    # def mesh_picking(self, event):
         
-        # if event.button == 1 and "Control" in event.modifiers:
-        #     face_ix = event.pick_info["face_index"]
+        self.img_picker_tool.gcpAdded.connect(self.img_gcp_added)
+
+        self.img_canvas.setMapTool(self.img_picker_tool)
+        
+        #GCP picking ib object space
+        self.mesh.add_event_handler(self.mesh_picking, "pointer_down")
+
+    def deactivate_gcp_picking(self):
+        self.mesh.remove_event_handler(self.mesh_picking, "pointer_down")
+        self.img_canvas.setMapTool(self.img_pan_tool)
+        
+    def img_gcp_added(self, data):
+        self.dlg_orient.add_gcp_to_table(data, gcp_type="img_space")
+    
+    def mesh_picking(self, event):
+        
+        if event.button == 1 and "Control" in event.modifiers:
+            face_ix = event.pick_info["face_index"]
             
-        #     #face_coords are not normalized; hence, divide by their sum first before using the further
-        #     face_coords = np.array(event.pick_info["face_coord"]).reshape(3, 1) 
-        #     face_coords /= np.sum(face_coords)
+            #face_coords are not normalized; hence, divide by their sum first before using the further
+            face_coords = np.array(event.pick_info["face_coord"]).reshape(3, 1) 
+            face_coords /= np.sum(face_coords)
             
-        #     face_vertex_ix = event.pick_info["world_object"].geometry.indices.data[face_ix, :]
-        #     face_vertex_pos = event.pick_info["world_object"].geometry.positions.data[face_vertex_ix, :]
+            face_vertex_ix = event.pick_info["world_object"].geometry.indices.data[face_ix, :]
+            face_vertex_pos = event.pick_info["world_object"].geometry.positions.data[face_vertex_ix, :]
             
-        #     click_pos = np.sum(face_vertex_pos*face_coords, axis=0)
+            click_pos = np.sum(face_vertex_pos*face_coords, axis=0)
             
-        #     click_geom = gfx.Geometry(positions=click_pos.astype(np.float32).reshape(1, 3))
-        #     click_obj = gfx.Points(click_geom, gfx.PointsMaterial(color=(0.78, 0, 0, 1), size=10))
-        #     self.obj_scene.add(click_obj)
-                        
-        #     click_text = gfx.Text(
-        #         gfx.TextGeometry(markdown="**1**", font_size=26, anchor="Bottom-Center", screen_space=True),
-        #         gfx.TextMaterial(color="#fff", outline_color="#000", outline_thickness=0.15))
-        #     click_text.local.position = click_obj.geometry.positions.data[0, :] + [0, 0, 10]
+            dlg_meta = GcpMetaDialog()
             
-        #     click_obj.add(click_text)           
+            img_gids = [feat.attributes()[self.img_gcps_gid_ix] for feat in self.img_gcps_lyr.getFeatures()]
+            map_gids = [feat.attributes()[self.map_gcps_gid_ix] for feat in self.map_gcps_lyr.getFeatures()]
+            pot_gids = list(set(img_gids).difference(map_gids))
+                
+            dlg_meta.combo_gid.addItems(pot_gids)
             
-        #     self.obj_canvas.request_draw(self.animate)
+            dlg_meta.line_iid.setText(self.active_camera.iid)
+            
+            dlg_meta.line_obj_x.setText("%.1f" % (click_pos[0]))
+            dlg_meta.line_obj_y.setText("%.1f" % (click_pos[1]))
+            dlg_meta.line_obj_z.setText("%.1f" % (click_pos[2]))
+            
+            result = dlg_meta.exec_() 
+            
+            if result:
+                
+                curr_gid = dlg_meta.combo_gid.currentText() 
+                
+                click_geom = gfx.Geometry(positions=click_pos.astype(np.float32).reshape(1, 3))
+                click_obj = gfx.Points(click_geom, gfx.PointsMaterial(color=(0.78, 0, 0, 1), size=10))
+                self.obj_scene.add(click_obj)
+                            
+                click_text = gfx.Text(
+                    gfx.TextGeometry(markdown="**%s**" % (curr_gid), font_size=26, anchor="Bottom-Center", screen_space=True),
+                    gfx.TextMaterial(color="#fff", outline_color="#000", outline_thickness=0.15))
+                click_text.local.position = click_obj.geometry.positions.data[0, :] + [0, 0, 10]
+                
+                click_obj.add(click_text)           
+                
+                self.obj_canvas.request_draw(self.animate)
+                self.dlg_orient.add_gcp_to_table({"obj_x":click_pos[0], 
+                                                  "obj_y":click_pos[1],
+                                                  "obj_z":click_pos[2],
+                                                  "gid":curr_gid},
+                                                  gcp_type="obj_space")
+                
+                feat = QgsFeature(self.map_gcps_lyr.fields())
+                
+                feat.setGeometry(QgsPoint(click_pos[0], click_pos[1]))
+                feat.setAttribute("iid", self.active_camera.iid)
+                feat.setAttribute("gid", dlg_meta.combo_gid.currentText())
+                feat.setAttribute("obj_x", float(click_pos[0]))
+                feat.setAttribute("obj_y", float(click_pos[1]))
+                feat.setAttribute("obj_z", float(click_pos[2]))
+                feat.setAttribute("desc", dlg_meta.line_desc.text())
+                feat.setAttribute("active", 0)
+                (res, afeat) = self.map_gcps_lyr.dataProvider().addFeatures([feat])
+                self.map_gcps_lyr.commitChanges()
+                
+                self.map_gcps_lyr.triggerRepaint()
+                self.map_gcps_lyr.reload()
+                # self.map_canvas.refresh()
