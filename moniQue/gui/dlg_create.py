@@ -132,52 +132,50 @@ class CreateDialog(QtWidgets.QDialog):
         transform_context = QgsProject.instance().transformContext() #necessary for writing
                 
         mesh = o3d.io.read_triangle_mesh(mesh_path)
-        nr_verts = int(np.asarray(mesh.vertices).shape[0])
+        
+        verts = np.asarray(mesh.vertices)
+        
+        nr_verts = int(verts.shape[0])
         nr_faces = int(np.asarray(mesh.triangles).shape[0])
-                
-        mesh_bbox = mesh.get_axis_aligned_bounding_box()
-        mesh_centroid = mesh_bbox.get_center()
-        mesh_cx = mesh_centroid[0]
-        mesh_cy = mesh_centroid[1]
         
-        mesh_half_extent = mesh_bbox.get_half_extent()
-        mesh_dx = mesh_half_extent[0]
-        mesh_dy = mesh_half_extent[1]
+        minx, miny, minz = np.min(verts, axis=0)
+        maxx, maxy, maxz = np.max(verts, axis=0)
 
-        mesh_tl = [mesh_cx - mesh_dx, mesh_cy+mesh_dy]
-        mesh_tr = [mesh_cx + mesh_dx, mesh_cy+mesh_dy]
-        mesh_br = [mesh_cx + mesh_dx, mesh_cy-mesh_dy]
-        mesh_bl = [mesh_cx - mesh_dx, mesh_cy-mesh_dy]
-        
-        mesh_bbox = [QgsPointXY(mesh_tl[0], mesh_tl[1]),
-                     QgsPointXY(mesh_tr[0], mesh_tr[1]),
-                     QgsPointXY(mesh_br[0], mesh_br[1]),
-                     QgsPointXY(mesh_bl[0], mesh_bl[1]),
-                     QgsPointXY(mesh_tl[0], mesh_tl[1])]
+        mesh_bbox = [QgsPointXY(minx, maxy),
+                     QgsPointXY(maxx, maxy),
+                     QgsPointXY(maxx, miny),
+                     QgsPointXY(minx, miny),
+                     QgsPointXY(minx, maxy)]
             
         reg_lyr = QgsVectorLayer("Polygon?crs=%s" % (crs), "region", "memory")
         pr = reg_lyr.dataProvider()
         pr.addAttributes([QgsField("name", QtCore.QVariant.String), 
-                          QgsField("path", QtCore.QVariant.String), 
+                          QgsField("path", QtCore.QVariant.String),
+                          QgsField("op_path", QtCore.QVariant.String), 
                           QgsField("nr_verts", QtCore.QVariant.Int), 
                           QgsField("nr_faces", QtCore.QVariant.Int), 
                           QgsField("minx", QtCore.QVariant.Double, "double", 10, 3), 
-                          QgsField("maxx", QtCore.QVariant.Double, "double", 10, 3), 
                           QgsField("miny", QtCore.QVariant.Double, "double", 10, 3),
-                          QgsField("maxy", QtCore.QVariant.Double, "double", 10, 3)])
+                          QgsField("minz", QtCore.QVariant.Double, "double", 10, 3),
+                          QgsField("maxx", QtCore.QVariant.Double, "double", 10, 3), 
+                          QgsField("maxy", QtCore.QVariant.Double, "double", 10, 3),
+                          QgsField("maxz", QtCore.QVariant.Double, "double", 10, 3)])
         reg_lyr.updateFields() 
             
         # add a feature
         feat = QgsFeature()
         feat.setGeometry(QgsGeometry.fromPolygonXY([mesh_bbox]))
         feat.setAttributes([os.path.basename(mesh_path), 
-                            mesh_path, 
+                            mesh_path,
+                            "",
                             nr_verts,
                             nr_faces, 
-                            float(mesh_bl[0]), 
-                            float(mesh_tr[0]), 
-                            float(mesh_bl[1]), 
-                            float(mesh_tr[1])])
+                            float(minx), 
+                            float(miny), 
+                            float(minz), 
+                            float(maxx),
+                            float(maxy),
+                            float(maxz)])
         pr.addFeatures([feat])
 
         # update layer's extent when new features have been added

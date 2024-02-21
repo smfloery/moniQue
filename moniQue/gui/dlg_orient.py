@@ -41,8 +41,9 @@ from qgis.core import (
 
 class OrientDialog(QtWidgets.QDialog):
     
-    # closed_signal = QtCore.pyqtSignal(object)
-
+    gcp_selected_signal = QtCore.pyqtSignal(object)
+    gcp_deselected_signal = QtCore.pyqtSignal()
+    
     def __init__(self, parent=None, icon_dir=None, active_iid=None):
         """Constructor."""
         super(OrientDialog, self).__init__()
@@ -83,7 +84,7 @@ class OrientDialog(QtWidgets.QDialog):
         self.btn_delete_gcp.setIcon(QtGui.QIcon(os.path.join(self.icon_dir, "mActionDeleteSelectedFeatures.png")))
         # self.btn_ori_tool.triggered.connect(self.show_orient_dlg)
         # self.btn_ori_tool.setCheckable(True)
-        # self.btn_ori_tool.setEnabled(False)
+        self.btn_delete_gcp.setEnabled(False)
         self.main_toolbar.addAction(self.btn_delete_gcp)
 
         self.table_gcps = QtWidgets.QTableWidget()
@@ -96,7 +97,9 @@ class OrientDialog(QtWidgets.QDialog):
         self.table_gcps.setObjectName("table_gcps")
         self.table_gcps.setColumnCount(9)
         self.table_gcps.setRowCount(0)
-
+        
+        self.table_gcps.cellClicked.connect(self.gcp_selected)
+    
         self.table_gcps.horizontalHeader().setHighlightSections(True)
         self.table_gcps.horizontalHeader().resizeSection(0, 10)
         self.table_gcps.horizontalHeader().resizeSection(1, 50)
@@ -117,7 +120,7 @@ class OrientDialog(QtWidgets.QDialog):
 
         params_layout = QtWidgets.QVBoxLayout()
         params_layout.setSpacing(3)
-
+    
         def create_cam_param_layout(param=None, label_size=25, line_size=125, unit=None):
 
             layout = QtWidgets.QHBoxLayout()
@@ -181,6 +184,27 @@ class OrientDialog(QtWidgets.QDialog):
         layout.addWidget(self.main_toolbar)
         layout.addLayout(main_layout)
         self.setLayout(layout)
+
+    def gcp_selected(self, rix, cix):
+    
+        if cix != 0:
+    
+            #row was already selected; hence only deselect
+            if rix == self.prev_row:
+                self.btn_delete_gcp.setEnabled(False)
+                self.table_gcps.clearSelection()
+                self.prev_row = -1
+                
+                self.gcp_deselected_signal.emit()
+
+            else:
+                self.btn_delete_gcp.setEnabled(True)
+                self.table_gcps.setCurrentCell(rix, cix)
+                self.prev_row = rix
+
+                sel_gid = self.table_gcps.item(rix, 1).text()
+                self.gcp_selected_signal.emit({"gid":sel_gid})
+                
 
     def closeEvent(self, event):
         self.parent.img_list.setEnabled(True)

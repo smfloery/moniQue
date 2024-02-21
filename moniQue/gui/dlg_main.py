@@ -43,7 +43,7 @@ from .dlg_meta_gcp import GcpMetaDialog
 from ..tools.ImgPickerTool import ImgPickerTool
 
 from ..camera import Camera
-
+from ..helpers import create_point_3d
 class MainDialog(QtWidgets.QDialog):
     
     load_project_signal = QtCore.pyqtSignal(object)
@@ -243,10 +243,12 @@ class MainDialog(QtWidgets.QDialog):
         if self.btn_ori_tool.isChecked():
             self.dlg_orient = OrientDialog(parent=self, icon_dir=self.icon_dir, active_iid=self.active_camera.iid)
 
-            gcps = self.get_gcps_from_gpkg()
-            print(gcps)
+            self.dlg_orient.gcp_selected_signal.connect(self.select_gcp)
+            self.dlg_orient.gcp_deselected_signal.connect(self.deselect_gcp)
+
+            # gcps = self.get_gcps_from_gpkg()
             
-            self.dlg_orient.add_gcps_from_lyr(gcps)
+            self.dlg_orient.add_gcps_from_lyr(self.get_gcps_from_gpkg())
             
             self.dlg_orient.show()
 
@@ -266,10 +268,7 @@ class MainDialog(QtWidgets.QDialog):
     
     def closeEvent(self, event):
         
-        print(self.img_lyr)
-        
         if self.img_lyr is not None:
-            print("bluub")
             QgsProject.instance().removeMapLayer(self.img_lyr.id())
             self.img_lyr = None
         
@@ -300,25 +299,29 @@ class MainDialog(QtWidgets.QDialog):
         self.img_canvas.refresh()
         self.close_dialog_signal.emit()
     
-    def add_mesh_to_obj_canvas(self, o3d_mesh):
+    def add_mesh_to_obj_canvas(self, o3d_mesh, min_xyz):
         
         verts = np.asarray(o3d_mesh.vertices)
         faces = np.asarray(o3d_mesh.triangles).astype(np.uint32)
         norms = np.asarray(o3d_mesh.vertex_normals).astype(np.float32)
-        
-        verts_loc = verts - np.min(verts, axis=0)
                         
-        print("Loading mesh...")
-        mesh_geom = gfx.geometries.Geometry(indices=faces, positions=verts_loc.astype(np.float32), normals=norms)
+        # print("Loading mesh...")
+        mesh_geom = gfx.geometries.Geometry(indices=faces, positions=verts.astype(np.float32), normals=norms)
         mesh_material = gfx.MeshPhongMaterial(color="#BEBEBE", side="FRONT", shininess=10)
 
-        print("Adding mesh to canvas...")
+        # print("Adding mesh to canvas...")
         self.mesh = gfx.Mesh(mesh_geom, mesh_material)
         self.obj_scene.add(self.mesh)
         
-        print("Adding lights...")
+        #group that will hold all the GCPs on object space
+        self.obj_gcps_grp = gfx.Group()
+        self.obj_scene.add(self.obj_gcps_grp)
+        
+        # print("Adding lights...")
         self.obj_scene.add(gfx.AmbientLight(intensity=1), gfx.DirectionalLight())
         self.obj_camera.show_object(self.obj_scene)
+        
+        self.min_xyz = min_xyz
         
     def animate(self):
         self.obj_renderer.render(self.obj_scene, self.obj_camera)
@@ -382,7 +385,15 @@ class MainDialog(QtWidgets.QDialog):
                 gcps[curr_gid] = curr_gcp
 
         return gcps
-          
+    
+    def select_gcp(self, data):
+        self.map_gcps_lyr.selectByExpression("\"gid\"=%s"%(data["gid"]))
+        self.img_gcps_lyr.selectByExpression("\"gid\"=%s"%(data["gid"]))
+    
+    def deselect_gcp(self):
+        self.map_gcps_lyr.removeSelection()
+        self.img_gcps_lyr.removeSelection()
+    
     def add_camera_to_list(self, camera):
         """Add camera to the image list.
 
@@ -471,6 +482,18 @@ class MainDialog(QtWidgets.QDialog):
         self.active_camera = self.camera_collection[iid]
         self.setWindowTitle("%s - %s" % (self.project_name, iid))
         
+        #remove all children from the group --> removes all prevously loaded GCPs
+        self.obj_gcps_grp.clear()
+        
+        for feat in self.map_gcps_lyr.getFeatures():
+            feat_pos = [feat["obj_x"]-self.min_xyz[0], 
+                        feat["obj_y"]-self.min_xyz[1], 
+                        feat["obj_z"]-self.min_xyz[2]]
+            feat_gfx = create_point_3d(feat_pos, feat["gid"])
+            self.obj_gcps_grp.add(feat_gfx)
+        
+        self.obj_canvas.request_draw(self.animate)
+        
         # #     #highlight currently selected camera
         # #     #clear previously highlighter cameras
         # #     self.clear_highlighted_features()
@@ -550,17 +573,17 @@ class MainDialog(QtWidgets.QDialog):
         self.img_canvas.setMapTool(self.img_picker_tool)
         
         #GCP picking ib object space
-        self.mesh.add_event_handler(self.mesh_picking, "pointer_down")
+        self.mesh.add_event_handler(self.mesh_picking, "click")
 
     def deactivate_gcp_picking(self):
-        self.mesh.remove_event_handler(self.mesh_picking, "pointer_down")
+        self.mesh.remove_event_handler(self.mesh_picking, "click")
         self.img_canvas.setMapTool(self.img_pan_tool)
         
     def img_gcp_added(self, data):
         self.dlg_orient.add_gcp_to_table(data, gcp_type="img_space")
     
     def mesh_picking(self, event):
-        
+            
         if event.button == 1 and "Control" in event.modifiers:
             face_ix = event.pick_info["face_index"]
             
@@ -571,7 +594,8 @@ class MainDialog(QtWidgets.QDialog):
             face_vertex_ix = event.pick_info["world_object"].geometry.indices.data[face_ix, :]
             face_vertex_pos = event.pick_info["world_object"].geometry.positions.data[face_vertex_ix, :]
             
-            click_pos = np.sum(face_vertex_pos*face_coords, axis=0)
+            click_pos = np.sum(face_vertex_pos*face_coords, axis=0) 
+            click_pos_global = click_pos + self.min_xyz
             
             dlg_meta = GcpMetaDialog()
             
@@ -583,9 +607,9 @@ class MainDialog(QtWidgets.QDialog):
             
             dlg_meta.line_iid.setText(self.active_camera.iid)
             
-            dlg_meta.line_obj_x.setText("%.1f" % (click_pos[0]))
-            dlg_meta.line_obj_y.setText("%.1f" % (click_pos[1]))
-            dlg_meta.line_obj_z.setText("%.1f" % (click_pos[2]))
+            dlg_meta.line_obj_x.setText("%.1f" % (click_pos_global[0]))
+            dlg_meta.line_obj_y.setText("%.1f" % (click_pos_global[1]))
+            dlg_meta.line_obj_z.setText("%.1f" % (click_pos_global[2]))
             
             result = dlg_meta.exec_() 
             
@@ -593,32 +617,24 @@ class MainDialog(QtWidgets.QDialog):
                 
                 curr_gid = dlg_meta.combo_gid.currentText() 
                 
-                click_geom = gfx.Geometry(positions=click_pos.astype(np.float32).reshape(1, 3))
-                click_obj = gfx.Points(click_geom, gfx.PointsMaterial(color=(0.78, 0, 0, 1), size=10))
-                self.obj_scene.add(click_obj)
-                            
-                click_text = gfx.Text(
-                    gfx.TextGeometry(markdown="**%s**" % (curr_gid), font_size=26, anchor="Bottom-Center", screen_space=True),
-                    gfx.TextMaterial(color="#fff", outline_color="#000", outline_thickness=0.15))
-                click_text.local.position = click_obj.geometry.positions.data[0, :] + [0, 0, 10]
-                
-                click_obj.add(click_text)           
-                
+                click_obj = create_point_3d(click_pos, curr_gid)
+                self.obj_gcps_grp.add(click_obj)
                 self.obj_canvas.request_draw(self.animate)
-                self.dlg_orient.add_gcp_to_table({"obj_x":click_pos[0], 
-                                                  "obj_y":click_pos[1],
-                                                  "obj_z":click_pos[2],
+                
+                self.dlg_orient.add_gcp_to_table({"obj_x":click_pos_global[0], 
+                                                  "obj_y":click_pos_global[1],
+                                                  "obj_z":click_pos_global[2],
                                                   "gid":curr_gid},
                                                   gcp_type="obj_space")
                 
                 feat = QgsFeature(self.map_gcps_lyr.fields())
                 
-                feat.setGeometry(QgsPoint(click_pos[0], click_pos[1]))
+                feat.setGeometry(QgsPoint(click_pos_global[0], click_pos_global[1]))
                 feat.setAttribute("iid", self.active_camera.iid)
                 feat.setAttribute("gid", dlg_meta.combo_gid.currentText())
-                feat.setAttribute("obj_x", float(click_pos[0]))
-                feat.setAttribute("obj_y", float(click_pos[1]))
-                feat.setAttribute("obj_z", float(click_pos[2]))
+                feat.setAttribute("obj_x", float(click_pos_global[0]))
+                feat.setAttribute("obj_y", float(click_pos_global[1]))
+                feat.setAttribute("obj_z", float(click_pos_global[2]))
                 feat.setAttribute("desc", dlg_meta.line_desc.text())
                 feat.setAttribute("active", 0)
                 (res, afeat) = self.map_gcps_lyr.dataProvider().addFeatures([feat])

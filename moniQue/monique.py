@@ -34,6 +34,7 @@ from .gui.dlg_main import MainDialog
 import os.path
 import json
 import open3d as o3d
+import numpy as np
 from .camera import Camera
 
 class MoniQue:
@@ -190,7 +191,7 @@ class MoniQue:
         gpkg_reg_lyr = self.gpkg_path + "|layername=region"
         self.reg_lyr = QgsVectorLayer(gpkg_reg_lyr, "region", "ogr")
         self.reg_lyr.loadNamedStyle(self.map_region_qml_path)
-                
+            
         gpkg_cam_lyr = self.gpkg_path + "|layername=cameras"
         self.cam_lyr = QgsVectorLayer(gpkg_cam_lyr, "cameras", "ogr")           
         self.cam_lyr.loadNamedStyle(self.cam_qml_path)
@@ -211,20 +212,6 @@ class MoniQue:
         # # self.map_gcps_lyr.selectionChanged.connect(self.map_gcp_selected)
         # # self.map_gcps_lyr.featuresDeleted.connect(self.map_gcp_deleted)
         # self.map_gcps_lyr.geometryChanged.connect(self.map_gcp_changed)
-        
-        # gcps_h_src = []
-        
-        # for feat in self.map_gcps_lyr.getFeatures():
-        #     feat_dict = json.loads(QgsJsonUtils.exportAttributes(feat))
-        #     gcps_h_src.append(feat_dict["H_src"])
-        # gcps_h_src = list(set(gcps_h_src))
-        
-        # for src in gcps_h_src:
-        #     if os.path.isfile(src):
-        #         src_name = os.path.basename(src).rsplit(".")[0]
-        #         if QgsProject.instance().mapLayersByName(src_name) == 0:
-        #             src_lyr = QgsRasterLayer(src, src_name)
-        #             QgsProject.instance().addMapLayer(src_lyr)
         
         gpkg_img_gcps_lyr = self.gpkg_path + "|layername=gcps_img"
         self.img_gcps_lyr = QgsVectorLayer(gpkg_img_gcps_lyr, "gcps_img", "ogr")
@@ -267,11 +254,12 @@ class MoniQue:
                                  "img_gcps_lyr":self.img_gcps_lyr,
                                  "map_line_lyr":self.map_line_lyr,
                                  "map_gcps_lyr":self.map_gcps_lyr}
+        self.dlg_main.set_layers(self.layer_collection)
         
         self.load_mesh()
         
         self.dlg_main.activate_gui_elements()
-        self.dlg_main.set_layers(self.layer_collection)
+        
         
         self.load_cameras_from_gpkg()
         
@@ -297,14 +285,27 @@ class MoniQue:
             #!raise Error message that mesh could no be found/loaded
             pass
         
-        self.o3d_mesh = o3d.io.read_triangle_mesh(mesh_path)
+        reg_minx = reg_feat["minx"]
+        reg_miny = reg_feat["miny"]
+        reg_minz = reg_feat["minz"]
+        
+        mesh = o3d.io.read_triangle_mesh(mesh_path)
+        
+        verts = np.asarray(mesh.vertices)
+        verts -= [reg_minx, reg_miny, reg_minz]
+        tris = np.asarray(mesh.triangles)
+        
+        self.o3d_mesh = o3d.geometry.TriangleMesh(o3d.utility.Vector3dVector(verts),
+                                                  o3d.utility.Vector3iVector(tris))
         self.o3d_mesh.compute_vertex_normals()
         
         scene = o3d.t.geometry.RaycastingScene()
         scene.add_triangles(o3d.t.geometry.TriangleMesh.from_legacy(self.o3d_mesh))
         
         self.ray_scene = scene
-        self.dlg_main.add_mesh_to_obj_canvas(self.o3d_mesh)
+        self.dlg_main.add_mesh_to_obj_canvas(self.o3d_mesh, [reg_minx, reg_miny, reg_minz])
+        
+        
         
         # self.mono_tool.set_scene(scene)
         # self.vertex_tool.set_scene(scene)
