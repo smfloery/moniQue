@@ -43,6 +43,7 @@ class OrientDialog(QtWidgets.QDialog):
     
     gcp_selected_signal = QtCore.pyqtSignal(object)
     gcp_deselected_signal = QtCore.pyqtSignal()
+    gcp_delete_signal = QtCore.pyqtSignal(object)
     
     def __init__(self, parent=None, icon_dir=None, active_iid=None):
         """Constructor."""
@@ -82,7 +83,7 @@ class OrientDialog(QtWidgets.QDialog):
 
         self.btn_delete_gcp = QtWidgets.QAction("Delete selected GCP.", self)
         self.btn_delete_gcp.setIcon(QtGui.QIcon(os.path.join(self.icon_dir, "mActionDeleteSelectedFeatures.png")))
-        # self.btn_ori_tool.triggered.connect(self.show_orient_dlg)
+        self.btn_delete_gcp.triggered.connect(self.delete_selected_gcp)
         # self.btn_ori_tool.setCheckable(True)
         self.btn_delete_gcp.setEnabled(False)
         self.main_toolbar.addAction(self.btn_delete_gcp)
@@ -194,7 +195,6 @@ class OrientDialog(QtWidgets.QDialog):
                 self.btn_delete_gcp.setEnabled(False)
                 self.table_gcps.clearSelection()
                 self.prev_row = -1
-                
                 self.gcp_deselected_signal.emit()
 
             else:
@@ -202,10 +202,17 @@ class OrientDialog(QtWidgets.QDialog):
                 self.table_gcps.setCurrentCell(rix, cix)
                 self.prev_row = rix
 
-                sel_gid = self.table_gcps.item(rix, 1).text()
-                self.gcp_selected_signal.emit({"gid":sel_gid})
-                
-
+                self.sel_gid = self.table_gcps.item(rix, 1).text()
+                self.gcp_selected_signal.emit({"gid":self.sel_gid})
+    
+    def delete_selected_gcp(self):
+        self.gcp_delete_signal.emit({"gid":self.sel_gid})
+        
+        self.table_gcps.removeRow(self.prev_row)
+        self.table_gcps.clearSelection()
+        self.prev_row = -1
+        self.btn_delete_gcp.setEnabled(False)
+        
     def closeEvent(self, event):
         self.parent.img_list.setEnabled(True)
         self.parent.btn_ori_tool.setChecked(False)

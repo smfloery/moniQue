@@ -245,7 +245,7 @@ class MainDialog(QtWidgets.QDialog):
 
             self.dlg_orient.gcp_selected_signal.connect(self.select_gcp)
             self.dlg_orient.gcp_deselected_signal.connect(self.deselect_gcp)
-
+            self.dlg_orient.gcp_delete_signal.connect(self.delete_gcp)
             # gcps = self.get_gcps_from_gpkg()
             
             self.dlg_orient.add_gcps_from_lyr(self.get_gcps_from_gpkg())
@@ -389,11 +389,44 @@ class MainDialog(QtWidgets.QDialog):
     def select_gcp(self, data):
         self.map_gcps_lyr.selectByExpression("\"gid\"=%s"%(data["gid"]))
         self.img_gcps_lyr.selectByExpression("\"gid\"=%s"%(data["gid"]))
+        
+        for pnts in self.obj_gcps_grp.children:
+            if int(data["gid"]) == int(pnts.geometry.gid.data[0]):
+                pnts.material = gfx.PointsMaterial(color=(1, 0.98, 0, 1), size=10)
+            else:
+                pnts.material = gfx.PointsMaterial(color=(0.78, 0, 0, 1), size=10)
+        
+        self.obj_canvas.request_draw(self.animate)
     
     def deselect_gcp(self):
         self.map_gcps_lyr.removeSelection()
         self.img_gcps_lyr.removeSelection()
-    
+
+        for pnts in self.obj_gcps_grp.children:
+            pnts.material = gfx.PointsMaterial(color=(0.78, 0, 0, 1), size=10)
+        
+        self.obj_canvas.request_draw(self.animate)
+        
+    def delete_gcp(self, data):
+        if self.map_gcps_lyr.selectedFeatureCount() > 0:
+            self.map_gcps_lyr.startEditing()
+            self.map_gcps_lyr.deleteSelectedFeatures() 
+            self.map_gcps_lyr.commitChanges()
+        
+        if self.img_gcps_lyr.selectedFeatureCount() > 0:
+            self.img_gcps_lyr.startEditing()
+            self.img_gcps_lyr.deleteSelectedFeatures()
+            self.img_gcps_lyr.commitChanges()
+
+        del_gcp_obj = None
+        for gcp_obj in self.obj_gcps_grp.children:
+            if int(data["gid"]) == int(gcp_obj.geometry.gid.data[0]):
+                del_gcp_obj = gcp_obj
+                
+        if del_gcp_obj:
+            self.obj_gcps_grp.remove(del_gcp_obj)
+            self.obj_canvas.request_draw(self.animate)
+            
     def add_camera_to_list(self, camera):
         """Add camera to the image list.
 
