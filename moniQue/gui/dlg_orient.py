@@ -71,22 +71,25 @@ class OrientDialog(QtWidgets.QDialog):
         self.setMinimumSize(QtCore.QSize(800, 400))
         self.setMaximumSize(QtCore.QSize(800, 400))
         
-        self.main_toolbar = QtWidgets.QToolBar("My main toolbar")
-        self.main_toolbar.setIconSize(QtCore.QSize(20, 20))
-
+        params_toolbar = QtWidgets.QToolBar("")
+        params_toolbar.setIconSize(QtCore.QSize(20, 20))
+        
+        table_toolbar = QtWidgets.QToolBar("")
+        table_toolbar.setIconSize(QtCore.QSize(20, 20))
+        
         self.btn_init_ori = QtWidgets.QAction("Set initial orientation from camera view.", self)
         self.btn_init_ori.setIcon(QtGui.QIcon(os.path.join(self.icon_dir, "mActionMeasureBearing.png")))
         # self.btn_ori_tool.triggered.connect(self.show_orient_dlg)
         # self.btn_ori_tool.setCheckable(True)
         # self.btn_ori_tool.setEnabled(False)
-        self.main_toolbar.addAction(self.btn_init_ori)
+        params_toolbar.addAction(self.btn_init_ori)
 
         self.btn_delete_gcp = QtWidgets.QAction("Delete selected GCP.", self)
         self.btn_delete_gcp.setIcon(QtGui.QIcon(os.path.join(self.icon_dir, "mActionDeleteSelectedFeatures.png")))
         self.btn_delete_gcp.triggered.connect(self.delete_selected_gcp)
         # self.btn_ori_tool.setCheckable(True)
         self.btn_delete_gcp.setEnabled(False)
-        self.main_toolbar.addAction(self.btn_delete_gcp)
+        table_toolbar.addAction(self.btn_delete_gcp)
 
         self.table_gcps = QtWidgets.QTableWidget()
         
@@ -120,6 +123,8 @@ class OrientDialog(QtWidgets.QDialog):
         self.table_gcps.setHorizontalHeaderLabels(["use", "gid", "X", "Y", "Z", "x", "y", "dx", "dy"])
 
         params_layout = QtWidgets.QVBoxLayout()
+        
+
         params_layout.setSpacing(3)
     
         def create_cam_param_layout(param=None, label_size=25, line_size=125, unit=None):
@@ -151,6 +156,8 @@ class OrientDialog(QtWidgets.QDialog):
 
         focal_layout, focal_line = create_cam_param_layout(param="f: ", unit=" [px]")
         
+        params_layout.addWidget(params_toolbar)
+        
         params_layout.addLayout(prc_x_layout)
         params_layout.addLayout(prc_y_layout)
         params_layout.addLayout(prc_z_layout)
@@ -164,7 +171,9 @@ class OrientDialog(QtWidgets.QDialog):
         params_layout.addStretch()
         
         self.btn_calc_ori = QtWidgets.QPushButton("Calculate")
+        self.btn_calc_ori.setEnabled(False)
         self.btn_save_ori = QtWidgets.QPushButton("Save")
+        self.btn_save_ori.setEnabled(False)
         
         btn_layout = QtWidgets.QHBoxLayout()
         btn_layout.setContentsMargins(5, 0, 0, 0)
@@ -173,16 +182,20 @@ class OrientDialog(QtWidgets.QDialog):
 
         params_layout.addLayout(btn_layout)
 
+        self.table_layout = QtWidgets.QVBoxLayout()
+        self.table_layout.addWidget(table_toolbar)
+        self.table_layout.addWidget(self.table_gcps)
+        
         main_layout = QtWidgets.QHBoxLayout()
         main_layout.setSpacing(0)
         main_layout.setContentsMargins(5, 0, 5, 0)
-        main_layout.addWidget(self.table_gcps)
+        main_layout.addLayout(self.table_layout)
         main_layout.addLayout(params_layout)
 
         layout = QtWidgets.QVBoxLayout()
         layout.setSpacing(0)
         layout.setContentsMargins(0, 0, 0, 5)
-        layout.addWidget(self.main_toolbar)
+        # layout.addWidget(self.main_toolbar)
         layout.addLayout(main_layout)
         self.setLayout(layout)
 
@@ -349,6 +362,16 @@ class OrientDialog(QtWidgets.QDialog):
             
             if data["img_dy"]:
                 self.table_gcps.setItem(rx, self.name2ix["dy"], QtWidgets.QTableWidgetItem("%.1f" % data["img_dy"]))
+    
+    def update_selected_gcp(self, data, gcp_type=None):
+        if gcp_type == "img_space":
+            self.table_gcps.setItem(self.table_gcps.currentRow(), self.name2ix["x"], QtWidgets.QTableWidgetItem("%.1f" % (data["img_x"])))
+            self.table_gcps.setItem(self.table_gcps.currentRow(), self.name2ix["y"], QtWidgets.QTableWidgetItem("%.1f" % (data["img_y"])))
+        elif gcp_type == "obj_space":
+            self.table_gcps.setItem(self.table_gcps.currentRow(), self.name2ix["X"], QtWidgets.QTableWidgetItem("%.1f" % (data["obj_x"])))
+            self.table_gcps.setItem(self.table_gcps.currentRow(), self.name2ix["Y"], QtWidgets.QTableWidgetItem("%.1f" % (data["obj_y"])))
+            self.table_gcps.setItem(self.table_gcps.currentRow(), self.name2ix["Z"], QtWidgets.QTableWidgetItem("%.1f" % (data["obj_z"])))
+            
     
     # def set_gpkg_path(self):
     #     gpkg_path = QtWidgets.QFileDialog.getSaveFileName(None, "GPKG path", "", ("Geopackage (*.gpkg)"))[0]

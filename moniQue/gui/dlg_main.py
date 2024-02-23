@@ -34,7 +34,7 @@ from PIL import Image
 import json
 from collections import OrderedDict
 
-from qgis.core import QgsFeature, QgsPoint, QgsFeatureRequest, QgsRasterLayer, QgsProject, QgsJsonUtils
+from qgis.core import QgsFeature, QgsPoint, QgsFeatureRequest, QgsRasterLayer, QgsProject, QgsJsonUtils, QgsGeometry
 from qgis.gui import QgsMapToolPan
 
 from .dlg_create import CreateDialog
@@ -230,7 +230,11 @@ class MainDialog(QtWidgets.QDialog):
         self.map_gcps_lyr = lyr_dict["map_gcps_lyr"]
         
         self.img_gcps_gid_ix = self.img_gcps_lyr.dataProvider().fieldNameIndex('gid')
+        
         self.map_gcps_gid_ix = self.map_gcps_lyr.dataProvider().fieldNameIndex('gid')
+        self.map_gcps_lyr_obj_x_ix = self.map_gcps_lyr.dataProvider().fieldNameIndex('obj_x')
+        self.map_gcps_lyr_obj_y_ix = self.map_gcps_lyr.dataProvider().fieldNameIndex('obj_y')
+        self.map_gcps_lyr_obj_z_ix = self.map_gcps_lyr.dataProvider().fieldNameIndex('obj_z')
         
         #define layers which should be shown/considered in which canvas
         self.img_canvas.setLayers([self.img_line_lyr, self.img_gcps_lyr])
@@ -603,9 +607,10 @@ class MainDialog(QtWidgets.QDialog):
         #GCP picking in image space
         self.img_picker_tool = ImgPickerTool(self.img_canvas, GcpMetaDialog())
         self.img_picker_tool.set_camera(self.active_camera)
-        self.img_picker_tool.set_layers(img_lyr=self.img_gcps_lyr, map_lyr=self.map_gcps_lyr)
+        self.img_picker_tool.set_layers(img_gcps_lyr=self.img_gcps_lyr, map_gcps_lyr=self.map_gcps_lyr)
         
         self.img_picker_tool.gcpAdded.connect(self.img_gcp_added)
+        self.img_picker_tool.gcpUpdated.connect(self.img_gcp_updated)
 
         self.img_canvas.setMapTool(self.img_picker_tool)
         
@@ -618,6 +623,9 @@ class MainDialog(QtWidgets.QDialog):
         
     def img_gcp_added(self, data):
         self.dlg_orient.add_gcp_to_table(data, gcp_type="img_space")
+    
+    def img_gcp_updated(self, data):
+        self.dlg_orient.update_selected_gcp(data, gcp_type="img_space")
     
     def mesh_picking(self, event):
             
@@ -634,49 +642,74 @@ class MainDialog(QtWidgets.QDialog):
             click_pos = np.sum(face_vertex_pos*face_coords, axis=0) 
             click_pos_global = click_pos + self.min_xyz
             
-            dlg_meta = GcpMetaDialog()
-            
-            img_gids = [feat.attributes()[self.img_gcps_gid_ix] for feat in self.img_gcps_lyr.getFeatures()]
-            map_gids = [feat.attributes()[self.map_gcps_gid_ix] for feat in self.map_gcps_lyr.getFeatures()]
-            pot_gids = list(set(img_gids).difference(map_gids))
-                
-            dlg_meta.combo_gid.addItems(pot_gids)
-            
-            dlg_meta.line_iid.setText(self.active_camera.iid)
-            
-            dlg_meta.line_obj_x.setText("%.1f" % (click_pos_global[0]))
-            dlg_meta.line_obj_y.setText("%.1f" % (click_pos_global[1]))
-            dlg_meta.line_obj_z.setText("%.1f" % (click_pos_global[2]))
-            
-            result = dlg_meta.exec_() 
-            
-            if result:
-                
-                curr_gid = dlg_meta.combo_gid.currentText() 
-                
-                click_obj = create_point_3d(click_pos, curr_gid)
-                self.obj_gcps_grp.add(click_obj)
-                self.obj_canvas.request_draw(self.animate)
-                
-                self.dlg_orient.add_gcp_to_table({"obj_x":click_pos_global[0], 
-                                                  "obj_y":click_pos_global[1],
-                                                  "obj_z":click_pos_global[2],
-                                                  "gid":curr_gid},
-                                                  gcp_type="obj_space")
-                
-                feat = QgsFeature(self.map_gcps_lyr.fields())
-                
-                feat.setGeometry(QgsPoint(click_pos_global[0], click_pos_global[1]))
-                feat.setAttribute("iid", self.active_camera.iid)
-                feat.setAttribute("gid", dlg_meta.combo_gid.currentText())
-                feat.setAttribute("obj_x", float(click_pos_global[0]))
-                feat.setAttribute("obj_y", float(click_pos_global[1]))
-                feat.setAttribute("obj_z", float(click_pos_global[2]))
-                feat.setAttribute("desc", dlg_meta.line_desc.text())
-                feat.setAttribute("active", 0)
-                (res, afeat) = self.map_gcps_lyr.dataProvider().addFeatures([feat])
+            feat_geom = QgsPoint(click_pos_global[0], click_pos_global[1])
+
+            #TODO change feature attributes as well
+            if self.map_gcps_lyr.selectedFeatureCount() > 0:
+                sel_fid = self.map_gcps_lyr.selectedFeatureIds()[0]
+                self.map_gcps_lyr.startEditing()
+                self.map_gcps_lyr.changeGeometry(sel_fid, QgsGeometry.fromPoint(feat_geom))
+                self.map_gcps_lyr.changeAttributeValue(sel_fid, self.map_gcps_lyr_obj_x_ix, float(click_pos_global[0]))
+                self.map_gcps_lyr.changeAttributeValue(sel_fid, self.map_gcps_lyr_obj_y_ix, float(click_pos_global[1]))
+                self.map_gcps_lyr.changeAttributeValue(sel_fid, self.map_gcps_lyr_obj_z_ix, float(click_pos_global[2]))
                 self.map_gcps_lyr.commitChanges()
                 
-                self.map_gcps_lyr.triggerRepaint()
-                self.map_gcps_lyr.reload()
-                # self.map_canvas.refresh()
+                for pnts in self.obj_gcps_grp.children:
+                    if int(self.sel_gid) == int(pnts.geometry.gid.data[0]):
+                        pnts.geometry.positions.data[0, :] = click_pos                                      #update point geometry position
+                        pnts.geometry.positions.update_range(0)
+                        pnts.children[0].local.position = pnts.geometry.positions.data[0, :] + [0, 0, 10]   #update position of label
+                        break
+                    
+                self.obj_canvas.request_draw(self.animate)
+                self.dlg_orient.update_selected_gcp({"obj_x":click_pos_global[0],
+                                                     "obj_y":click_pos_global[1],
+                                                     "obj_z":click_pos_global[2]}, gcp_type="obj_space")
+            else:
+                
+                dlg_meta = GcpMetaDialog()
+                
+                img_gids = [feat.attributes()[self.img_gcps_gid_ix] for feat in self.img_gcps_lyr.getFeatures()]
+                map_gids = [feat.attributes()[self.map_gcps_gid_ix] for feat in self.map_gcps_lyr.getFeatures()]
+                pot_gids = list(set(img_gids).difference(map_gids))
+                    
+                dlg_meta.combo_gid.addItems(pot_gids)
+                
+                dlg_meta.line_iid.setText(self.active_camera.iid)
+                
+                dlg_meta.line_obj_x.setText("%.1f" % (click_pos_global[0]))
+                dlg_meta.line_obj_y.setText("%.1f" % (click_pos_global[1]))
+                dlg_meta.line_obj_z.setText("%.1f" % (click_pos_global[2]))
+                
+                result = dlg_meta.exec_() 
+
+                if result:
+                    
+                    curr_gid = dlg_meta.combo_gid.currentText() 
+                    
+                    click_obj = create_point_3d(click_pos, curr_gid)
+                    self.obj_gcps_grp.add(click_obj)
+                    self.obj_canvas.request_draw(self.animate)
+                    
+                    self.dlg_orient.add_gcp_to_table({"obj_x":click_pos_global[0], 
+                                                    "obj_y":click_pos_global[1],
+                                                    "obj_z":click_pos_global[2],
+                                                    "gid":curr_gid},
+                                                    gcp_type="obj_space")
+                    
+                    feat = QgsFeature(self.map_gcps_lyr.fields())
+                    
+                    feat.setGeometry(QgsPoint(click_pos_global[0], click_pos_global[1]))
+                    feat.setAttribute("iid", self.active_camera.iid)
+                    feat.setAttribute("gid", dlg_meta.combo_gid.currentText())
+                    feat.setAttribute("obj_x", float(click_pos_global[0]))
+                    feat.setAttribute("obj_y", float(click_pos_global[1]))
+                    feat.setAttribute("obj_z", float(click_pos_global[2]))
+                    feat.setAttribute("desc", dlg_meta.line_desc.text())
+                    feat.setAttribute("active", 0)
+                    (res, afeat) = self.map_gcps_lyr.dataProvider().addFeatures([feat])
+                    self.map_gcps_lyr.commitChanges()
+                    
+                    self.map_gcps_lyr.triggerRepaint()
+                    # self.map_gcps_lyr.reload()
+                    # self.map_canvas.refresh()
