@@ -216,6 +216,8 @@ class MainDialog(QtWidgets.QDialog):
         layout.addLayout(main_layout)
         self.setLayout(layout)
         
+        self.sel_gid = None
+        
     def set_layers(self, lyr_dict):
         self.reg_lyr = lyr_dict["reg_lyr"]
         self.cam_lyr = lyr_dict["cam_lyr"]        
@@ -387,6 +389,7 @@ class MainDialog(QtWidgets.QDialog):
         return gcps
     
     def select_gcp(self, data):
+        self.sel_gid = data["gid"]
         self.map_gcps_lyr.selectByExpression("\"gid\"=%s"%(data["gid"]))
         self.img_gcps_lyr.selectByExpression("\"gid\"=%s"%(data["gid"]))
         
@@ -399,6 +402,7 @@ class MainDialog(QtWidgets.QDialog):
         self.obj_canvas.request_draw(self.animate)
     
     def deselect_gcp(self):
+        self.sel_gid = None
         self.map_gcps_lyr.removeSelection()
         self.img_gcps_lyr.removeSelection()
 
