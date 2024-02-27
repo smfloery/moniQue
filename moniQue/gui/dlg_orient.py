@@ -40,6 +40,7 @@ from qgis.core import (
 )
 
 import operator
+from ..lsq import srs_lm
 
 class OrientDialog(QtWidgets.QDialog):
     
@@ -53,13 +54,13 @@ class OrientDialog(QtWidgets.QDialog):
         super(OrientDialog, self).__init__()
 
         self.name2ix = {"gid":1,
-                "X":2,
-                "Y":3,
-                "Z":4,
-                "x":5,
-                "y":6,
-                "dx":7,
-                "dy":8}
+                        "X":2,
+                        "Y":3,
+                        "Z":4,
+                        "x":5,
+                        "y":6,
+                        "dx":7,
+                        "dy":8}
         
         self.prev_row = -1
         
@@ -149,32 +150,39 @@ class OrientDialog(QtWidgets.QDialog):
 
             return layout, param_line
 
-        prc_x_layout, prc_x_line = create_cam_param_layout(param="X<sub>0</sub>: ", unit=" [m]")
-        prc_y_layout, prc_y_line = create_cam_param_layout(param="Y<sub>0</sub>: ", unit=" [m]")
-        prc_z_layout, prc_z_line = create_cam_param_layout(param="Z<sub>0</sub>: ", unit=" [m]")
+        obj_x0_layout, obj_x0_line = create_cam_param_layout(param="X<sub>0</sub>: ", unit=" [m]")
+        obj_y0_layout, obj_y0_line = create_cam_param_layout(param="Y<sub>0</sub>: ", unit=" [m]")
+        obj_z0_layout, obj_z0_line = create_cam_param_layout(param="Z<sub>0</sub>: ", unit=" [m]")
 
         alpha_layout, alpha_line = create_cam_param_layout(param="\u03B1: ", unit=" [°]")
         zeta_layout, zeta_line = create_cam_param_layout(param="\u03B6: ", unit=" [°]")
         kappa_layout, kappa_line = create_cam_param_layout(param="\u03BA: ", unit=" [°]")
 
         focal_layout, focal_line = create_cam_param_layout(param="f: ", unit=" [px]")
+        img_x0_layout, img_x0_line = create_cam_param_layout(param="x<sub>0</sub>: ", unit=" [px]")
+        img_y0_layout, img_y0_line = create_cam_param_layout(param="y<sub>0</sub>: ", unit=" [px]")
+        
         
         params_layout.addWidget(params_toolbar)
         
-        params_layout.addLayout(prc_x_layout)
-        params_layout.addLayout(prc_y_layout)
-        params_layout.addLayout(prc_z_layout)
+        params_layout.addLayout(obj_x0_layout)
+        params_layout.addLayout(obj_y0_layout)
+        params_layout.addLayout(obj_z0_layout)
         
         params_layout.addLayout(alpha_layout)
         params_layout.addLayout(zeta_layout)
         params_layout.addLayout(kappa_layout)
 
         params_layout.addLayout(focal_layout)
+        params_layout.addLayout(img_x0_layout)
+        params_layout.addLayout(img_y0_layout)
 
         params_layout.addStretch()
         
         self.btn_calc_ori = QtWidgets.QPushButton("Calculate")
         self.btn_calc_ori.setEnabled(False)
+        self.btn_calc_ori.clicked.connect(self.calc_orientation)
+        
         self.btn_save_ori = QtWidgets.QPushButton("Save")
         self.btn_save_ori.setEnabled(False)
         
@@ -244,6 +252,18 @@ class OrientDialog(QtWidgets.QDialog):
         self.prev_row = -1
         self.btn_delete_gcp.setEnabled(False)
         
+        #if GCP is deleted the number of active GCPS might have changed;
+        active_gcps = 0
+        nr_rows = self.table_gcps.rowCount()
+        for rix in range(nr_rows):
+            if self.table_gcps.item(rix, 0).checkState() == QtCore.Qt.Checked:
+                active_gcps += 1
+    
+        if active_gcps >= 4:
+            self.btn_calc_ori.setEnabled(True)
+        else:
+            self.btn_calc_ori.setEnabled(False)
+    
     def closeEvent(self, event):
         self.parent.img_list.setEnabled(True)
         self.parent.btn_ori_tool.setChecked(False)
@@ -400,4 +420,38 @@ class OrientDialog(QtWidgets.QDialog):
             self.table_gcps.setItem(self.table_gcps.currentRow(), self.name2ix["X"], QtWidgets.QTableWidgetItem("%.1f" % (data["obj_x"])))
             self.table_gcps.setItem(self.table_gcps.currentRow(), self.name2ix["Y"], QtWidgets.QTableWidgetItem("%.1f" % (data["obj_y"])))
             self.table_gcps.setItem(self.table_gcps.currentRow(), self.name2ix["Z"], QtWidgets.QTableWidgetItem("%.1f" % (data["obj_z"])))
-            
+    
+    def calc_orientation(self):
+        nr_rows = self.table_gcps.rowCount()
+        
+        ori_data = {"gid":[], 
+                    "img":[], 
+                    "obj":[], 
+                    "init_params":{"obj_x0":None,
+                                    "obj_y0":None,
+                                    "obj_z0":None,
+                                    "alpha":None,
+                                    "zeta":None,
+                                    "kappa":None,
+                                    "f":None,
+                                    "img_x0":None,
+                                    "img_y0":None}}
+        
+        for rix in range(nr_rows):
+            if self.table_gcps.item(rix, 0).checkState() == QtCore.Qt.Checked:
+                curr_gid = self.table_gcps.item(rix, self.name2ix["gid"]).text()
+                curr_obj_x = float(self.table_gcps.item(rix, self.name2ix["X"]).text())
+                curr_obj_y = float(self.table_gcps.item(rix, self.name2ix["Y"]).text())
+                curr_obj_z = float(self.table_gcps.item(rix, self.name2ix["Z"]).text())
+                curr_img_x = float(self.table_gcps.item(rix, self.name2ix["x"]).text())
+                curr_img_y = float(self.table_gcps.item(rix, self.name2ix["y"]).text())
+                
+                ori_data["gid"].append(curr_gid)
+                ori_data["img"].append([curr_img_x, curr_img_y])
+                ori_data["obj"].append([curr_obj_x, curr_obj_y, curr_obj_z])
+                
+                
+        #TODO get initival values
+        
+        print(ori_data)
+                

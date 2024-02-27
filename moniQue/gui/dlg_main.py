@@ -501,14 +501,23 @@ class MainDialog(QtWidgets.QDialog):
         cam_state = self.obj_camera.get_state()
         print(cam_state)
         
-        # proj_mat = self.obj_camera.projection_matrix
-        # print(proj_mat)
-        print(self.obj_camera.view_matrix)
-        print(self.obj_camera.camera_matrix)
-        # print(proj_mat_to_rkz(proj_mat))
+        view_mat = self.obj_camera.view_matrix
         
-        # print(cam_state)
-    
+        #opengl might be column order and not row ordre; hence, transpose
+        rot_mat = view_mat[:3, :3].T
+        #opengl coordinate systems is rotated by 180 degrees around x axis
+        rot_mat = rot_mat@np.array([[1, 0, 0], 
+                                    [0, np.cos(np.pi), -np.sin(np.pi)], 
+                                    [0, np.sin(np.pi), np.cos(np.pi)]])
+        print(rot_mat)
+        
+        #last column contains the negative position of the camera
+        cam_pos = view_mat[:3, -1]*(-1)
+        
+        
+        print(cam_pos)
+        
+        
     def toggle_camera(self):
         
         #before for the first time an image is loaded
