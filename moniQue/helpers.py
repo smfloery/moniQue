@@ -15,3 +15,10 @@ def create_point_3d(pos, gid):
     
     click_obj.add(click_text)   
     return click_obj
+
+def proj_mat_to_rkz(proj_mat):
+    a_mat = proj_mat[:3, :3]
+    a_vec = proj_mat[:, 3].reshape(3, 1)    #last row of P
+    
+    z_vec = - np.linalg.inv(a_mat)@a_vec
+    print(z_vec)    

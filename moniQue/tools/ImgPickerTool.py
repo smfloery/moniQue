@@ -65,6 +65,8 @@ class ImgPickerTool(QgsMapTool):
                         self.meta_window.line_img_x.setText("%.1f" % (mx))
                         self.meta_window.line_img_y.setText("%.1f" % (my))
                         
+                        self.meta_window.gids_not_allowed = img_gids
+                        
                         result = self.meta_window.exec_() 
                         if result:
                         

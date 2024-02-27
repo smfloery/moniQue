@@ -39,11 +39,14 @@ from qgis.core import (
     QgsVectorFileWriter,
 )
 
+import operator
+
 class OrientDialog(QtWidgets.QDialog):
     
     gcp_selected_signal = QtCore.pyqtSignal(object)
     gcp_deselected_signal = QtCore.pyqtSignal()
     gcp_delete_signal = QtCore.pyqtSignal(object)
+    get_camera_signal = QtCore.pyqtSignal()
     
     def __init__(self, parent=None, icon_dir=None, active_iid=None):
         """Constructor."""
@@ -79,7 +82,7 @@ class OrientDialog(QtWidgets.QDialog):
         
         self.btn_init_ori = QtWidgets.QAction("Set initial orientation from camera view.", self)
         self.btn_init_ori.setIcon(QtGui.QIcon(os.path.join(self.icon_dir, "mActionMeasureBearing.png")))
-        # self.btn_ori_tool.triggered.connect(self.show_orient_dlg)
+        self.btn_init_ori.triggered.connect(self.get_camera_signal.emit)
         # self.btn_ori_tool.setCheckable(True)
         # self.btn_ori_tool.setEnabled(False)
         params_toolbar.addAction(self.btn_init_ori)
@@ -103,7 +106,8 @@ class OrientDialog(QtWidgets.QDialog):
         self.table_gcps.setRowCount(0)
         
         self.table_gcps.cellClicked.connect(self.gcp_selected)
-    
+        self.table_gcps.itemChanged.connect(self.gcp_status_changed)
+        
         self.table_gcps.horizontalHeader().setHighlightSections(True)
         self.table_gcps.horizontalHeader().resizeSection(0, 10)
         self.table_gcps.horizontalHeader().resizeSection(1, 50)
@@ -124,7 +128,6 @@ class OrientDialog(QtWidgets.QDialog):
 
         params_layout = QtWidgets.QVBoxLayout()
         
-
         params_layout.setSpacing(3)
     
         def create_cam_param_layout(param=None, label_size=25, line_size=125, unit=None):
@@ -200,7 +203,7 @@ class OrientDialog(QtWidgets.QDialog):
         self.setLayout(layout)
 
     def gcp_selected(self, rix, cix):
-    
+        
         if cix != 0:
     
             #row was already selected; hence only deselect
@@ -217,6 +220,21 @@ class OrientDialog(QtWidgets.QDialog):
 
                 self.sel_gid = self.table_gcps.item(rix, 1).text()
                 self.gcp_selected_signal.emit({"gid":self.sel_gid})
+    
+    def gcp_status_changed(self, item):
+        active_gcps = 0
+        
+        if item.column() == 0:
+            nr_rows = self.table_gcps.rowCount()
+                    
+            for rix in range(nr_rows):
+                if self.table_gcps.item(rix, 0).checkState() == QtCore.Qt.Checked:
+                    active_gcps += 1
+    
+            if active_gcps >= 4:
+                self.btn_calc_ori.setEnabled(True)
+            else:
+                self.btn_calc_ori.setEnabled(False)
     
     def delete_selected_gcp(self):
         self.gcp_delete_signal.emit({"gid":self.sel_gid})
@@ -312,7 +330,7 @@ class OrientDialog(QtWidgets.QDialog):
             chkBoxItem = QtWidgets.QTableWidgetItem()
             chkBoxItem.setFlags(QtCore.Qt.ItemIsUserCheckable)# | Qt.ItemIsEnabled)
             chkBoxItem.setCheckState(QtCore.Qt.Unchecked)
-                    
+                        
             self.table_gcps.setItem(nr_rows, 0, chkBoxItem)
             self.table_gcps.setItem(nr_rows, self.name2ix["gid"], QtWidgets.QTableWidgetItem(str(data["gid"])))
 
@@ -326,21 +344,32 @@ class OrientDialog(QtWidgets.QDialog):
         
     def add_gcps_from_lyr(self, gcps):
         
+        self.active_gcps = 0
+        
         nr_gcps = len(gcps)
         
         for rx, (gid, data) in enumerate(gcps.items()):
+            
+            nr_none_attr = operator.countOf(data.values(), None)
             
             self.table_gcps.insertRow(rx)
             self.table_gcps.setRowHeight(rx, 25)
 
             chkBoxItem = QtWidgets.QTableWidgetItem()
-            chkBoxItem.setFlags(QtCore.Qt.ItemIsUserCheckable)# | Qt.ItemIsEnabled)
-            if data["active"] == 0:
-                chkBoxItem.setCheckState(QtCore.Qt.Unchecked)
+            flags = chkBoxItem.flags()
+            flags |= QtCore.Qt.ItemIsUserCheckable
+            
+            if nr_none_attr > 2:
+                flags &= ~QtCore.Qt.ItemIsEnabled
+                        
+            chkBoxItem.setFlags(flags)
+            
+            if data["active"] == 1:
+                chkBoxItem.setCheckState(QtCore.Qt.Checked)
             else:
                 chkBoxItem.setCheckState(QtCore.Qt.Unchecked)
             
-            self.table_gcps.setItem(rx, 0, chkBoxItem)
+            self.table_gcps.setItem(rx, 0, chkBoxItem)    
             self.table_gcps.setItem(rx, self.name2ix["gid"], QtWidgets.QTableWidgetItem(gid))
             if data["obj_x"]:
                 self.table_gcps.setItem(rx, self.name2ix["X"], QtWidgets.QTableWidgetItem("%.1f" % data["obj_x"]))
@@ -372,216 +401,3 @@ class OrientDialog(QtWidgets.QDialog):
             self.table_gcps.setItem(self.table_gcps.currentRow(), self.name2ix["Y"], QtWidgets.QTableWidgetItem("%.1f" % (data["obj_y"])))
             self.table_gcps.setItem(self.table_gcps.currentRow(), self.name2ix["Z"], QtWidgets.QTableWidgetItem("%.1f" % (data["obj_z"])))
             
-    
-    # def set_gpkg_path(self):
-    #     gpkg_path = QtWidgets.QFileDialog.getSaveFileName(None, "GPKG path", "", ("Geopackage (*.gpkg)"))[0]
-    #     if gpkg_path:
-    #         self.gpkg_line.setText(gpkg_path)
-
-    #         if (self.mesh_line.text() is not "") & (self.crs_widget.crs().isValid()):
-    #             self.create_btn.setEnabled(True)
-                
-    # def set_mesh_path(self):
-    #     mesh_path = QtWidgets.QFileDialog.getOpenFileName(None, "Open mesh", "", ("Mesh (*.ply)"))[0]   
-    #     if mesh_path:
-    #         self.mesh_line.setText(mesh_path)
-
-    #         if (self.gpkg_line.text()  is not "") & (self.crs_widget.crs().isValid()):
-    #             self.create_btn.setEnabled(True)
-
-    # def set_crs(self):
-    #     if (self.gpkg_line.text() is not "") & (self.mesh_line.text() is not "") & (self.crs_widget.crs().isValid()):
-    #         self.create_btn.setEnabled(True)
-    
-    # def create_project(self):
-    #     gpkg_path = self.gpkg_line.text()
-    #     mesh_path = self.mesh_line.text()
-    #     crs = self.crs_widget.crs().authid()
-        
-    #     QtWidgets.QApplication.instance().setOverrideCursor(QtCore.Qt.WaitCursor)
-    #     transform_context = QgsProject.instance().transformContext() #necessary for writing
-                
-    #     mesh = o3d.io.read_triangle_mesh(mesh_path)
-    #     nr_verts = int(np.asarray(mesh.vertices).shape[0])
-    #     nr_faces = int(np.asarray(mesh.triangles).shape[0])
-                
-    #     mesh_bbox = mesh.get_axis_aligned_bounding_box()
-    #     mesh_centroid = mesh_bbox.get_center()
-    #     mesh_cx = mesh_centroid[0]
-    #     mesh_cy = mesh_centroid[1]
-        
-    #     mesh_half_extent = mesh_bbox.get_half_extent()
-    #     mesh_dx = mesh_half_extent[0]
-    #     mesh_dy = mesh_half_extent[1]
-
-    #     mesh_tl = [mesh_cx - mesh_dx, mesh_cy+mesh_dy]
-    #     mesh_tr = [mesh_cx + mesh_dx, mesh_cy+mesh_dy]
-    #     mesh_br = [mesh_cx + mesh_dx, mesh_cy-mesh_dy]
-    #     mesh_bl = [mesh_cx - mesh_dx, mesh_cy-mesh_dy]
-        
-    #     mesh_bbox = [QgsPointXY(mesh_tl[0], mesh_tl[1]),
-    #                  QgsPointXY(mesh_tr[0], mesh_tr[1]),
-    #                  QgsPointXY(mesh_br[0], mesh_br[1]),
-    #                  QgsPointXY(mesh_bl[0], mesh_bl[1]),
-    #                  QgsPointXY(mesh_tl[0], mesh_tl[1])]
-            
-    #     reg_lyr = QgsVectorLayer("Polygon?crs=%s" % (crs), "region", "memory")
-    #     pr = reg_lyr.dataProvider()
-    #     pr.addAttributes([QgsField("name", QtCore.QVariant.String), 
-    #                       QgsField("path", QtCore.QVariant.String), 
-    #                       QgsField("nr_verts", QtCore.QVariant.Int), 
-    #                       QgsField("nr_faces", QtCore.QVariant.Int), 
-    #                       QgsField("minx", QtCore.QVariant.Double, "double", 10, 3), 
-    #                       QgsField("maxx", QtCore.QVariant.Double, "double", 10, 3), 
-    #                       QgsField("miny", QtCore.QVariant.Double, "double", 10, 3),
-    #                       QgsField("maxy", QtCore.QVariant.Double, "double", 10, 3)])
-    #     reg_lyr.updateFields() 
-            
-    #     # add a feature
-    #     feat = QgsFeature()
-    #     feat.setGeometry(QgsGeometry.fromPolygonXY([mesh_bbox]))
-    #     feat.setAttributes([os.path.basename(mesh_path), 
-    #                         mesh_path, 
-    #                         nr_verts,
-    #                         nr_faces, 
-    #                         float(mesh_bl[0]), 
-    #                         float(mesh_tr[0]), 
-    #                         float(mesh_bl[1]), 
-    #                         float(mesh_tr[1])])
-    #     pr.addFeatures([feat])
-
-    #     # update layer's extent when new features have been added
-    #     # because change of extent in provider is not propagated to the layer
-    #     reg_lyr.updateExtents()
-        
-    #     #write region layer to geopackage
-    #     lyr_options = QgsVectorFileWriter.SaveVectorOptions()
-    #     lyr_options.layerName = reg_lyr.name()
-    #     lyr_options.driverName = "GPKG"
-        
-    #     if hasattr(QgsVectorFileWriter, 'writeAsVectorFormatV3'): #for QGIS Version >3.20
-    #         use_v3 = True
-    #         _writer = QgsVectorFileWriter.writeAsVectorFormatV3(reg_lyr, gpkg_path, transform_context, lyr_options)
-    #     elif hasattr(QgsVectorFileWriter, 'writeAsVectorFormatV2'): #for QGIS Version <3.20
-    #         use_v3 = False
-    #         _writer = QgsVectorFileWriter.writeAsVectorFormatV2(reg_lyr, gpkg_path, transform_context, lyr_options)
-            
-    #     if _writer[0] == QgsVectorFileWriter.NoError:
-    #         pass
-    #     else:
-    #         self.msg_bar.pushMessage("Error", "Could not create project.", level=Qgis.Critical, duration=3)
-    #         raise ValueError("Could not create project!")
-                            
-    #     #create additionally needed layers and add them to the geopackage as well
-    #     cam_lyr = QgsVectorLayer("Point?crs=%s" % (crs), "cameras", "memory")
-    #     cam_pr = cam_lyr.dataProvider()
-    #     cam_pr.addAttributes([QgsField("iid", QtCore.QVariant.String),
-    #                           QgsField("path", QtCore.QVariant.String),
-    #                           QgsField("ext", QtCore.QVariant.String),
-    #                           QgsField("is_oriented", QtCore.QVariant.Int),
-    #                           QgsField("X", QtCore.QVariant.Double, "double", 10, 3),
-    #                           QgsField("Y", QtCore.QVariant.Double, "double", 10, 3),
-    #                           QgsField("H", QtCore.QVariant.Double, "double", 10, 3),
-    #                           QgsField("X_std", QtCore.QVariant.Double, "double", 10, 3),
-    #                           QgsField("Y_std", QtCore.QVariant.Double, "double", 10, 3),
-    #                           QgsField("H_std", QtCore.QVariant.Double, "double", 10, 3),
-    #                           QgsField("alpha", QtCore.QVariant.Double, "double", 10, 5),
-    #                           QgsField("zeta", QtCore.QVariant.Double, "double", 10, 3),
-    #                           QgsField("kappa", QtCore.QVariant.Double, "double", 10, 5),
-    #                           QgsField("alpha_std", QtCore.QVariant.Double, "double", 10, 3),
-    #                           QgsField("zeta_std", QtCore.QVariant.Double, "double", 10, 5),
-    #                           QgsField("kappa_std", QtCore.QVariant.Double, "double", 10, 3),
-    #                           QgsField("s0", QtCore.QVariant.Double, "double", 10, 1),
-    #                           QgsField("x0", QtCore.QVariant.Double, "double", 10, 1),
-    #                           QgsField("y0", QtCore.QVariant.Double, "double", 10, 1),
-    #                           QgsField("f", QtCore.QVariant.Double, "double", 10, 1),
-    #                           QgsField("f_std", QtCore.QVariant.Double, "double", 10, 1),
-    #                           QgsField("img_w", QtCore.QVariant.Int),
-    #                           QgsField("img_h", QtCore.QVariant.Int),
-    #                           QgsField("hfov", QtCore.QVariant.Double, "double", 6, 3),
-    #                           QgsField("vfov", QtCore.QVariant.Double, "double", 6, 3)])
-    #     cam_lyr.updateFields() 
-                
-    #     gcps_lyr = QgsVectorLayer("Point?crs=%s" % (crs), "gcps", "memory")
-    #     gcps_pr = gcps_lyr.dataProvider()
-    #     gcps_pr.addAttributes([QgsField("iid", QtCore.QVariant.String),
-    #                           QgsField("gid", QtCore.QVariant.String),
-    #                           QgsField("desc", QtCore.QVariant.String),
-    #                           QgsField("X", QtCore.QVariant.Double, "double", 10, 3),
-    #                           QgsField("Y", QtCore.QVariant.Double, "double", 10, 3),
-    #                           QgsField("H", QtCore.QVariant.Double, "double", 10, 3),
-    #                           QgsField("H_src", QtCore.QVariant.String),
-    #                           QgsField("X_std", QtCore.QVariant.Double, "double", 10, 3),
-    #                           QgsField("Y_std", QtCore.QVariant.Double, "double", 10, 3),
-    #                           QgsField("H_std", QtCore.QVariant.Double, "double", 10, 3),
-    #                           QgsField("active", QtCore.QVariant.String)])
-    #     gcps_lyr.updateFields() 
-        
-    #     gcps_img_lyr = QgsVectorLayer("Point?crs=%s" % (crs), "gcps_img", "memory")
-    #     gcps_img_pr = gcps_img_lyr.dataProvider()
-    #     gcps_img_pr.addAttributes([QgsField("iid", QtCore.QVariant.String),
-    #                           QgsField("gid", QtCore.QVariant.String),
-    #                           QgsField("desc", QtCore.QVariant.String),
-    #                           QgsField("x", QtCore.QVariant.Double, "double", 10, 1),
-    #                           QgsField("y", QtCore.QVariant.Double, "double", 10, 1),
-    #                           QgsField("dx", QtCore.QVariant.Double, "double", 10, 1),
-    #                           QgsField("dy", QtCore.QVariant.Double, "double", 10, 1),
-    #                           QgsField("active", QtCore.QVariant.String)])
-    #     gcps_img_lyr.updateFields()
-        
-    #     # cam_hfov_lyr = QgsVectorLayer("Polygon?crs=%s" % (crs), "cameras_hfov", "memory")
-    #     # cam_hfov_pr = cam_hfov_lyr.dataProvider()
-    #     # cam_hfov_pr.addAttributes([QgsField("iid", QtCore.QVariant.String),
-    #     #                            QgsField("is_oriented", QtCore.QVariant.Int),
-    #     #                             QgsField("path", QtCore.QVariant.String),
-    #     #                             QgsField("ext", QtCore.QVariant.String),
-    #     #                             QgsField("w", QtCore.QVariant.Int),
-    #     #                             QgsField("h", QtCore.QVariant.Int),
-    #     #                             QgsField("hfov", QtCore.QVariant.Double, "double", 6, 3),
-    #     #                             QgsField("vfov", QtCore.QVariant.Double, "double", 6, 3)])
-    #     # cam_hfov_lyr.updateFields() 
-        
-    #     map_line_lyr = QgsVectorLayer("LineString?crs=%s" % (crs), "lines", "memory")
-    #     map_line_pr = map_line_lyr.dataProvider()
-    #     map_line_pr.addAttributes([QgsField("iid", QtCore.QVariant.String), 
-    #                                QgsField("type", QtCore.QVariant.String), 
-    #                                QgsField("comment", QtCore.QVariant.String)]);
-    #     map_line_lyr.updateFields() 
-        
-    #     map_line_pnts_lyr = QgsVectorLayer("Point?crs=%s" % (crs), "lines_vx", "memory")
-        
-    #     img_line_lyr = QgsVectorLayer("LineString", "lines_img", "memory")
-    #     img_line_pr = img_line_lyr.dataProvider()
-    #     img_line_pr.addAttributes([QgsField("iid", QtCore.QVariant.String), 
-    #                                QgsField("type", QtCore.QVariant.String), 
-    #                                QgsField("comment", QtCore.QVariant.String)]);
-    #     img_line_lyr.updateFields() 
-        
-    #     img_line_pnts_lyr = QgsVectorLayer("Point", "lines_img_vx", "memory")
-        
-    #     lyrs = [map_line_lyr, cam_lyr, map_line_pnts_lyr, img_line_lyr, img_line_pnts_lyr, gcps_lyr, gcps_img_lyr]              
-        
-    #     for lyr in lyrs:
-    #         options = QgsVectorFileWriter.SaveVectorOptions()
-    #         options.actionOnExistingFile = QgsVectorFileWriter.CreateOrOverwriteLayer    
-    #         options.layerName = lyr.name()
-    #         options.driverName = "GPKG"
-            
-    #         if use_v3: #QGIS < 3.20
-    #             _writer = QgsVectorFileWriter.writeAsVectorFormatV3(lyr, gpkg_path, transform_context, options)
-    #         else:
-    #             _writer = QgsVectorFileWriter.writeAsVectorFormatV2(lyr, gpkg_path, transform_context, options)
-            
-    #         if _writer[0] == QgsVectorFileWriter.NoError:
-    #             pass
-    #         else:
-    #             #! does not work; no message bar in the create dialog; necessary to send signal to main_dialog
-    #             #! with error message as parameter
-    #             # self.msg_bar.pushMessage("Error", "Could not create project.", level=Qgis.Critical, duration=3)
-    #             # raise ValueError("Could not create project!")
-    #             pass
-        
-    #     QtWidgets.QApplication.instance().restoreOverrideCursor()
-
-    #     self.created_signal.emit({"gpkg_path":gpkg_path})
-    #     self.close()

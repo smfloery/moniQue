@@ -1,4 +1,4 @@
-from PyQt5.QtWidgets import QDialog, QGroupBox, QLineEdit, QDialogButtonBox, QVBoxLayout, QFormLayout, QLabel, QComboBox
+from PyQt5.QtWidgets import QDialog, QGroupBox, QLineEdit, QDialogButtonBox, QVBoxLayout, QFormLayout, QLabel, QComboBox, QErrorMessage
 from PyQt5.QtGui import QIntValidator
 
 class GcpMetaDialog(QDialog):
@@ -76,14 +76,23 @@ class GcpMetaDialog(QDialog):
   
         # setting lay out
         self.setLayout(mainLayout)
-    
+
+        self.error_dialog = QErrorMessage(parent=self)
+        self.gids_not_allowed = None
+        
     # def getMeta(self):
     #     return {"type":self.line_type.text(), "comment":self.line_comment.text()}
     
     # def clearFields(self):
     #     self.line_type.clear()
     #     self.line_comment.clear()
-  
+    
+    def accept(self):
+        if self.combo_gid.currentText() not in self.gids_not_allowed:
+            super().accept()
+        else:
+            self.error_dialog.showMessage('GID already in use!')
+            
     def createForm(self):
   
         # creating a form layout

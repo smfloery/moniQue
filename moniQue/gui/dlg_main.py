@@ -43,7 +43,8 @@ from .dlg_meta_gcp import GcpMetaDialog
 from ..tools.ImgPickerTool import ImgPickerTool
 
 from ..camera import Camera
-from ..helpers import create_point_3d
+from ..helpers import create_point_3d, proj_mat_to_rkz
+
 class MainDialog(QtWidgets.QDialog):
     
     load_project_signal = QtCore.pyqtSignal(object)
@@ -252,7 +253,7 @@ class MainDialog(QtWidgets.QDialog):
             self.dlg_orient.gcp_selected_signal.connect(self.select_gcp)
             self.dlg_orient.gcp_deselected_signal.connect(self.deselect_gcp)
             self.dlg_orient.gcp_delete_signal.connect(self.delete_gcp)
-            # gcps = self.get_gcps_from_gpkg()
+            self.dlg_orient.get_camera_signal.connect(self.get_obj_canvas_camera)
             
             self.dlg_orient.add_gcps_from_lyr(self.get_gcps_from_gpkg())
             
@@ -363,6 +364,7 @@ class MainDialog(QtWidgets.QDialog):
         for feat in self.img_gcps_lyr.getFeatures():
             curr_gcp = gcp_data.copy()
             img_gcp = json.loads(QgsJsonUtils.exportAttributes(feat))
+            
             curr_gid = img_gcp["gid"]
             
             curr_gcp["img_x"] = img_gcp["img_x"]
@@ -494,6 +496,18 @@ class MainDialog(QtWidgets.QDialog):
     def set_img_canvas_extent(self):
         self.img_canvas.setExtent(self.img_lyr.extent())
         self.img_canvas.refresh()
+    
+    def get_obj_canvas_camera(self):
+        cam_state = self.obj_camera.get_state()
+        print(cam_state)
+        
+        # proj_mat = self.obj_camera.projection_matrix
+        # print(proj_mat)
+        print(self.obj_camera.view_matrix)
+        print(self.obj_camera.camera_matrix)
+        # print(proj_mat_to_rkz(proj_mat))
+        
+        # print(cam_state)
     
     def toggle_camera(self):
         
@@ -680,6 +694,8 @@ class MainDialog(QtWidgets.QDialog):
                 dlg_meta.line_obj_x.setText("%.1f" % (click_pos_global[0]))
                 dlg_meta.line_obj_y.setText("%.1f" % (click_pos_global[1]))
                 dlg_meta.line_obj_z.setText("%.1f" % (click_pos_global[2]))
+                
+                dlg_meta.gids_not_allowed = map_gids
                 
                 result = dlg_meta.exec_() 
 
