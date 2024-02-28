@@ -43,7 +43,7 @@ from .dlg_meta_gcp import GcpMetaDialog
 from ..tools.ImgPickerTool import ImgPickerTool
 
 from ..camera import Camera
-from ..helpers import create_point_3d, rot2alzeka, alzeka2rot, photo2opengl, opengl2photo
+from ..helpers import create_point_3d, rot2alzeka, alzeka2rot, photo2pygfx, pygfx2photo
 
 class MainDialog(QtWidgets.QDialog):
     
@@ -149,16 +149,20 @@ class MainDialog(QtWidgets.QDialog):
         # btn_img_pan.triggered.connect(self.load_mesh)
         
         self.obj_renderer = gfx.WgpuRenderer(self.obj_canvas)
+        self.stats = gfx.Stats(viewport=self.obj_renderer)
+
         self.obj_scene = gfx.Scene()
         
-        light_gray = np.array((100, 100, 100, 255)) / 255
+        # light_gray = np.array((100, 100, 100, 255)) / 255
         background = gfx.Background(None, gfx.BackgroundMaterial([1, 1, 1, 1]))
         self.obj_scene.add(background)
         
-        self.obj_camera = gfx.PerspectiveCamera(fov=45)#, depth_range=(10, 10000))
-
+        self.obj_camera = gfx.PerspectiveCamera(fov=45, depth_range=(1, 100000))
+        
         self.obj_canvas.request_draw(self.animate)
         self.obj_controller = gfx.TrackballController(self.obj_camera, register_events=self.obj_renderer, damping=0)
+        
+        # self.obj_scene.add(gfx.AxesHelper(size=1000, thickness=3))
         
         self.list_toolbar = QtWidgets.QToolBar()
         self.list_toolbar.setIconSize(QtCore.QSize(20, 20))
@@ -314,7 +318,8 @@ class MainDialog(QtWidgets.QDialog):
                         
         # print("Loading mesh...")
         mesh_geom = gfx.geometries.Geometry(indices=faces, positions=verts.astype(np.float32), normals=norms)
-        mesh_material = gfx.MeshPhongMaterial(color="#BEBEBE", side="FRONT", shininess=10)
+        mesh_material = gfx.MeshNormalMaterial(side="FRONT")
+        # mesh_material = gfx.MeshPhongMaterial(color="#BEBEBE", side="FRONT", shininess=10)
 
         # print("Adding mesh to canvas...")
         self.mesh = gfx.Mesh(mesh_geom, mesh_material)
@@ -331,7 +336,9 @@ class MainDialog(QtWidgets.QDialog):
         self.min_xyz = min_xyz
         
     def animate(self):
-        self.obj_renderer.render(self.obj_scene, self.obj_camera)
+        with self.stats:
+            self.obj_renderer.render(self.obj_scene, self.obj_camera, flush=False)
+            self.stats.render()
     
     def import_images(self):
         """Import selected images.
@@ -498,23 +505,29 @@ class MainDialog(QtWidgets.QDialog):
         self.img_canvas.refresh()
     
     def get_obj_canvas_camera(self):
-        cam_state = self.obj_camera.get_state()
+        # cam_state = self.obj_camera.get_state()
         
-        view_mat = self.obj_camera.view_matrix
+        cam_pos = self.obj_camera.local.position + self.min_xyz
+
+        cam_rmat_pygfx = self.obj_camera.local.rotation_matrix[:3, :3]  #already transposed in contrast to self.obj_camera.view_matrix; otherweise the same
+        cam_rmat_photo = pygfx2photo(cam_rmat_pygfx)
         
-        rot_mat_opengl = view_mat[:3, :3]
-        rot_mat_photo = opengl2photo(rot_mat_opengl)
+        alzekas = rot2alzeka(cam_rmat_photo)
+        # alzekas_deg = np.rad2deg(alzekas)
         
-        alzekas = rot2alzeka(rot_mat_photo)
-        alzekas_deg = np.rad2deg(alzekas)
+        # rot_mat_photo = alzeka2rot(alzekas[0, :])        
+        # rot_mat_opengl = rot_mat_photo@np.array([[np.cos(np.pi), 0, np.sin(np.pi)],
+        #                                          [0, 1, 0],
+        #                                          [-np.sin(np.pi), 0, np.cos(np.pi)]])
+        # print(rot_mat_opengl)
         
-        #last column contains the negative position of the camera
-        cam_pos = view_mat[:3, -1]*(-1)
-        cam_pos += self.min_xyz
+        # self.obj_camera.local.rotation_matrix = rot_mat_photo
+        # self.obj_canvas.request_draw(self.animate)
+        # print(np.rad2deg(self.obj_camera.local.euler))
         
         data = {"obj_x0":cam_pos[0], "obj_y0":cam_pos[1], "obj_z0":cam_pos[2], 
-                "alpha":alzekas_deg[0, 0], "zeta":alzekas_deg[0, 1], "kappa":alzekas_deg[0, 2],
-                "img_x0":self.active_camera.img_w/2., "img_y0":self.active_camera.img_h/2.*(-1)}
+                "alpha":alzekas[0, 0], "zeta":alzekas[0, 1], "kappa":alzekas[0, 2],
+                "img_x0":self.active_camera.img_w/2., "img_y0":self.active_camera.img_h/2.*(-1), "f":np.sqrt(self.active_camera.img_w**2 + self.active_camera.img_h**2)/3.}
         
         self.dlg_orient.set_init_params(data)
                 

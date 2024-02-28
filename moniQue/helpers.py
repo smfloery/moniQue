@@ -64,16 +64,15 @@ def rot2alzeka(rot_mat):
     alzekas = np.array([[al_1_rad, ze_1_rad, ka_1_rad], [al_2_rad, ze_2_rad, ka_2_rad]])
     return alzekas
 
-def opengl2photo(rot_mat):
-    #opengl might be column order and not row ordre; hence, transpose
-    #opengl coordinate systems is rotated by 180 degrees around x axis
-    # rot_mat_photo = rot_mat.T@np.array([[1, 0, 0], 
-    #                                     [0, np.cos(np.pi), -np.sin(np.pi)], 
-    #                                     [0, np.sin(np.pi), np.cos(np.pi)]])
-    return rot_mat.T
+def pygfx2photo(rot_mat):
+    #rotmat (which comes from pygfx.camera.local.rotation_matrix) is the opengl view_matrix but already transposed!
+    rot_mat_photo = rot_mat@np.array([[np.cos(np.pi), 0, np.sin(np.pi)],
+                                      [0, 1, 0],
+                                      [-np.sin(np.pi), 0, np.cos(np.pi)]]).T
+    return rot_mat_photo
 
-def photo2opengl(rot_mat):
-    rot_mat_opengl = rot_mat@np.array([[1, 0, 0], 
-                                       [0, np.cos(np.pi), -np.sin(np.pi)], 
-                                       [0, np.sin(np.pi), np.cos(np.pi)]]).T
-    return rot_mat_opengl.T
+def photo2pygfx(rot_mat):
+    rot_mat_opengl = rot_mat@np.array([[np.cos(np.pi), 0, np.sin(np.pi)],
+                                       [0, 1, 0],
+                                       [-np.sin(np.pi), 0, np.cos(np.pi)]])
+    return rot_mat_opengl

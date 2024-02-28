@@ -63,6 +63,7 @@ class OrientDialog(QtWidgets.QDialog):
                         "dy":8}
         
         self.prev_row = -1
+        self.init_params = None
         
         self.parent = parent
         self.parent.img_list.setEnabled(False)
@@ -221,6 +222,8 @@ class OrientDialog(QtWidgets.QDialog):
         layout.addLayout(main_layout)
         self.setLayout(layout)
 
+        self.error_dialog = QtWidgets.QErrorMessage(parent=self)
+        
     def gcp_selected(self, rix, cix):
         
         if cix != 0:
@@ -437,44 +440,60 @@ class OrientDialog(QtWidgets.QDialog):
         self.obj_y0_line.setText("%.1f" % (data["obj_y0"]))
         self.obj_z0_line.setText("%.1f" % (data["obj_z0"]))
         
-        self.alpha_line.setText("%.3f" % (data["alpha"]))
-        self.zeta_line.setText("%.3f" % (data["zeta"]))
-        self.kappa_line.setText("%.3f" % (data["kappa"]))
+        #display euler angles in degrees; but in data array its still in radiant
+        self.alpha_line.setText("%.3f" % (np.rad2deg(data["alpha"])))
+        self.zeta_line.setText("%.3f" % (np.rad2deg(data["zeta"])))
+        self.kappa_line.setText("%.3f" % (np.rad2deg(data["kappa"])))
         
         self.img_x0_line.setText("%.1f" % (data["img_x0"]))
         self.img_y0_line.setText("%.1f" % (data["img_y0"]))
-    
+        self.focal_line.setText("%.1f" % (data["f"]))
+        
+        self.init_params = data.copy()
+        
+        
     def calc_orientation(self):
-        nr_rows = self.table_gcps.rowCount()
         
-        ori_data = {"gid":[], 
-                    "img":[], 
-                    "obj":[], 
-                    "init_params":{"obj_x0":None,
-                                    "obj_y0":None,
-                                    "obj_z0":None,
-                                    "alpha":None,
-                                    "zeta":None,
-                                    "kappa":None,
-                                    "f":None,
-                                    "img_x0":None,
-                                    "img_y0":None}}
-        
-        for rix in range(nr_rows):
-            if self.table_gcps.item(rix, 0).checkState() == QtCore.Qt.Checked:
-                curr_gid = self.table_gcps.item(rix, self.name2ix["gid"]).text()
-                curr_obj_x = float(self.table_gcps.item(rix, self.name2ix["X"]).text())
-                curr_obj_y = float(self.table_gcps.item(rix, self.name2ix["Y"]).text())
-                curr_obj_z = float(self.table_gcps.item(rix, self.name2ix["Z"]).text())
-                curr_img_x = float(self.table_gcps.item(rix, self.name2ix["x"]).text())
-                curr_img_y = float(self.table_gcps.item(rix, self.name2ix["y"]).text())
+        if not self.init_params:
+            self.error_dialog.showMessage('Set initial camera parameters first!')
+        else:
+            ori_data = {"gid":[], "img":[], "obj":[], "init_params":None}
+            
+            nr_rows = self.table_gcps.rowCount()
+            for rix in range(nr_rows):
+                if self.table_gcps.item(rix, 0).checkState() == QtCore.Qt.Checked:
+                    curr_gid = self.table_gcps.item(rix, self.name2ix["gid"]).text()
+                    curr_obj_x = float(self.table_gcps.item(rix, self.name2ix["X"]).text())
+                    curr_obj_y = float(self.table_gcps.item(rix, self.name2ix["Y"]).text())
+                    curr_obj_z = float(self.table_gcps.item(rix, self.name2ix["Z"]).text())
+                    curr_img_x = float(self.table_gcps.item(rix, self.name2ix["x"]).text())
+                    curr_img_y = float(self.table_gcps.item(rix, self.name2ix["y"]).text())
+                    
+                    ori_data["gid"].append(curr_gid)
+                    ori_data["img"].append([curr_img_x, curr_img_y])
+                    ori_data["obj"].append([curr_obj_x, curr_obj_y, curr_obj_z])
+                    
+            
+            ori_data["init_params"] = self.init_params
+            res = srs_lm(ori_data)
+                        
+            if res.success == False:
+                self.error_dialog.showMessage('LSQ did not converge: %s' % (res.message))
+            else:
+                est_obj_x0 = res.params["obj_x0"].value
+                est_obj_y0 = res.params["obj_y0"].value
+                est_obj_z0 = res.params["obj_z0"].value
+                est_alpha = res.params["alpha"].value
+                est_zeta = res.params["zeta"].value
+                est_kappa = res.params["kappa"].value
+                est_focal = res.params["f"].value
                 
-                ori_data["gid"].append(curr_gid)
-                ori_data["img"].append([curr_img_x, curr_img_y])
-                ori_data["obj"].append([curr_obj_x, curr_obj_y, curr_obj_z])
+                cxx = res.covar
+                cxx_names = res.var_names
                 
-                
-        #TODO get initival values
-        
-        print(ori_data)
-                
+                print(est_obj_x0, est_obj_y0, est_obj_z0)
+                print(np.rad2deg([est_alpha, est_zeta, est_kappa]))
+                print(est_focal)
+                print(res.residual.reshape(-1, 2))
+
+            

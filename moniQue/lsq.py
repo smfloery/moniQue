@@ -6,6 +6,9 @@ def srs_lm(data):
     
     gcp_obj = np.array(data["obj"])
     gcp_img = np.array(data["img"])
+    
+    assert np.shape(gcp_obj)[1] == 3
+    assert np.shape(gcp_img)[1] == 2
     assert np.shape(gcp_obj)[0] == np.shape(gcp_img)[0]
     
     init_params = data["init_params"]
@@ -25,33 +28,34 @@ def srs_lm(data):
     params.add("img_y0", value=init_params["img_y0"], vary=False)
 
     r = minimize(residual, params, args=(gcp_img, gcp_obj), method="leastsq")
+    return r
 
-    if r.success == False:
-        return None
+    # if r.success == False:
+    #     return None
     
-    est_prc_x0 = r.params["obj_x0"].value
-    est_prc_y0 = r.params["obj_y0"].value
-    est_prc_z0 = r.params["obj_z0"].value
-    est_alpha = r.params["alpha"].value
-    est_zeta = r.params["zeta"].value
-    est_kappa = r.params["kappa"].value
-    est_focal = r.params["f"].value
+    # est_prc_x0 = r.params["obj_x0"].value
+    # est_prc_y0 = r.params["obj_y0"].value
+    # est_prc_z0 = r.params["obj_z0"].value
+    # est_alpha = r.params["alpha"].value
+    # est_zeta = r.params["zeta"].value
+    # est_kappa = r.params["kappa"].value
+    # est_focal = r.params["f"].value
     
-    est_params = {"obj_x0":est_prc_x0, 
-                  "obj_y0":est_prc_y0, 
-                  "obj_z0":est_prc_z0, 
-                  "alpha":est_alpha, 
-                  "zeta": est_zeta, 
-                  "kappa": est_kappa, 
-                  "f": est_focal, 
-                  "img_x0": init_params["img_x0"], 
-                  "img_y0": init_params["img_y0"]
-                  }
+    # est_params = {"obj_x0":est_prc_x0, 
+    #               "obj_y0":est_prc_y0, 
+    #               "obj_z0":est_prc_z0, 
+    #               "alpha":est_alpha, 
+    #               "zeta": est_zeta, 
+    #               "kappa": est_kappa, 
+    #               "f": est_focal, 
+    #               "img_x0": init_params["img_x0"], 
+    #               "img_y0": init_params["img_y0"]
+    #               }
 
-    cxx = r.covar
-    cxx_names = r.var_names
+    # cxx = r.covar
+    # cxx_names = r.var_names
     
-    return est_params, cxx, cxx_names, r.residual
+    # return est_params, cxx, cxx_names, r.residual
 
 def world2img(gcp_obj, p):
 
@@ -86,9 +90,7 @@ def world2img(gcp_obj, p):
     rot = alzeka2rot(np.array([alpha, zeta, kappa]))
     
     # Vector camera DEM
-    prc = np.array([obj_x0, 
-                    obj_y0, 
-                    obj_z0])
+    prc = np.array([obj_x0, obj_y0, obj_z0])
 
     # Translate
     gcp_obj_red = gcp_obj - prc
@@ -108,8 +110,6 @@ def residual(params, img_gcp, obj_gcp):
     #obj_gcps reprojected into image using currently estimated paramters
     obj_gcp_img = world2img(obj_gcp, params)
     
-    # nObs = len(xy_p)
-    
     # difference between observed image coordinates and reprojected
     dx = img_gcp[:, 0] - obj_gcp_img[:, 0]
     dy = img_gcp[:, 1] - obj_gcp_img[:, 1]
@@ -117,11 +117,4 @@ def residual(params, img_gcp, obj_gcp):
     #reshape to dx0,dy0,dx1,dy1,dx2,dy2,....dxn,dyn
     res_xy = np.vstack((dx, dy)).ravel("F")
     
-    # # 1D vector of the residual
-    # r = []
-    # for i in range(nObs):
-    #     r.append(dx[i])
-    #     r.append(dy[i])
-    # r = np.asarray(r)
-
     return res_xy
