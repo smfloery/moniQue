@@ -43,7 +43,7 @@ from .dlg_meta_gcp import GcpMetaDialog
 from ..tools.ImgPickerTool import ImgPickerTool
 
 from ..camera import Camera
-from ..helpers import create_point_3d, proj_mat_to_rkz
+from ..helpers import create_point_3d, rot2alzeka, alzeka2rot, photo2opengl, opengl2photo
 
 class MainDialog(QtWidgets.QDialog):
     
@@ -499,24 +499,25 @@ class MainDialog(QtWidgets.QDialog):
     
     def get_obj_canvas_camera(self):
         cam_state = self.obj_camera.get_state()
-        print(cam_state)
         
         view_mat = self.obj_camera.view_matrix
         
-        #opengl might be column order and not row ordre; hence, transpose
-        rot_mat = view_mat[:3, :3].T
-        #opengl coordinate systems is rotated by 180 degrees around x axis
-        rot_mat = rot_mat@np.array([[1, 0, 0], 
-                                    [0, np.cos(np.pi), -np.sin(np.pi)], 
-                                    [0, np.sin(np.pi), np.cos(np.pi)]])
-        print(rot_mat)
+        rot_mat_opengl = view_mat[:3, :3]
+        rot_mat_photo = opengl2photo(rot_mat_opengl)
+        
+        alzekas = rot2alzeka(rot_mat_photo)
+        alzekas_deg = np.rad2deg(alzekas)
         
         #last column contains the negative position of the camera
         cam_pos = view_mat[:3, -1]*(-1)
+        cam_pos += self.min_xyz
         
+        data = {"obj_x0":cam_pos[0], "obj_y0":cam_pos[1], "obj_z0":cam_pos[2], 
+                "alpha":alzekas_deg[0, 0], "zeta":alzekas_deg[0, 1], "kappa":alzekas_deg[0, 2],
+                "img_x0":self.active_camera.img_w/2., "img_y0":self.active_camera.img_h/2.*(-1)}
         
-        print(cam_pos)
-        
+        self.dlg_orient.set_init_params(data)
+                
         
     def toggle_camera(self):
         

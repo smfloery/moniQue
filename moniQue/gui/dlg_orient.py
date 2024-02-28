@@ -154,14 +154,25 @@ class OrientDialog(QtWidgets.QDialog):
         obj_y0_layout, obj_y0_line = create_cam_param_layout(param="Y<sub>0</sub>: ", unit=" [m]")
         obj_z0_layout, obj_z0_line = create_cam_param_layout(param="Z<sub>0</sub>: ", unit=" [m]")
 
+        self.obj_x0_line = obj_x0_line
+        self.obj_y0_line = obj_y0_line
+        self.obj_z0_line = obj_z0_line
+                
         alpha_layout, alpha_line = create_cam_param_layout(param="\u03B1: ", unit=" [°]")
         zeta_layout, zeta_line = create_cam_param_layout(param="\u03B6: ", unit=" [°]")
         kappa_layout, kappa_line = create_cam_param_layout(param="\u03BA: ", unit=" [°]")
 
-        focal_layout, focal_line = create_cam_param_layout(param="f: ", unit=" [px]")
+        self.alpha_line = alpha_line
+        self.zeta_line = zeta_line
+        self.kappa_line = kappa_line
+
+        focal_layout, focal_line = create_cam_param_layout(param="f: ", unit=" [px]")      
         img_x0_layout, img_x0_line = create_cam_param_layout(param="x<sub>0</sub>: ", unit=" [px]")
         img_y0_layout, img_y0_line = create_cam_param_layout(param="y<sub>0</sub>: ", unit=" [px]")
         
+        self.focal_line = focal_line
+        self.img_x0_line = img_x0_line
+        self.img_y0_line = img_y0_line
         
         params_layout.addWidget(params_toolbar)
         
@@ -420,6 +431,18 @@ class OrientDialog(QtWidgets.QDialog):
             self.table_gcps.setItem(self.table_gcps.currentRow(), self.name2ix["X"], QtWidgets.QTableWidgetItem("%.1f" % (data["obj_x"])))
             self.table_gcps.setItem(self.table_gcps.currentRow(), self.name2ix["Y"], QtWidgets.QTableWidgetItem("%.1f" % (data["obj_y"])))
             self.table_gcps.setItem(self.table_gcps.currentRow(), self.name2ix["Z"], QtWidgets.QTableWidgetItem("%.1f" % (data["obj_z"])))
+    
+    def set_init_params(self, data):
+        self.obj_x0_line.setText("%.1f" % (data["obj_x0"]))
+        self.obj_y0_line.setText("%.1f" % (data["obj_y0"]))
+        self.obj_z0_line.setText("%.1f" % (data["obj_z0"]))
+        
+        self.alpha_line.setText("%.3f" % (data["alpha"]))
+        self.zeta_line.setText("%.3f" % (data["zeta"]))
+        self.kappa_line.setText("%.3f" % (data["kappa"]))
+        
+        self.img_x0_line.setText("%.1f" % (data["img_x0"]))
+        self.img_y0_line.setText("%.1f" % (data["img_y0"]))
     
     def calc_orientation(self):
         nr_rows = self.table_gcps.rowCount()

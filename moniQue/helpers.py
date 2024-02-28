@@ -42,3 +42,38 @@ def alzeka2rot(euler):
     R[2,2] = np.cos(ze)
     
     return R
+
+def rot2alzeka(rot_mat):
+    ze_1_rad = np.arccos(rot_mat[2,2])
+    ze_2_rad = 2*np.pi - ze_1_rad
+    if ze_2_rad < 0:
+        ze_2_rad += 2*np.pi
+
+    ka_1_rad = np.arctan2(rot_mat[2, 1], rot_mat[2, 0]*(-1))
+    if ka_1_rad < 0:
+        ka_2_rad = ka_1_rad + np.pi
+    else:
+        ka_2_rad = ka_1_rad - np.pi
+
+    al_1_rad = np.arctan2(rot_mat[1, 2], rot_mat[0, 2])
+    if al_1_rad < 0:
+        al_2_rad = al_1_rad + np.pi
+    else:
+        al_2_rad = al_1_rad - np.pi
+
+    alzekas = np.array([[al_1_rad, ze_1_rad, ka_1_rad], [al_2_rad, ze_2_rad, ka_2_rad]])
+    return alzekas
+
+def opengl2photo(rot_mat):
+    #opengl might be column order and not row ordre; hence, transpose
+    #opengl coordinate systems is rotated by 180 degrees around x axis
+    # rot_mat_photo = rot_mat.T@np.array([[1, 0, 0], 
+    #                                     [0, np.cos(np.pi), -np.sin(np.pi)], 
+    #                                     [0, np.sin(np.pi), np.cos(np.pi)]])
+    return rot_mat.T
+
+def photo2opengl(rot_mat):
+    rot_mat_opengl = rot_mat@np.array([[1, 0, 0], 
+                                       [0, np.cos(np.pi), -np.sin(np.pi)], 
+                                       [0, np.sin(np.pi), np.cos(np.pi)]]).T
+    return rot_mat_opengl.T
