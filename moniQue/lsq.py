@@ -30,33 +30,6 @@ def srs_lm(data):
     r = minimize(residual, params, args=(gcp_img, gcp_obj), method="leastsq")
     return r
 
-    # if r.success == False:
-    #     return None
-    
-    # est_prc_x0 = r.params["obj_x0"].value
-    # est_prc_y0 = r.params["obj_y0"].value
-    # est_prc_z0 = r.params["obj_z0"].value
-    # est_alpha = r.params["alpha"].value
-    # est_zeta = r.params["zeta"].value
-    # est_kappa = r.params["kappa"].value
-    # est_focal = r.params["f"].value
-    
-    # est_params = {"obj_x0":est_prc_x0, 
-    #               "obj_y0":est_prc_y0, 
-    #               "obj_z0":est_prc_z0, 
-    #               "alpha":est_alpha, 
-    #               "zeta": est_zeta, 
-    #               "kappa": est_kappa, 
-    #               "f": est_focal, 
-    #               "img_x0": init_params["img_x0"], 
-    #               "img_y0": init_params["img_y0"]
-    #               }
-
-    # cxx = r.covar
-    # cxx_names = r.var_names
-    
-    # return est_params, cxx, cxx_names, r.residual
-
 def world2img(gcp_obj, p):
 
     """Transform world coordinates in camera coordinates.
@@ -86,7 +59,7 @@ def world2img(gcp_obj, p):
         f = p["f"].value
         img_x0 = p["img_x0"].value
         img_y0 = p["img_y0"].value
-        
+    
     rot = alzeka2rot(np.array([alpha, zeta, kappa]))
     
     # Vector camera DEM
@@ -94,16 +67,16 @@ def world2img(gcp_obj, p):
 
     # Translate
     gcp_obj_red = gcp_obj - prc
-
+    
     den = gcp_obj_red[:, 0] * rot[0, 2] + gcp_obj_red[:, 1] * rot[1, 2] + gcp_obj_red[:, 2] * rot[2, 2]
     x_nom = gcp_obj_red[:, 0] * rot[0, 0] + gcp_obj_red[:, 1] * rot[1, 0] + gcp_obj_red[:, 2] * rot[2, 0]
     y_nom = gcp_obj_red[:, 0] * rot[0, 1] + gcp_obj_red[:, 1] * rot[1, 1] + gcp_obj_red[:, 2] * rot[2, 1]
     
-    x = -f * (x_nom/den) + img_x0
-    y = -f * (y_nom/den) + img_y0
-    
-    return np.hstack((x.reshape(-1, 1), 
-                      y.reshape(-1, 1)))
+    img_x = img_x0 - f * (x_nom/den)
+    img_y = img_y0 - f * (y_nom/den)
+        
+    return np.hstack((img_x.reshape(-1, 1), 
+                      img_y.reshape(-1, 1)))
 
 def residual(params, img_gcp, obj_gcp):
 

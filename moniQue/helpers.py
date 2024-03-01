@@ -15,14 +15,7 @@ def create_point_3d(pos, gid):
     
     click_obj.add(click_text)   
     return click_obj
-
-def proj_mat_to_rkz(proj_mat):
-    a_mat = proj_mat[:3, :3]
-    a_vec = proj_mat[:, 3].reshape(3, 1)    #last row of P
-    
-    z_vec = - np.linalg.inv(a_mat)@a_vec
-    print(z_vec)
-    
+   
 def alzeka2rot(euler):
     
     al = euler[0]
@@ -64,15 +57,8 @@ def rot2alzeka(rot_mat):
     alzekas = np.array([[al_1_rad, ze_1_rad, ka_1_rad], [al_2_rad, ze_2_rad, ka_2_rad]])
     return alzekas
 
-def pygfx2photo(rot_mat):
-    #rotmat (which comes from pygfx.camera.local.rotation_matrix) is the opengl view_matrix but already transposed!
-    rot_mat_photo = rot_mat@np.array([[np.cos(np.pi), 0, np.sin(np.pi)],
-                                      [0, 1, 0],
-                                      [-np.sin(np.pi), 0, np.cos(np.pi)]]).T
-    return rot_mat_photo
+def calc_hfov(img_w, focal):
+    return 2*np.arctan(img_w/(2*focal))
 
-def photo2pygfx(rot_mat):
-    rot_mat_opengl = rot_mat@np.array([[np.cos(np.pi), 0, np.sin(np.pi)],
-                                       [0, 1, 0],
-                                       [-np.sin(np.pi), 0, np.cos(np.pi)]])
-    return rot_mat_opengl
+def calc_vfov(img_h, focal):
+    return 2*np.arctan(img_h/(2*focal))
