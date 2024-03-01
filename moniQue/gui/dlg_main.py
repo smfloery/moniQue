@@ -43,7 +43,7 @@ from .dlg_meta_gcp import GcpMetaDialog
 from ..tools.ImgPickerTool import ImgPickerTool
 
 from ..camera import Camera
-from ..helpers import create_point_3d, rot2alzeka, alzeka2rot, photo2pygfx, pygfx2photo
+from ..helpers import create_point_3d, rot2alzeka, alzeka2rot, calc_hfov
 
 class MainDialog(QtWidgets.QDialog):
     
@@ -258,6 +258,7 @@ class MainDialog(QtWidgets.QDialog):
             self.dlg_orient.gcp_deselected_signal.connect(self.deselect_gcp)
             self.dlg_orient.gcp_delete_signal.connect(self.delete_gcp)
             self.dlg_orient.get_camera_signal.connect(self.get_obj_canvas_camera)
+            self.dlg_orient.camera_estimated_signal.connect(self.set_obj_canvas_camera)
             
             self.dlg_orient.add_gcps_from_lyr(self.get_gcps_from_gpkg())
             
@@ -352,7 +353,6 @@ class MainDialog(QtWidgets.QDialog):
             [img_name, img_ext] = os.path.basename(path).rsplit(".", 1)
             
             if img_name not in loaded_imgs:
-                
                 
                 img = Image.open(path)
                 img_h = img.height
@@ -509,28 +509,31 @@ class MainDialog(QtWidgets.QDialog):
         
         cam_pos = self.obj_camera.local.position + self.min_xyz
 
+        #the camera appears to be exactly what alzeka needs; hence, we can directly derive alzeka from the rotation matrix
         cam_rmat_pygfx = self.obj_camera.local.rotation_matrix[:3, :3]  #already transposed in contrast to self.obj_camera.view_matrix; otherweise the same
-        cam_rmat_photo = pygfx2photo(cam_rmat_pygfx)
-        
-        alzekas = rot2alzeka(cam_rmat_photo)
-        # alzekas_deg = np.rad2deg(alzekas)
-        
-        # rot_mat_photo = alzeka2rot(alzekas[0, :])        
-        # rot_mat_opengl = rot_mat_photo@np.array([[np.cos(np.pi), 0, np.sin(np.pi)],
-        #                                          [0, 1, 0],
-        #                                          [-np.sin(np.pi), 0, np.cos(np.pi)]])
-        # print(rot_mat_opengl)
-        
-        # self.obj_camera.local.rotation_matrix = rot_mat_photo
-        # self.obj_canvas.request_draw(self.animate)
-        # print(np.rad2deg(self.obj_camera.local.euler))
-        
+        alzekas = rot2alzeka(cam_rmat_pygfx)
+                
         data = {"obj_x0":cam_pos[0], "obj_y0":cam_pos[1], "obj_z0":cam_pos[2], 
                 "alpha":alzekas[0, 0], "zeta":alzekas[0, 1], "kappa":alzekas[0, 2],
-                "img_x0":self.active_camera.img_w/2., "img_y0":self.active_camera.img_h/2.*(-1), "f":np.sqrt(self.active_camera.img_w**2 + self.active_camera.img_h**2)/3.}
+                "img_x0":self.active_camera.img_w/2., "img_y0":self.active_camera.img_h/2.*(-1), "f":np.sqrt(self.active_camera.img_w**2 + self.active_camera.img_h**2)}
         
         self.dlg_orient.set_init_params(data)
-                
+    
+    def set_obj_canvas_camera(self, data):
+        self.obj_camera.local.position = np.array(data["prc"]) - self.min_xyz
+        
+        photo_rmat = alzeka2rot(data["alzeka"])
+        pygfx_rmat = np.zeros((4,4))
+        pygfx_rmat[3, 3] = 1
+        pygfx_rmat[:3, :3] = photo_rmat
+        
+        self.obj_camera.local.rotation_matrix = pygfx_rmat
+
+        hfov = calc_hfov(self.active_camera.img_w, data["f"])
+        self.obj_camera.fov = np.rad2deg(hfov)
+        
+        self.obj_canvas.request_draw(self.animate)
+
         
     def toggle_camera(self):
         

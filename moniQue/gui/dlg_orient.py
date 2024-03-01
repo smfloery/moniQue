@@ -48,6 +48,7 @@ class OrientDialog(QtWidgets.QDialog):
     gcp_deselected_signal = QtCore.pyqtSignal()
     gcp_delete_signal = QtCore.pyqtSignal(object)
     get_camera_signal = QtCore.pyqtSignal()
+    camera_estimated_signal = QtCore.pyqtSignal(object)
     
     def __init__(self, parent=None, icon_dir=None, active_iid=None):
         """Constructor."""
@@ -488,12 +489,18 @@ class OrientDialog(QtWidgets.QDialog):
                 est_kappa = res.params["kappa"].value
                 est_focal = res.params["f"].value
                 
-                cxx = res.covar
-                cxx_names = res.var_names
+                self.camera_estimated_signal.emit({"prc":[est_obj_x0, est_obj_y0, est_obj_z0],
+                                                   "alzeka":[est_alpha, est_zeta, est_kappa],
+                                                   "f":est_focal})
+                                                
+                # cxx = res.covar
+                # cxx_names = res.var_names
                 
-                print(est_obj_x0, est_obj_y0, est_obj_z0)
-                print(np.rad2deg([est_alpha, est_zeta, est_kappa]))
-                print(est_focal)
-                print(res.residual.reshape(-1, 2))
+                
+                
+                # print(est_obj_x0, est_obj_y0, est_obj_z0)
+                # print(np.rad2deg([est_alpha, est_zeta, est_kappa]))
+                # print(est_focal)
+                # print(res.residual.reshape(-1, 2))
 
             
