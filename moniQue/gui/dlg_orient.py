@@ -41,6 +41,7 @@ from qgis.core import (
 
 import operator
 from ..lsq import srs_lm
+from ..helpers import calc_hfov, calc_vfov
 
 class OrientDialog(QtWidgets.QDialog):
     
@@ -49,6 +50,7 @@ class OrientDialog(QtWidgets.QDialog):
     gcp_delete_signal = QtCore.pyqtSignal(object)
     get_camera_signal = QtCore.pyqtSignal()
     camera_estimated_signal = QtCore.pyqtSignal(object)
+    save_orientation_signal = QtCore.pyqtSignal()
     
     def __init__(self, parent=None, icon_dir=None, active_iid=None):
         """Constructor."""
@@ -113,7 +115,7 @@ class OrientDialog(QtWidgets.QDialog):
         
         self.table_gcps.horizontalHeader().setHighlightSections(True)
         self.table_gcps.horizontalHeader().resizeSection(0, 10)
-        self.table_gcps.horizontalHeader().resizeSection(1, 50)
+        self.table_gcps.horizontalHeader().resizeSection(1, 30)
         self.table_gcps.horizontalHeader().setSectionResizeMode(1, QtWidgets.QHeaderView.Stretch)
         self.table_gcps.horizontalHeader().resizeSection(2, 80)
         self.table_gcps.horizontalHeader().resizeSection(3, 80)
@@ -137,44 +139,67 @@ class OrientDialog(QtWidgets.QDialog):
 
             layout = QtWidgets.QHBoxLayout()
             param_label = QtWidgets.QLabel(param)
-            param_label.setMinimumSize(QtCore.QSize(25, 10))
+            param_label.setFixedWidth(25)
             param_label.setAlignment(QtCore.Qt.AlignRight | QtCore.Qt.AlignVCenter)
 
             param_line = QtWidgets.QLineEdit()
-            param_line.setMinimumSize(QtCore.QSize(125, 10))
+            param_line.setMinimumWidth(100)
             param_line.setReadOnly(True)
+            param_line.setToolTip("Estimated parameter")
+
+            param_std_line = QtWidgets.QLineEdit()
+            param_std_line.setFixedWidth(50)
+            param_std_line.setToolTip("Standard deviation")
+            
             unit_label = QtWidgets.QLabel(unit)
-            unit_label.setMinimumSize(QtCore.QSize(25, 10))
+            unit_label.setFixedWidth(25)
 
             layout.addWidget(param_label)
             layout.addWidget(param_line)
+            layout.addWidget(param_std_line)
             layout.addWidget(unit_label)
 
-            return layout, param_line
+            return layout, param_line, param_std_line
 
-        obj_x0_layout, obj_x0_line = create_cam_param_layout(param="X<sub>0</sub>: ", unit=" [m]")
-        obj_y0_layout, obj_y0_line = create_cam_param_layout(param="Y<sub>0</sub>: ", unit=" [m]")
-        obj_z0_layout, obj_z0_line = create_cam_param_layout(param="Z<sub>0</sub>: ", unit=" [m]")
+        obj_x0_layout, obj_x0_line, obj_x0_std_line = create_cam_param_layout(param="X<sub>0</sub>: ", unit=" [m]")
+        obj_y0_layout, obj_y0_line, obj_y0_std_line = create_cam_param_layout(param="Y<sub>0</sub>: ", unit=" [m]")
+        obj_z0_layout, obj_z0_line, obj_z0_std_line = create_cam_param_layout(param="Z<sub>0</sub>: ", unit=" [m]")
 
         self.obj_x0_line = obj_x0_line
+        self.obj_x0_std_line = obj_x0_std_line
+        
         self.obj_y0_line = obj_y0_line
+        self.obj_y0_std_line = obj_y0_std_line
+        
         self.obj_z0_line = obj_z0_line
+        self.obj_z0_std_line = obj_z0_std_line
                 
-        alpha_layout, alpha_line = create_cam_param_layout(param="\u03B1: ", unit=" [°]")
-        zeta_layout, zeta_line = create_cam_param_layout(param="\u03B6: ", unit=" [°]")
-        kappa_layout, kappa_line = create_cam_param_layout(param="\u03BA: ", unit=" [°]")
+        alpha_layout, alpha_line, alpha_std_line = create_cam_param_layout(param="\u03B1: ", unit=" [°]")
+        zeta_layout, zeta_line, zeta_std_line = create_cam_param_layout(param="\u03B6: ", unit=" [°]")
+        kappa_layout, kappa_line, kappa_std_line = create_cam_param_layout(param="\u03BA: ", unit=" [°]")
 
         self.alpha_line = alpha_line
+        self.alpha_std_line = alpha_std_line
+        
         self.zeta_line = zeta_line
+        self.zeta_std_line = zeta_std_line
+        
         self.kappa_line = kappa_line
+        self.kappa_std_line = kappa_std_line
+        
 
-        focal_layout, focal_line = create_cam_param_layout(param="f: ", unit=" [px]")      
-        img_x0_layout, img_x0_line = create_cam_param_layout(param="x<sub>0</sub>: ", unit=" [px]")
-        img_y0_layout, img_y0_line = create_cam_param_layout(param="y<sub>0</sub>: ", unit=" [px]")
+        focal_layout, focal_line, focal_std_line = create_cam_param_layout(param="f: ", unit=" [px]")      
+        img_x0_layout, img_x0_line, img_x0_std_line = create_cam_param_layout(param="x<sub>0</sub>: ", unit=" [px]")
+        img_y0_layout, img_y0_line, img_y0_std_line = create_cam_param_layout(param="y<sub>0</sub>: ", unit=" [px]")
         
         self.focal_line = focal_line
+        self.focal_std_line = focal_std_line
+        
         self.img_x0_line = img_x0_line
+        self.img_x0_std_line = img_x0_std_line
+        
         self.img_y0_line = img_y0_line
+        self.img_y0_std_line = img_y0_std_line
         
         params_layout.addWidget(params_toolbar)
         
@@ -198,6 +223,7 @@ class OrientDialog(QtWidgets.QDialog):
         
         self.btn_save_ori = QtWidgets.QPushButton("Save")
         self.btn_save_ori.setEnabled(False)
+        self.btn_save_ori.clicked.connect(self.save_orientation)
         
         btn_layout = QtWidgets.QHBoxLayout()
         btn_layout.setContentsMargins(5, 0, 0, 0)
@@ -279,59 +305,6 @@ class OrientDialog(QtWidgets.QDialog):
         else:
             self.btn_calc_ori.setEnabled(False)
     
-    def closeEvent(self, event):
-        self.parent.img_list.setEnabled(True)
-        self.parent.btn_ori_tool.setChecked(False)
-
-        self.parent.deactivate_gcp_picking()
-
-        # self.close_dialog_signal.emit()
-
-        # gpkg_layout = QtWidgets.QHBoxLayout()
-        # gpkg_label = QtWidgets.QLabel("GPKG Path")
-        # self.gpkg_line = QtWidgets.QLineEdit()
-        # self.gpkg_line.setEnabled(False)
-        # self.gpkg_btn = QtWidgets.QPushButton()
-        # self.gpkg_btn.clicked.connect(self.set_gpkg_path)
-        
-        # gpkg_layout.addWidget(gpkg_label)
-        # gpkg_layout.addWidget(self.gpkg_line)
-        # gpkg_layout.addWidget(self.gpkg_btn)
-
-        # mesh_layout = QtWidgets.QHBoxLayout()
-        # mesh_label = QtWidgets.QLabel("Mesh Path")
-        # self.mesh_line = QtWidgets.QLineEdit()
-        # self.mesh_line.setEnabled(False)
-        # self.mesh_btn = QtWidgets.QPushButton()
-        # self.mesh_btn.clicked.connect(self.set_mesh_path)
-
-        # mesh_layout.addWidget(mesh_label)
-        # mesh_layout.addWidget(self.mesh_line)
-        # mesh_layout.addWidget(self.mesh_btn)
-        
-        # crs_layout = QtWidgets.QHBoxLayout()
-        # crs_label = QtWidgets.QLabel("Project CRS")
-        # self.crs_widget = QgsProjectionSelectionWidget()
-        # self.crs_widget.crsChanged.connect(self.set_crs)
-
-        # crs_layout.addWidget(crs_label)
-        # crs_layout.addWidget(self.crs_widget)
-        
-        # btn_layout = QtWidgets.QHBoxLayout()
-        # self.create_btn = QtWidgets.QPushButton("Create")
-        # self.create_btn.setEnabled(False)
-        # self.create_btn.clicked.connect(self.create_project)
-        
-        # btn_layout.addStretch(1)
-        # btn_layout.addWidget(self.create_btn)
-        
-        # main_layout.addLayout(gpkg_layout)
-        # main_layout.addLayout(mesh_layout)
-        # main_layout.addLayout(crs_layout)
-        # main_layout.addLayout(btn_layout)
-        # main_layout.addStretch(1)
-        # self.setLayout(main_layout)
-    
     def add_gcp_to_table(self, data, gcp_type=None):
         
         nr_rows = self.table_gcps.rowCount()
@@ -399,7 +372,7 @@ class OrientDialog(QtWidgets.QDialog):
                         
             chkBoxItem.setFlags(flags)
             
-            if data["active"] == 1:
+            if data["active"] == "1":
                 chkBoxItem.setCheckState(QtCore.Qt.Checked)
             else:
                 chkBoxItem.setCheckState(QtCore.Qt.Unchecked)
@@ -441,6 +414,7 @@ class OrientDialog(QtWidgets.QDialog):
         self.obj_y0_line.setText("%.1f" % (data["obj_y0"]))
         self.obj_z0_line.setText("%.1f" % (data["obj_z0"]))
         
+
         #display euler angles in degrees; but in data array its still in radiant
         self.alpha_line.setText("%.3f" % (np.rad2deg(data["alpha"])))
         self.zeta_line.setText("%.3f" % (np.rad2deg(data["zeta"])))
@@ -450,9 +424,36 @@ class OrientDialog(QtWidgets.QDialog):
         self.img_y0_line.setText("%.1f" % (data["img_y0"]))
         self.focal_line.setText("%.1f" % (data["f"]))
         
+        if "obj_x0_std" in list(data.keys()):
+            self.obj_x0_std_line.setText("%.1f" % (data["obj_x0_std"]))
+            self.obj_y0_std_line.setText("%.1f" % (data["obj_y0_std"]))
+            self.obj_z0_std_line.setText("%.1f" % (data["obj_z0_std"]))
+            
+            self.alpha_std_line.setText("%.3f" % (np.rad2deg(data["alpha_std"])))
+            self.zeta_std_line.setText("%.3f" % (np.rad2deg(data["zeta_std"])))
+            self.kappa_std_line.setText("%.3f" % (np.rad2deg(data["kappa_std"])))
+            
+            self.focal_std_line.setText("%.1f" % (data["f_std"]))
+                
         self.init_params = data.copy()
+    
+    def set_residuals(self, data):
         
+        used_gids = list(data["residuals"].keys())
         
+        nr_rows = self.table_gcps.rowCount()
+                
+        for rix in range(nr_rows):
+            
+            curr_gid = self.table_gcps.item(rix,1).text()
+            
+            if curr_gid in used_gids:
+                self.table_gcps.setItem(rix, self.name2ix["dx"], QtWidgets.QTableWidgetItem("%.1f" % (data["residuals"][curr_gid][0])))
+                self.table_gcps.setItem(rix, self.name2ix["dy"], QtWidgets.QTableWidgetItem("%.1f" % (data["residuals"][curr_gid][1])))
+            else:
+                self.table_gcps.setItem(rix, self.name2ix["dx"], QtWidgets.QTableWidgetItem(""))
+                self.table_gcps.setItem(rix, self.name2ix["dy"], QtWidgets.QTableWidgetItem(""))
+             
     def calc_orientation(self):
         
         if not self.init_params:
@@ -488,19 +489,41 @@ class OrientDialog(QtWidgets.QDialog):
                 est_zeta = res.params["zeta"].value
                 est_kappa = res.params["kappa"].value
                 est_focal = res.params["f"].value
-                
-                self.camera_estimated_signal.emit({"prc":[est_obj_x0, est_obj_y0, est_obj_z0],
-                                                   "alzeka":[est_alpha, est_zeta, est_kappa],
-                                                   "f":est_focal})
-                                                
-                # cxx = res.covar
-                # cxx_names = res.var_names
-                
-                
-                
-                # print(est_obj_x0, est_obj_y0, est_obj_z0)
-                # print(np.rad2deg([est_alpha, est_zeta, est_kappa]))
-                # print(est_focal)
-                # print(res.residual.reshape(-1, 2))
 
-            
+                cxx = res.covar
+                
+                cxx_std = np.sqrt(np.diag(cxx))
+                cxx_names = ["%s_std" % (name) for name in res.var_names]
+                cxx_dict = dict(zip(cxx_names, cxx_std.tolist()))
+                
+                gcp_residuals = res.residual.reshape(-1, 2)
+                gcp_gids = ori_data["gid"]
+                
+                gcp_dict = {"residuals": dict(zip(gcp_gids, gcp_residuals.tolist()))}
+                
+                est_data = {"obj_x0":est_obj_x0,
+                            "obj_y0":est_obj_y0,
+                            "obj_z0":est_obj_z0,
+                            "alpha":est_alpha,
+                            "zeta":est_zeta,
+                            "kappa":est_kappa,
+                            "img_x0":self.init_params["img_x0"],
+                            "img_y0":self.init_params["img_y0"],
+                            "f":est_focal}
+                est_data = {**est_data, **cxx_dict}
+                est_data = {**est_data, **gcp_dict}
+                
+                self.camera_estimated_signal.emit(est_data)
+                self.set_init_params(est_data)
+                self.set_residuals(est_data)
+                self.btn_save_ori.setEnabled(True)
+
+    def save_orientation(self):
+        self.save_orientation_signal.emit()
+    
+    def closeEvent(self, event):
+        self.parent.img_list.setEnabled(True)
+        self.parent.btn_ori_tool.setChecked(False)
+
+        self.parent.deactivate_gcp_picking()
+        self.parent.discard_changes()

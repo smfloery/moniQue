@@ -1,9 +1,7 @@
 import open3d as o3d
 import numpy as np
-import urllib.request
 import json
-import ssl
-
+from helpers import alzeka2rot, rot2alzeka
 class Camera():
     
     def __init__(self, iid, path, ext, is_oriented=False, hfov=None, vfov=None, img_h=None, img_w=None,
@@ -22,8 +20,10 @@ class Camera():
         
         self.obj_x0 = obj_x0
         self.obj_x0_std = obj_x0_std
+        
         self.obj_y0 = obj_y0
         self.obj_y0_std = obj_y0_std
+        
         self.obj_z0 = obj_z0
         self.obj_z0_std = obj_z0_std
                 
@@ -32,13 +32,20 @@ class Camera():
         
         self.alpha = alpha
         self.alpha_std = alpha_std
+        
         self.kappa = kappa
         self.kappa_std = kappa_std
+        
         self.zeta = zeta
         self.zeta_std = zeta_std
         
         self.alzeka = [alpha, zeta, kappa]
         self.alzeka_std = [alpha_std, kappa_std, zeta_std]
+        
+        if None in self.alzeka:
+            self.rmat = None
+        else:
+            self.rmat = alzeka2rot(self.alzeka)
         
         # if alzeka is not None:
         #     self.azimut = self.alpha2azi()
@@ -49,6 +56,7 @@ class Camera():
         
         self.img_x0 = img_x0
         self.img_y0 = img_y0
+        
         self.f = f
         self.f_std = f_std
         
@@ -69,6 +77,13 @@ class Camera():
         
     def alpha2azi(self):
         pass
+    
+    def asdict(self):
+        return {"obj_x0":self.obj_x0, "obj_y0":self.obj_y0, "obj_z0":self.obj_z0, 
+                "obj_x0_std":self.obj_x0_std, "obj_y0_std":self.obj_y0_std, "obj_z0_std":self.obj_z0_std,
+                "alpha":self.alpha, "zeta":self.zeta, "kappa":self.kappa,
+                "alpha_std":self.alpha_std, "zeta_std":self.zeta_std, "kappa_std":self.kappa_std,
+                "img_x0":self.img_x0, "img_y0":self.img_y0, "f":self.f, "f_std":self.f_std, "hfov":self.hfov, "vfov":self.vfov}
     
     #     if not token:
     #         token = "40622e289e7005b3007a499eac4ecb3a"
@@ -265,77 +280,3 @@ class Camera():
     # #             rays.append(Ray([rays_start[ix, 0], rays_start[ix, 1], rays_start[ix, 2]], [row[0], row[1], row[2]]))
                 
     # #     return rays
-    
-    # def euler2rot(self, euler):
-    
-    #     al = self.euler[0]
-    #     ze = self.euler[1]
-    #     ka = self.euler[2]
-        
-    #     R = np.empty((3, 3))
-
-    #     R[0,0] = np.cos(al) * np.cos(ze) * np.cos(ka) - np.sin(al) * np.sin(ka)
-    #     R[0,1] = -np.cos(al) * np.cos(ze) * np.sin(ka) - np.sin(al) * np.cos(ka)
-    #     R[0,2] = np.cos(al) * np.sin(ze)
-    #     R[1,0] = np.sin(al) * np.cos(ze) * np.cos(ka) + np.cos(al) * np.sin(ka)
-    #     R[1,1] = -np.sin(al) * np.cos(ze) * np.sin(ka) + np.cos(al) * np.cos(ka)
-    #     R[1,2] = np.sin(al) * np.sin(ze)
-    #     R[2,0] = -np.sin(ze) * np.cos(ka)
-    #     R[2,1] = np.sin(ze) * np.sin(ka)
-    #     R[2,2] = np.cos(ze)
-        
-    #     return R
-    
-    # def from_dict(self, cam_data):
-    #     self.s0 = cam_data["sigma0"]
-    #     self.id = cam_data["img_id"]
-    #     self.name = cam_data["name"]
-        
-    #     cam_eor = cam_data["eor"]
-    #     self.prc = np.array([cam_eor["prj_ctr"]["E"], cam_eor["prj_ctr"]["N"], cam_eor["prj_ctr"]["H"]])
-    #     self.prc_std = np.array([cam_eor["prj_ctr"]["std_E"], cam_eor["prj_ctr"]["std_N"], cam_eor["prj_ctr"]["std_H"]])
-                
-    #     cam_ior = cam_data["ior"]
-    #     self.ior = np.array([cam_ior["x0"], cam_ior["y0"], cam_ior["f0"]])
-    #     self.ior_std = np.array([cam_ior["std_x0"], cam_ior["std_y0"], cam_ior["std_f0"]])
-        
-    #     self.alpha = cam_data["eor"]["rot"]["alpha"]
-    #     self.zeta = cam_data["eor"]["rot"]["zeta"]
-    #     self.kappa = cam_data["eor"]["rot"]["kappa"]
-        
-    #     self.euler = np.array([self.alpha, self.zeta, self.kappa])
-    #     self.euler_std = np.array([cam_data["eor"]["rot"]["std_rot_a"], cam_data["eor"]["rot"]["std_rot_z"], cam_data["eor"]["rot"]["std_rot_k"]])
-        
-    #     self.R = self.euler2rot(self.euler)
-        
-    #     self.meta = cam_data["meta"]
-        
-    #     self.img_w = int(self.meta["width"])
-    #     self.img_h = int(self.meta["height"])
-        
-    #     self.hfov = np.arctan(self.img_w/(self.ior[2]*2))*2
-    #     self.vfov = np.arctan(self.img_h/(self.ior[2]*2))*2
-        
-    #     self.status = "ok"
-        
-    # def hfov_geom(self, dist=100):
-
-    #     #left side
-    #     l_pnt_e = self.prc[0] + dist * np.sin(self.alpha_from_north(self.alpha) - self.hfov/2.)
-    #     l_pnt_n = self.prc[1] + dist * np.cos(self.alpha_from_north(self.alpha) - self.hfov/2.)
-        
-    #     #right side
-    #     r_pnt_e = self.prc[0] + dist * np.sin(self.alpha_from_north(self.alpha) + self.hfov/2.)
-    #     r_pnt_n = self.prc[1] + dist * np.cos(self.alpha_from_north(self.alpha) + self.hfov/2.)
-                               
-    #     return "POLYGON((%.3f %.3f, %.3f %.3f, %.3f %.3f, %.3f %.3f))" % (self.prc[0], self.prc[1],
-    #                                                                       l_pnt_e, l_pnt_n,
-    #                                                                       r_pnt_e, r_pnt_n,
-    #                                                                       self.prc[0], self.prc[1])
-        
-    #     fov_arr = np.array([[self.prc[0], self.prc[1]],
-    #                         [l_pnt_e, l_pnt_n],
-    #                         [r_pnt_e, r_pnt_n],
-    #                         [self.prc[0], self.prc[1]]])
-        
-    #     #return Polygon(np.squeeze(fov_arr))

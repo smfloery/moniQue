@@ -43,7 +43,7 @@ from .dlg_meta_gcp import GcpMetaDialog
 from ..tools.ImgPickerTool import ImgPickerTool
 
 from ..camera import Camera
-from ..helpers import create_point_3d, rot2alzeka, alzeka2rot, calc_hfov
+from ..helpers import create_point_3d, rot2alzeka, alzeka2rot, calc_hfov, calc_vfov
 
 class MainDialog(QtWidgets.QDialog):
     
@@ -149,8 +149,6 @@ class MainDialog(QtWidgets.QDialog):
         # btn_img_pan.triggered.connect(self.load_mesh)
         
         self.obj_renderer = gfx.WgpuRenderer(self.obj_canvas)
-        self.stats = gfx.Stats(viewport=self.obj_renderer)
-
         self.obj_scene = gfx.Scene()
         
         # light_gray = np.array((100, 100, 100, 255)) / 255
@@ -258,9 +256,13 @@ class MainDialog(QtWidgets.QDialog):
             self.dlg_orient.gcp_deselected_signal.connect(self.deselect_gcp)
             self.dlg_orient.gcp_delete_signal.connect(self.delete_gcp)
             self.dlg_orient.get_camera_signal.connect(self.get_obj_canvas_camera)
-            self.dlg_orient.camera_estimated_signal.connect(self.set_obj_canvas_camera)
+            self.dlg_orient.camera_estimated_signal.connect(self.process_estimated_camera)
+            self.dlg_orient.save_orientation_signal.connect(self.save_orientation_to_lyr)
             
             self.dlg_orient.add_gcps_from_lyr(self.get_gcps_from_gpkg())
+
+            if self.active_camera.is_oriented == 1:
+                self.dlg_orient.set_init_params(self.active_camera.asdict())
             
             self.dlg_orient.show()
 
@@ -337,9 +339,7 @@ class MainDialog(QtWidgets.QDialog):
         self.min_xyz = min_xyz
         
     def animate(self):
-        with self.stats:
-            self.obj_renderer.render(self.obj_scene, self.obj_camera, flush=False)
-            self.stats.render()
+        self.obj_renderer.render(self.obj_scene, self.obj_camera)
     
     def import_images(self):
         """Import selected images.
@@ -519,22 +519,101 @@ class MainDialog(QtWidgets.QDialog):
         
         self.dlg_orient.set_init_params(data)
     
-    def set_obj_canvas_camera(self, data):
-        self.obj_camera.local.position = np.array(data["prc"]) - self.min_xyz
+    def process_estimated_camera(self, data):
         
-        photo_rmat = alzeka2rot(data["alzeka"])
+        est_hfov = calc_hfov(self.active_camera.img_w, data["f"])
+        est_vfov = calc_vfov(self.active_camera.img_h, data["f"])
+        data["hfov"] = est_hfov
+        data["vfov"] = est_vfov
+        
+        self.set_obj_canvas_camera(data)
+        self.update_camera(data)
+        self.update_gcps(data)
+        
+    def update_camera(self, data):
+        curr_cam = list(self.cam_lyr.getFeatures(expression = "iid = '%s'" % (self.active_camera.iid)))[0]
+        curr_cam_fid = curr_cam.id()
+        
+        self.cam_lyr.startEditing()
+        self.cam_lyr.changeGeometry(curr_cam_fid, QgsGeometry.fromPoint(QgsPoint(data["obj_x0"], data["obj_y0"])))
+        
+        self.cam_lyr.changeAttributeValue(curr_cam_fid, curr_cam.fieldNameIndex("is_oriented"), 1)
+        
+        attrs = ["obj_x0", "obj_y0", "obj_z0", "alpha", "zeta", "kappa", "img_x0", "img_y0", "f", "hfov","vfov"]
+        for attr in attrs:
+            self.cam_lyr.changeAttributeValue(curr_cam_fid, curr_cam.fieldNameIndex(attr), float(data[attr]))
+        
+        attrs = ["obj_x0_std", "obj_y0_std", "obj_z0_std", "alpha_std", "zeta_std", "kappa_std", "f_std"]
+        for attr in attrs:
+            self.cam_lyr.changeAttributeValue(curr_cam_fid, curr_cam.fieldNameIndex(attr), float(data[attr]))
+        
+        self.cam_lyr.triggerRepaint()
+    
+    def update_gcps(self, data):
+        curr_img_gcps = self.img_gcps_lyr.getFeatures(expression = "iid = '%s'" % (self.active_camera.iid))
+        curr_map_gcps = self.map_gcps_lyr.getFeatures(expression = "iid = '%s'" % (self.active_camera.iid))
+        
+        used_gids = list(data["residuals"].keys())
+        
+        self.img_gcps_lyr.startEditing()
+        self.map_gcps_lyr.startEditing()
+        for gcp in curr_img_gcps:
+            
+            gcp_gid = str(gcp.attribute("gid"))
+            gcp_fid = gcp.id()
+                
+            if gcp_gid in used_gids:
+                self.img_gcps_lyr.changeAttributeValue(gcp_fid, gcp.fieldNameIndex("img_dx"), float(data["residuals"][gcp_gid][0]))
+                self.img_gcps_lyr.changeAttributeValue(gcp_fid, gcp.fieldNameIndex("img_dy"), float(data["residuals"][gcp_gid][1]))
+                self.img_gcps_lyr.changeAttributeValue(gcp_fid, gcp.fieldNameIndex("active"), "1")
+            else:
+                self.img_gcps_lyr.changeAttributeValue(gcp_fid, gcp.fieldNameIndex("img_dx"), None)
+                self.img_gcps_lyr.changeAttributeValue(gcp_fid, gcp.fieldNameIndex("img_dy"), None)
+                self.img_gcps_lyr.changeAttributeValue(gcp_fid, gcp.fieldNameIndex("active"), "0")
+        
+        for gcp in curr_map_gcps:
+            
+            gcp_gid = str(gcp.attribute("gid"))
+            gcp_fid = gcp.id()
+            
+            if gcp_gid in used_gids:
+                self.map_gcps_lyr.changeAttributeValue(gcp_fid, gcp.fieldNameIndex("active"), "1")
+            else:
+                self.map_gcps_lyr.changeAttributeValue(gcp_fid, gcp.fieldNameIndex("active"), "0")
+        
+    def save_orientation_to_lyr(self):
+        self.cam_lyr.commitChanges()
+        self.img_gcps_lyr.commitChanges()
+        self.map_gcps_lyr.commitChanges()
+        
+        cam_feat = list(self.cam_lyr.getFeatures(expression = "iid = '%s'" % (self.active_camera.iid)))[0]
+        cam_feat_json = json.loads(QgsJsonUtils.exportAttributes(cam_feat))
+        
+        del cam_feat_json["fid"]
+        cam = Camera(**cam_feat_json)
+
+        self.camera_collection[cam.iid] = cam
+        self.active_camera = self.camera_collection[cam.iid]
+        
+    def discard_changes(self):
+        self.img_gcps_lyr.rollBack()
+        self.map_gcps_lyr.rollBack()
+        self.cam_lyr.rollBack()
+         
+    def set_obj_canvas_camera(self, data):
+        self.obj_camera.local.position = np.array([data["obj_x0"], data["obj_y0"], data["obj_z0"]]) - self.min_xyz
+        
+        photo_rmat = alzeka2rot([data["alpha"], data["zeta"], data["kappa"]])
         pygfx_rmat = np.zeros((4,4))
         pygfx_rmat[3, 3] = 1
         pygfx_rmat[:3, :3] = photo_rmat
         
         self.obj_camera.local.rotation_matrix = pygfx_rmat
-
-        hfov = calc_hfov(self.active_camera.img_w, data["f"])
-        self.obj_camera.fov = np.rad2deg(hfov)
+        
+        self.obj_camera.fov = np.rad2deg(data["hfov"])
         
         self.obj_canvas.request_draw(self.animate)
 
-        
     def toggle_camera(self):
         
         #before for the first time an image is loaded
@@ -546,9 +625,6 @@ class MainDialog(QtWidgets.QDialog):
         item = self.img_list.selectedItems()[0]
         item.setCheckState(QtCore.Qt.Checked)
         self.uncheck_list_items(item)
-        
-        # # Get his status when the check status changes.
-        # if item.checkState() == QtCore.Qt.Checked:
                     
         iid = item.text()
         iid_path = self.camera_collection[iid].path
@@ -572,6 +648,9 @@ class MainDialog(QtWidgets.QDialog):
                         feat["obj_z"]-self.min_xyz[2]]
             feat_gfx = create_point_3d(feat_pos, feat["gid"])
             self.obj_gcps_grp.add(feat_gfx)
+
+        if self.active_camera.is_oriented == 1:
+            self.set_obj_canvas_camera(self.active_camera.asdict())
         
         self.obj_canvas.request_draw(self.animate)
         
@@ -684,7 +763,6 @@ class MainDialog(QtWidgets.QDialog):
             
             feat_geom = QgsPoint(click_pos_global[0], click_pos_global[1])
 
-            #TODO change feature attributes as well
             if self.map_gcps_lyr.selectedFeatureCount() > 0:
                 sel_fid = self.map_gcps_lyr.selectedFeatureIds()[0]
                 self.map_gcps_lyr.startEditing()

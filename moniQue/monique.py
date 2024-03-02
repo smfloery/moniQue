@@ -50,6 +50,7 @@ class MoniQue:
         """
         # Save reference to the QGIS interface
         self.iface = iface
+        self.iface.actionMapTips().trigger()    #enable showing map tips
         
         # initialize plugin directory
         self.plugin_dir = os.path.dirname(__file__)
