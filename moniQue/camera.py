@@ -1,7 +1,7 @@
 import open3d as o3d
 import numpy as np
 import json
-from helpers import alzeka2rot, rot2alzeka
+from .helpers import alzeka2rot, rot2alzeka
 class Camera():
     
     def __init__(self, iid, path, ext, is_oriented=False, hfov=None, vfov=None, img_h=None, img_w=None,
@@ -11,6 +11,8 @@ class Camera():
                  gcps=None, img_gcps=None, obj_gcps=None):
         
         self.is_oriented=is_oriented
+        
+        self.min_dist = 100
         
         self.iid = iid
         self.path = path
@@ -33,14 +35,14 @@ class Camera():
         self.alpha = alpha
         self.alpha_std = alpha_std
         
-        self.kappa = kappa
-        self.kappa_std = kappa_std
-        
         self.zeta = zeta
         self.zeta_std = zeta_std
         
+        self.kappa = kappa
+        self.kappa_std = kappa_std
+        
         self.alzeka = [alpha, zeta, kappa]
-        self.alzeka_std = [alpha_std, kappa_std, zeta_std]
+        self.alzeka_std = [alpha_std, zeta_std, kappa_std]
         
         if None in self.alzeka:
             self.rmat = None
@@ -227,21 +229,19 @@ class Camera():
     #         else:
     #             return alpha_north
     
-    # def ray(self, img_x=None, img_y=None, min_dist=None):
+    def ray(self, img_x=None, img_y=None):
         
-    #     if img_y > 0:
-    #         img_y*=-1
+        if img_y > 0:
+            img_y*=-1
             
-    #     pnts_img = np.array([img_x, img_y, 0])
-    #     pnts_img_p0 = np.subtract(pnts_img, self.ior)
-    #     pnts_obj_dir = (np.dot(self.R, pnts_img_p0.T)).T
-    #     pnts_obj_dir_norm = pnts_obj_dir / (np.sum(np.abs(pnts_obj_dir)**2, axis=-1)**(1./2)).reshape(-1, 1)
+        pnts_img = np.array([img_x, img_y, 0])
+        pnts_img_p0 = np.subtract(pnts_img, self.ior)
+        pnts_obj_dir = (np.dot(self.rmat, pnts_img_p0.T)).T
+        pnts_obj_dir_norm = np.ravel(pnts_obj_dir / (np.sum(np.abs(pnts_obj_dir)**2, axis=-1)**(1./2)).reshape(-1, 1))
         
-    #     if min_dist is not None:
-    #         ray_start = self.prc + min_dist * pnts_obj_dir_norm
-    #         return [ray_start[0], ray_start[1], ray_start[2], pnts_obj_dir_norm[0, 0], pnts_obj_dir_norm[0, 1], pnts_obj_dir_norm[0, 2]]
-    #     else: 
-    #         return [self.prc[0], self.prc[1], self.prc[2], pnts_obj_dir_norm[0, 0], pnts_obj_dir_norm[0, 1], pnts_obj_dir_norm[0, 2]]
+        # if min_dist is not None:
+        ray_start = np.ravel(self.prc + self.min_dist * pnts_obj_dir_norm)
+        return np.array([[ray_start[0], ray_start[1], ray_start[2], pnts_obj_dir_norm[0], pnts_obj_dir_norm[1], pnts_obj_dir_norm[2]]])
        
     # # def rays(self, mode=None, step_x=None, step_y=None, wdeg=None, hdeg=None, min_dist=None):
                 

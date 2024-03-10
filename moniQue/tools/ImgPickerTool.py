@@ -11,7 +11,6 @@ class ImgPickerTool(QgsMapTool):
     
     def __init__(self, canvas, meta_window):
         
-        
         self.canvas = canvas
         self.meta_window = meta_window
         

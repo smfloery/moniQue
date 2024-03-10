@@ -5,9 +5,8 @@ from PyQt5.QtGui import QColor
 
 class SelectTool(QgsMapTool):
     
-    def __init__(self, img_canvas, map_canvas):
+    def __init__(self, img_canvas):
         self.img_canvas = img_canvas
-        self.map_canvas = map_canvas
         
         QgsMapTool.__init__(self, self.img_canvas)
         

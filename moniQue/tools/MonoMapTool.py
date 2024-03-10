@@ -49,7 +49,10 @@ class MonoMapTool(QgsMapTool):
     def set_layers(self, img_lyr, map_lyr):
         self.img_lyr = img_lyr
         self.map_lyr = map_lyr
-        
+    
+    def set_minxyz(self, min_xyz):
+        self.min_xyz = min_xyz
+     
     def set_camera(self, camera):
         self.camera = camera
         self.rubberRay.reset()
@@ -67,16 +70,21 @@ class MonoMapTool(QgsMapTool):
             click_pos = self.toMapCoordinates(e.pos())
             mx, my = float(click_pos.x()), float(click_pos.y())
             
+            print(mx, my)
+            
             if (mx >= 0) and (mx <= self.camera.img_w):
                 if (my <= 0) and (my >= self.camera.img_h*(-1)):
-                                
+                    
+                    #ray is in global coordinates;
                     ray = self.camera.ray(img_x=mx, img_y=my)
-                    o3d_ray = o3d.core.Tensor([ray], dtype=o3d.core.Dtype.Float32)
+                    ray[0, :3] -= self.min_xyz
+                    o3d_ray = o3d.core.Tensor(ray, dtype=o3d.core.Dtype.Float32)
                     ans = self.ray_scene.cast_rays(o3d_ray)
                     
                     if ans['t_hit'].isfinite():
                         obj_coord = o3d_ray[0,:3] + o3d_ray[0,3:]*ans['t_hit'].reshape((-1,1))
                         obj_coord = obj_coord.numpy().ravel()
+                        obj_coord += self.min_xyz
                     
                         self.rubberMap.addPoint(QgsPointXY(obj_coord[0], obj_coord[1]), True)
                         self.rubberMap_h.append(obj_coord[2])
@@ -108,43 +116,38 @@ class MonoMapTool(QgsMapTool):
                 
                 img_line_geom = self.rubberImg.asGeometry()
                 
+                
+                self.meta_window.clearFields()
                 self.meta_window.fillAttributes(self.camera)
                 result = self.meta_window.exec_() 
                 
                 if result:
                 
                     feat_attr = self.meta_window.getMeta()
-                    self.meta_window.clearFields()
                     
                     map_feat = QgsFeature(self.map_lyr.fields())
                     map_feat.setGeometry(QgsGeometry.fromPolyline(map_line_pnts_h))
-                    map_feat["mtum_id"] = self.camera.id
-                    map_feat["von"] = self.camera.meta["von"]
-                    map_feat["bis"] = self.camera.meta["bis"]
+                    map_feat["iid"] = self.camera.iid
                     map_feat["type"] = feat_attr["type"]
                     map_feat["comment"] = feat_attr["comment"]
-                    # map_feat.setAttributes([self.camera.id, self.camera.meta["von"], self.camera.meta["bis"], feat_attr["type"], feat_attr["comment"]])
+
                     self.map_lyr.dataProvider().addFeatures([map_feat])
-                    
                     self.map_lyr.commitChanges()
                     self.map_lyr.triggerRepaint()
+                    
                     self.map_canvas.refresh()
                     
                     img_feat = QgsFeature(self.img_lyr.fields())
                     img_feat.setGeometry(img_line_geom)
-                    img_feat["mtum_id"] = self.camera.id
-                    img_feat["von"] = self.camera.meta["von"]
-                    img_feat["bis"] = self.camera.meta["bis"]
+                    img_feat["iid"] = self.camera.iid
                     img_feat["type"] = feat_attr["type"]
                     img_feat["comment"] = feat_attr["comment"]
                     
-                    #img_feat.setAttributes([self.camera.id, self.camera.meta["von"], self.camera.meta["bis"], feat_attr["type"], feat_attr["comment"]])
                     self.img_lyr.dataProvider().addFeatures([img_feat])
-                    
                     self.img_lyr.commitChanges()
                     self.img_lyr.triggerRepaint()
-                    self.img_lyr.reload()
-                    # self.img_canvas.refresh()
+                    
+                    self.img_canvas.refresh()
                 
             self.is_drawing = False
             self.rubberMap.reset()
@@ -162,7 +165,8 @@ class MonoMapTool(QgsMapTool):
             if (my <= 0) and (my >= self.camera.img_h*(-1)):
         
                 ray = self.camera.ray(img_x=mx, img_y=my)
-                o3d_ray = o3d.core.Tensor([ray], dtype=o3d.core.Dtype.Float32)
+                ray[0, :3] -= self.min_xyz
+                o3d_ray = o3d.core.Tensor(ray, dtype=o3d.core.Dtype.Float32)
                 ans = self.ray_scene.cast_rays(o3d_ray)
     
                 if self.is_drawing:
@@ -173,6 +177,7 @@ class MonoMapTool(QgsMapTool):
                 if ans['t_hit'].isfinite():
                     obj_coord = o3d_ray[0,:3] + o3d_ray[0,3:]*ans['t_hit'].reshape((-1,1))
                     obj_coord = obj_coord.numpy().ravel()
+                    obj_coord += self.min_xyz
                     
                     if self.rubberRay.numberOfVertices() == 2:
                         self.rubberRay.removeLastPoint()

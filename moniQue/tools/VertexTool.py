@@ -184,6 +184,7 @@ class VertexTool(QgsMapTool):
             else:
                 
                 obj_coord = self.monoplot(e)
+                print(obj_coord)
                 
                 if obj_coord is not None:
                 
@@ -300,6 +301,8 @@ class VertexTool(QgsMapTool):
                 curr_mouse_pos = self.toMapCoordinates(e.pos())
                 obj_coord = self.monoplot(e)
                 
+                print(obj_coord)
+                
                 if obj_coord is not None:
                     
                     obj_pnt = QgsPointXY(obj_coord[0], obj_coord[1])
@@ -381,6 +384,9 @@ class VertexTool(QgsMapTool):
     def set_camera(self, camera):
         self.camera = camera
     
+    def set_minxyz(self, min_xyz):
+        self.min_xyz = min_xyz
+    
     def monoplot(self, e):
         pos = self.toMapCoordinates(e.pos())
     
@@ -390,12 +396,15 @@ class VertexTool(QgsMapTool):
             if (my <= 0) and (my >= self.camera.img_h*(-1)):
         
                 ray = self.camera.ray(img_x=mx, img_y=my)
-                o3d_ray = o3d.core.Tensor([ray], dtype=o3d.core.Dtype.Float32)
+                ray[0, :3] -= self.min_xyz
+                
+                o3d_ray = o3d.core.Tensor(ray, dtype=o3d.core.Dtype.Float32)
                 ans = self.ray_scene.cast_rays(o3d_ray)
                 
                 if ans['t_hit'].isfinite():
-                    obj_coord = o3d_ray[0,:3] + o3d_ray[0,3:]*ans['t_hit'].reshape((-1,1))
+                    obj_coord = o3d_ray[0, :3] + o3d_ray[0, 3:]*ans['t_hit'].reshape((-1,1))
                     obj_coord = obj_coord.numpy().ravel()
+                    obj_coord[:3] += self.min_xyz
                     return obj_coord
                 else:
                     return None

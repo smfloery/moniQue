@@ -40,7 +40,11 @@ from qgis.gui import QgsMapToolPan
 from .dlg_create import CreateDialog
 from .dlg_orient import OrientDialog
 from .dlg_meta_gcp import GcpMetaDialog
+from .dlg_meta_mono import MonoMetaDialog
 from ..tools.ImgPickerTool import ImgPickerTool
+from ..tools.MonoMapTool import MonoMapTool
+from ..tools.SelectTool import SelectTool
+from ..tools.VertexTool import VertexTool
 
 from ..camera import Camera
 from ..helpers import create_point_3d, rot2alzeka, alzeka2rot, calc_hfov, calc_vfov
@@ -54,6 +58,7 @@ class MainDialog(QtWidgets.QDialog):
         """Constructor."""
         super(MainDialog, self).__init__()
         
+        self.parent = parent
         self.plugin_dir = plugin_dir
         self.icon_dir = os.path.join(self.plugin_dir, "gfx", "icon")
         
@@ -103,20 +108,23 @@ class MainDialog(QtWidgets.QDialog):
         self.btn_mono_tool = QtWidgets.QAction("Activate monoplotting tool", self)
         self.btn_mono_tool.setIcon(QtGui.QIcon(os.path.join(self.icon_dir, "mActionAddPolyline.png")))
         self.btn_mono_tool.setEnabled(False)
-        # # button_action.triggered.connect(self.load_mesh)
+        self.btn_mono_tool.setCheckable(True)
+        self.btn_mono_tool.triggered.connect(self.toggle_mono_tool)
         self.main_toolbar.addAction(self.btn_mono_tool)
         
         self.btn_mono_select = QtWidgets.QAction("Select monoplotted lines", self)
         self.btn_mono_select.setIcon(QtGui.QIcon(os.path.join(self.icon_dir, "mActionSelectRectangle.png")))
         self.btn_mono_select.setEnabled(False)
-        # button_action.triggered.connect(self.load_mesh)
+        self.btn_mono_select.setCheckable(True)
+        self.btn_mono_select.triggered.connect(self.toggle_mono_select_tool)
         self.main_toolbar.addAction(self.btn_mono_select)
         
-        btn_mono_vertex = QtWidgets.QAction("Edit monoplotted lines", self)
-        btn_mono_vertex.setIcon(QtGui.QIcon(os.path.join(self.icon_dir, "mActionVertexToolActiveLayer.png")))
-        btn_mono_vertex.setEnabled(False)
-        # button_action.triggered.connect(self.load_mesh)
-        self.main_toolbar.addAction(btn_mono_vertex)
+        self.btn_mono_vertex = QtWidgets.QAction("Edit monoplotted lines", self)
+        self.btn_mono_vertex.setIcon(QtGui.QIcon(os.path.join(self.icon_dir, "mActionVertexToolActiveLayer.png")))
+        self.btn_mono_vertex.setEnabled(False)
+        self.btn_mono_vertex.setCheckable(True)
+        self.btn_mono_vertex.triggered.connect(self.toggle_mono_vertex_tool)
+        self.main_toolbar.addAction(self.btn_mono_vertex)
         
         self.img_toolbar = QtWidgets.QToolBar()
         self.img_toolbar.setIconSize(QtCore.QSize(20, 20))
@@ -125,7 +133,9 @@ class MainDialog(QtWidgets.QDialog):
         self.img_canvas.setMinimumSize(QtCore.QSize(300, 16777215))
         
         self.img_pan_tool = QgsMapToolPan(self.img_canvas)
-        
+        self.mono_tool = MonoMapTool(self.img_canvas, self.parent.map_canvas, MonoMetaDialog())
+        self.mono_vertex_tool = VertexTool(self.img_canvas, self.parent.map_canvas)
+        self.mono_select_tool = SelectTool(self.img_canvas)
         
         btn_img_pan = QtWidgets.QAction("Pan (Image)", self)
         btn_img_pan.setIcon(QtGui.QIcon(os.path.join(self.icon_dir, "mActionPan.png")))
@@ -243,6 +253,10 @@ class MainDialog(QtWidgets.QDialog):
         self.img_canvas.setLayers([self.img_line_lyr, self.img_gcps_lyr])
         self.img_canvas.setMapTool(self.img_pan_tool)
         
+        self.mono_tool.set_layers(self.img_line_lyr, self.map_line_lyr)
+        self.mono_select_tool.set_layers(self.img_line_lyr, self.map_line_lyr)
+        self.mono_vertex_tool.set_layers(self.img_line_lyr, self.map_line_lyr)
+        
     def show_dlg_create(self):
         self.dlg_create = CreateDialog(parent=self, icon_dir=self.icon_dir)
         self.dlg_create.created_signal.connect(self.on_created_signal)
@@ -338,6 +352,12 @@ class MainDialog(QtWidgets.QDialog):
         
         self.min_xyz = min_xyz
         
+        self.mono_tool.set_minxyz(self.min_xyz)
+        self.mono_vertex_tool.set_minxyz(self.min_xyz)
+        
+        self.mono_tool.set_scene(self.parent.ray_scene)
+        self.mono_vertex_tool.set_scene(self.parent.ray_scene)
+
     def animate(self):
         self.obj_renderer.render(self.obj_scene, self.obj_camera)
     
@@ -651,70 +671,72 @@ class MainDialog(QtWidgets.QDialog):
 
         if self.active_camera.is_oriented == 1:
             self.set_obj_canvas_camera(self.active_camera.asdict())
-        
+            
+            self.btn_mono_tool.setEnabled(True)
+            self.btn_mono_select.setEnabled(True)
+            self.btn_mono_vertex.setEnabled(True)
+            
+            self.mono_tool.set_camera(self.active_camera)
+            self.mono_vertex_tool.set_camera(self.active_camera)
+            
+        else:
+            self.btn_mono_tool.setEnabled(False)
+            
         self.obj_canvas.request_draw(self.animate)
         
-        # #     #highlight currently selected camera
-        # #     #clear previously highlighter cameras
-        # #     self.clear_highlighted_features()
-        # #     self.clear_vertex_markers()
-
-        # #     # cam_feat = list(self.cam_lyr.getFeatures(request))[0]
-        # #     # self.cam_h = QgsHighlight(self.map_canvas, cam_feat, self.cam_lyr)
-        # #     # self.cam_h.setColor(self.highlight_color)
-        # #     # self.cam_h.setFillColor(self.highlight_color)
-        # #     # self.cam_h.show()
-                
-        # #     # cam_hfov_feat = list(self.cam_hfov_lyr.getFeatures(request))[0]
-        # #     # self.hfov_h = QgsHighlight(self.map_canvas, cam_hfov_feat, self.cam_hfov_lyr)
-        # #     # self.hfov_h.setColor(self.highlight_color)
-        # #     # self.hfov_h.setFillColor(self.highlight_color)
-        # #     # self.hfov_h.show()
-
-        # #     # self.mono_tool.set_camera(self.active_camera)
-        # #     # self.vertex_tool.set_camera(self.active_camera)
-        # #     # self.orient_tool.set_camera(self.active_camera)
+    def toggle_mono_tool(self):
+        if self.btn_mono_tool.isChecked():                  #activate
+            self.btn_ori_tool.setEnabled(False)
+            self.btn_mono_select.setEnabled(False)
+            self.btn_mono_vertex.setEnabled(False)
+            #during monoplotting user cant adjust image orientation
+            self.img_canvas.setMapTool(self.mono_tool)
+            self.mono_tool.reset()
+        else:                                               #deactivate
+            self.btn_ori_tool.setEnabled(True)
+            self.btn_mono_select.setEnabled(True)
+            self.btn_mono_vertex.setEnabled(True)
             
-        # #     if self.active_camera.is_oriented:
-        # #         self.dlg.btn_monotool.setEnabled(True)
-        # #         self.dlg.btn_select.setEnabled(True)
-        # #         self.dlg.btn_oritool.setEnabled(True)
-        # #         # self.dlg.btn_delete.setEnabled(True)
-        # #         self.dlg.btn_vertex.setEnabled(True)
-        # #     else:
-        # #         self.dlg.btn_oritool.setEnabled(True)
-
-        # elif item.checkState() == QtCore.Qt.Unchecked:
-        #     QgsProject.instance().removeMapLayer(self.img_lyr.id())
-            
-        #     self.img_canvas.refresh()
-        #     self.active_camera = None
-        #     self.img_lyr = None
-            
-        # #     self.dlg.btn_monotool.setEnabled(False)
-        # #     self.dlg.btn_monotool.setChecked(False)
-        # #     self.deactivate_plotting()
-            
-        # #     self.dlg.btn_oritool.setEnabled(False)
-        # #     self.dlg.btn_oritool.setChecked(False)
-            
-        # #     self.dlg.btn_select.setEnabled(False)
-        # #     self.dlg.btn_select.setChecked(False)
-            
-        # #     self.dlg.btn_vertex.setEnabled(False)
-        # #     self.dlg.btn_vertex.setChecked(False)
-            
-        # #     # self.dlg.btn_delete.setEnabled(False)
+            self.img_canvas.unsetMapTool(self.mono_tool)
+            self.img_canvas.setMapTool(self.img_pan_tool)
+    
+    def toggle_mono_select_tool(self):
+        if self.btn_mono_select.isChecked():              #activate tool
                         
-        # #     self.clear_highlighted_features()
+            self.btn_ori_tool.setEnabled(False)
+            self.btn_mono_tool.setEnabled(False)
+            self.btn_mono_vertex.setEnabled(False)
             
-        # #     self.clear_meta_fiels()
-
-        #     #use a filter which is not available to not show any lines in img canvas if no image is currently selected
-        #     expression = "iid = 'sth_not_existing'"
-        #     self.img_line_lyr.setSubsetString(expression) #show only those lines which correspond to the currently selected image
-        #     self.img_gcps_lyr.setSubsetString(expression)
-        #     self.map_gcps_lyr.setSubsetString(expression)
+            #during monoplotting user cant adjust image orientation
+            self.img_canvas.setMapTool(self.mono_select_tool)
+            self.mono_select_tool.reset()
+        else:
+            self.btn_ori_tool.setEnabled(True)
+            self.btn_mono_tool.setEnabled(True)#deactivate tool
+            self.btn_mono_select.setEnabled(True)
+            self.btn_mono_vertex.setEnabled(True)
+            
+            self.img_canvas.unsetMapTool(self.mono_select_tool)
+            self.img_canvas.setMapTool(self.img_pan_tool)    
+    
+    def toggle_mono_vertex_tool(self):
+        if self.btn_mono_vertex.isChecked():              #activate tool
+            
+            self.btn_ori_tool.setEnabled(False)
+            self.btn_mono_tool.setEnabled(False)
+            self.btn_mono_select.setEnabled(False)
+            
+            #during monoplotting user cant adjust image orientation
+            self.img_canvas.setMapTool(self.mono_vertex_tool)
+            self.mono_vertex_tool.reset()
+        else:                                           #deactivate tool
+            self.btn_ori_tool.setEnabled(True)
+            self.btn_mono_tool.setEnabled(True)
+            self.btn_mono_select.setEnabled(True)
+            self.btn_mono_vertex.setEnabled(True)
+            
+            self.img_canvas.unsetMapTool(self.mono_vertex_tool)
+            self.img_canvas.setMapTool(self.img_pan_tool)    
     
     def activate_gui_elements(self):
         self.img_list.setEnabled(True)
