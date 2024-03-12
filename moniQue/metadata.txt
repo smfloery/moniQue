@@ -5,15 +5,16 @@
 [general]
 name=moniQue
 qgisMinimumVersion=3.0
-description=Monoplotting oblique images.
+description=Monoplotting oblique images with uncertainty estimation.
 version=0.1
 author=Sebastian Mikolka-Flöry
 email=s.floery@gmx.at
 
-about=Provide a brief description of the plugin and its purpose.
+about=With moniQue its possible to i) convert digital terrain model (DTM) to a mesh ii) estimate the interior and exterior
+orientation of onlique images iii) monoplot features of interest in real-time iv) estimate the uncertainty of monoplotted features.
 
-tracker=http://bugs
-repository=http://repo
+tracker=https://github.com/smfloery/moniQue/issues
+repository=https://github.com/smfloery/moniQue
 # End of mandatory metadata
 
 # Recommended items:
@@ -23,9 +24,9 @@ hasProcessingProvider=no
 # changelog=
 
 # Tags are comma separated with spaces allowed
-tags=python
+tags=photogrammetry,image orientation, monoplotting, uncertainty estimation, orthophoto
 
-homepage=http://homepage
+homepage=https://github.com/smfloery/moniQue
 category=Plugins
 icon=icon.png
 # experimental flag

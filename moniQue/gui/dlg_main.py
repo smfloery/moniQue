@@ -49,6 +49,8 @@ from ..tools.VertexTool import VertexTool
 from ..camera import Camera
 from ..helpers import create_point_3d, rot2alzeka, alzeka2rot, calc_hfov, calc_vfov
 
+from ..tools.map_controller import OrbitController
+
 class MainDialog(QtWidgets.QDialog):
     
     load_project_signal = QtCore.pyqtSignal(object)
@@ -168,7 +170,8 @@ class MainDialog(QtWidgets.QDialog):
         self.obj_camera = gfx.PerspectiveCamera(fov=45, depth_range=(1, 100000))
         
         self.obj_canvas.request_draw(self.animate)
-        self.obj_controller = gfx.TrackballController(self.obj_camera, register_events=self.obj_renderer, damping=0)
+        # self.obj_controller = gfx.TrackballController(self.obj_camera, register_events=self.obj_renderer, damping=0)
+        self.obj_controller = OrbitController(self.obj_camera, register_events=self.obj_renderer, damping=0)
         
         # self.obj_scene.add(gfx.AxesHelper(size=1000, thickness=3))
         
