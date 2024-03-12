@@ -1,39 +1,48 @@
-# This file contains metadata for your plugin. Since 
-# version 2.0 of QGIS this is the proper way to supply 
-# information about a plugin. The old method of 
-# embedding metadata in __init__.py will 
-# is no longer supported since version 2.0.
+# This file contains metadata for your plugin.
 
 # This file should be included when you package your plugin.# Mandatory items:
 
 [general]
 name=moniQue
-qgisMinimumVersion=3.20
-description=Monoplotting oblique images.
+qgisMinimumVersion=3.0
+description=Monoplotting oblique images with uncertainty estimation.
 version=0.1
 author=Sebastian Mikolka-Flöry
-email=sebastian.floery@geo.tuwien.ac.at
+email=s.floery@gmx.at
 
-about=Monoplotting refers to the process of intersecting image rays originating from the projection center of a camera through pixels with the terrain. With this technique the object coodinates of image pixels can be caluclated from single images. This plugin provides all necessary functionalities including the interactive monoplotting of individual features, accucracy analysis of the monoplotted features, monoplotting of whole images + export to *.las or *.tif and generation of a simplified mesh from a digital terrain model.
+about=With moniQue its possible to i) convert digital terrain model (DTM) to a mesh ii) estimate the interior and exterior
+orientation of onlique images iii) monoplot features of interest in real-time iv) estimate the uncertainty of monoplotted features.
 
-tracker=http://bugs
-repository=http://repo
+tracker=https://github.com/smfloery/moniQue/issues
+repository=https://github.com/smfloery/moniQue
 # End of mandatory metadata
 
 # Recommended items:
 
+hasProcessingProvider=no
 # Uncomment the following line and add your changelog:
 # changelog=
 
 # Tags are comma separated with spaces allowed
-tags=python
+tags=photogrammetry,image orientation, monoplotting, uncertainty estimation, orthophoto
 
-homepage=http://homepage
+homepage=https://github.com/smfloery/moniQue
 category=Plugins
-icon=gfx/icon/icon.png
+icon=icon.png
 # experimental flag
 experimental=False
 
 # deprecated flag (applies to the whole plugin, not just a single version)
 deprecated=False
+
+# Since QGIS 3.8, a comma separated list of plugins to be installed
+# (or upgraded) can be specified.
+# Check the documentation for more information.
+# plugin_dependencies=
+
+Category of the plugin: Raster, Vector, Database or Web
+# category=
+
+# If the plugin can run on QGIS Server.
+server=False
 

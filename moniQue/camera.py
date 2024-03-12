@@ -1,53 +1,92 @@
 import open3d as o3d
 import numpy as np
-import urllib.request
 import json
-import ssl
-
-context = ssl._create_unverified_context()
-            
+from .helpers import alzeka2rot, rot2alzeka
 class Camera():
     
-    def __init__(self, name, path, ext, is_oriented=False):
+    def __init__(self, iid, path, ext, is_oriented=False, hfov=None, vfov=None, img_h=None, img_w=None,
+                 obj_x0=None, obj_y0=None, obj_z0=None, obj_x0_std=None, obj_y0_std=None, obj_z0_std=None, 
+                 alpha=None, alpha_std=None, kappa=None, kappa_std=None, zeta = None, zeta_std=None, 
+                 s0=None, img_x0=None, img_y0=None, f=None, f_std=None, 
+                 gcps=None, img_gcps=None, obj_gcps=None):
         
         self.is_oriented=is_oriented
         
-        self.iid = name
+        self.min_dist = 100
+        
+        self.iid = iid
         self.path = path
         self.ext = ext
         
-        self.s0 = None
+        self.s0 = s0
         
-        self.prc = None
-        self.prc_std = None
-        self.rmat = None
+        self.obj_x0 = obj_x0
+        self.obj_x0_std = obj_x0_std
         
-        self.ior = None
-        self.ior_std = None
+        self.obj_y0 = obj_y0
+        self.obj_y0_std = obj_y0_std
         
-        self.gcps = None
-        self.gcp_img_coords = None
-        self.gcp_obj_coords = None
+        self.obj_z0 = obj_z0
+        self.obj_z0_std = obj_z0_std
+                
+        self.prc = [self.obj_x0, self.obj_y0, self.obj_z0]
+        self.prc_std = [self.obj_x0_std, self.obj_y0_std, self.obj_z0_std]
         
-        self.alpha = None
-        self.zeta = None
-        self.kappa = None
+        self.alpha = alpha
+        self.alpha_std = alpha_std
         
-        self.alzeka = None
-        self.alzeka_std = None
+        self.zeta = zeta
+        self.zeta_std = zeta_std
         
-        self.meta = None
+        self.kappa = kappa
+        self.kappa_std = kappa_std
         
-        self.w = None
-        self.h = None
+        self.alzeka = [alpha, zeta, kappa]
+        self.alzeka_std = [alpha_std, zeta_std, kappa_std]
         
-        self.hfov = None
-        self.vfov = None
+        if None in self.alzeka:
+            self.rmat = None
+        else:
+            self.rmat = alzeka2rot(self.alzeka)
         
-    def set_img_dim(self, h, w):
-        self.h = h
-        self.w = w
-          
+        # if alzeka is not None:
+        #     self.azimut = self.alpha2azi()
+        #     self.rmat = self.alzeka2rot()
+        # else:
+        #     self.azimut = None
+        #     self.rmat = None
+        
+        self.img_x0 = img_x0
+        self.img_y0 = img_y0
+        
+        self.f = f
+        self.f_std = f_std
+        
+        self.ior = [img_x0, img_y0, f]
+        
+        self.gcps = gcps
+        self.gcp_img_coords = img_gcps
+        self.gcp_obj_coords = obj_gcps
+        
+        self.img_w = img_w
+        self.img_h = img_h
+        
+        self.hfov = hfov
+        self.vfov = vfov
+        
+    def alzeka2rot(self):
+        pass
+        
+    def alpha2azi(self):
+        pass
+    
+    def asdict(self):
+        return {"obj_x0":self.obj_x0, "obj_y0":self.obj_y0, "obj_z0":self.obj_z0, 
+                "obj_x0_std":self.obj_x0_std, "obj_y0_std":self.obj_y0_std, "obj_z0_std":self.obj_z0_std,
+                "alpha":self.alpha, "zeta":self.zeta, "kappa":self.kappa,
+                "alpha_std":self.alpha_std, "zeta_std":self.zeta_std, "kappa_std":self.kappa_std,
+                "img_x0":self.img_x0, "img_y0":self.img_y0, "f":self.f, "f_std":self.f_std, "hfov":self.hfov, "vfov":self.vfov}
+    
     #     if not token:
     #         token = "40622e289e7005b3007a499eac4ecb3a"
         
@@ -190,21 +229,19 @@ class Camera():
     #         else:
     #             return alpha_north
     
-    # def ray(self, img_x=None, img_y=None, min_dist=None):
+    def ray(self, img_x=None, img_y=None):
         
-    #     if img_y > 0:
-    #         img_y*=-1
+        if img_y > 0:
+            img_y*=-1
             
-    #     pnts_img = np.array([img_x, img_y, 0])
-    #     pnts_img_p0 = np.subtract(pnts_img, self.ior)
-    #     pnts_obj_dir = (np.dot(self.R, pnts_img_p0.T)).T
-    #     pnts_obj_dir_norm = pnts_obj_dir / (np.sum(np.abs(pnts_obj_dir)**2, axis=-1)**(1./2)).reshape(-1, 1)
+        pnts_img = np.array([img_x, img_y, 0])
+        pnts_img_p0 = np.subtract(pnts_img, self.ior)
+        pnts_obj_dir = (np.dot(self.rmat, pnts_img_p0.T)).T
+        pnts_obj_dir_norm = np.ravel(pnts_obj_dir / (np.sum(np.abs(pnts_obj_dir)**2, axis=-1)**(1./2)).reshape(-1, 1))
         
-    #     if min_dist is not None:
-    #         ray_start = self.prc + min_dist * pnts_obj_dir_norm
-    #         return [ray_start[0], ray_start[1], ray_start[2], pnts_obj_dir_norm[0, 0], pnts_obj_dir_norm[0, 1], pnts_obj_dir_norm[0, 2]]
-    #     else: 
-    #         return [self.prc[0], self.prc[1], self.prc[2], pnts_obj_dir_norm[0, 0], pnts_obj_dir_norm[0, 1], pnts_obj_dir_norm[0, 2]]
+        # if min_dist is not None:
+        ray_start = np.ravel(self.prc + self.min_dist * pnts_obj_dir_norm)
+        return np.array([[ray_start[0], ray_start[1], ray_start[2], pnts_obj_dir_norm[0], pnts_obj_dir_norm[1], pnts_obj_dir_norm[2]]])
        
     # # def rays(self, mode=None, step_x=None, step_y=None, wdeg=None, hdeg=None, min_dist=None):
                 
@@ -243,77 +280,3 @@ class Camera():
     # #             rays.append(Ray([rays_start[ix, 0], rays_start[ix, 1], rays_start[ix, 2]], [row[0], row[1], row[2]]))
                 
     # #     return rays
-    
-    # def euler2rot(self, euler):
-    
-    #     al = self.euler[0]
-    #     ze = self.euler[1]
-    #     ka = self.euler[2]
-        
-    #     R = np.empty((3, 3))
-
-    #     R[0,0] = np.cos(al) * np.cos(ze) * np.cos(ka) - np.sin(al) * np.sin(ka)
-    #     R[0,1] = -np.cos(al) * np.cos(ze) * np.sin(ka) - np.sin(al) * np.cos(ka)
-    #     R[0,2] = np.cos(al) * np.sin(ze)
-    #     R[1,0] = np.sin(al) * np.cos(ze) * np.cos(ka) + np.cos(al) * np.sin(ka)
-    #     R[1,1] = -np.sin(al) * np.cos(ze) * np.sin(ka) + np.cos(al) * np.cos(ka)
-    #     R[1,2] = np.sin(al) * np.sin(ze)
-    #     R[2,0] = -np.sin(ze) * np.cos(ka)
-    #     R[2,1] = np.sin(ze) * np.sin(ka)
-    #     R[2,2] = np.cos(ze)
-        
-    #     return R
-    
-    # def from_dict(self, cam_data):
-    #     self.s0 = cam_data["sigma0"]
-    #     self.id = cam_data["img_id"]
-    #     self.name = cam_data["name"]
-        
-    #     cam_eor = cam_data["eor"]
-    #     self.prc = np.array([cam_eor["prj_ctr"]["E"], cam_eor["prj_ctr"]["N"], cam_eor["prj_ctr"]["H"]])
-    #     self.prc_std = np.array([cam_eor["prj_ctr"]["std_E"], cam_eor["prj_ctr"]["std_N"], cam_eor["prj_ctr"]["std_H"]])
-                
-    #     cam_ior = cam_data["ior"]
-    #     self.ior = np.array([cam_ior["x0"], cam_ior["y0"], cam_ior["f0"]])
-    #     self.ior_std = np.array([cam_ior["std_x0"], cam_ior["std_y0"], cam_ior["std_f0"]])
-        
-    #     self.alpha = cam_data["eor"]["rot"]["alpha"]
-    #     self.zeta = cam_data["eor"]["rot"]["zeta"]
-    #     self.kappa = cam_data["eor"]["rot"]["kappa"]
-        
-    #     self.euler = np.array([self.alpha, self.zeta, self.kappa])
-    #     self.euler_std = np.array([cam_data["eor"]["rot"]["std_rot_a"], cam_data["eor"]["rot"]["std_rot_z"], cam_data["eor"]["rot"]["std_rot_k"]])
-        
-    #     self.R = self.euler2rot(self.euler)
-        
-    #     self.meta = cam_data["meta"]
-        
-    #     self.img_w = int(self.meta["width"])
-    #     self.img_h = int(self.meta["height"])
-        
-    #     self.hfov = np.arctan(self.img_w/(self.ior[2]*2))*2
-    #     self.vfov = np.arctan(self.img_h/(self.ior[2]*2))*2
-        
-    #     self.status = "ok"
-        
-    # def hfov_geom(self, dist=100):
-
-    #     #left side
-    #     l_pnt_e = self.prc[0] + dist * np.sin(self.alpha_from_north(self.alpha) - self.hfov/2.)
-    #     l_pnt_n = self.prc[1] + dist * np.cos(self.alpha_from_north(self.alpha) - self.hfov/2.)
-        
-    #     #right side
-    #     r_pnt_e = self.prc[0] + dist * np.sin(self.alpha_from_north(self.alpha) + self.hfov/2.)
-    #     r_pnt_n = self.prc[1] + dist * np.cos(self.alpha_from_north(self.alpha) + self.hfov/2.)
-                               
-    #     return "POLYGON((%.3f %.3f, %.3f %.3f, %.3f %.3f, %.3f %.3f))" % (self.prc[0], self.prc[1],
-    #                                                                       l_pnt_e, l_pnt_n,
-    #                                                                       r_pnt_e, r_pnt_n,
-    #                                                                       self.prc[0], self.prc[1])
-        
-    #     fov_arr = np.array([[self.prc[0], self.prc[1]],
-    #                         [l_pnt_e, l_pnt_n],
-    #                         [r_pnt_e, r_pnt_n],
-    #                         [self.prc[0], self.prc[1]]])
-        
-    #     #return Polygon(np.squeeze(fov_arr))

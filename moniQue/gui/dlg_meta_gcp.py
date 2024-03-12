@@ -1,9 +1,10 @@
-from PyQt5.QtWidgets import QDialog, QGroupBox, QLineEdit, QDialogButtonBox, QVBoxLayout, QFormLayout, QLabel, QComboBox
+from PyQt5.QtWidgets import QDialog, QGroupBox, QLineEdit, QDialogButtonBox, QVBoxLayout, QFormLayout, QLabel, QComboBox, QErrorMessage
+from PyQt5.QtGui import QIntValidator
 
-class MetaWindow(QDialog):
+class GcpMetaDialog(QDialog):
   
     def __init__(self):
-        super(MetaWindow, self).__init__()
+        super(GcpMetaDialog, self).__init__()
         
         # setting window title
         self.setWindowTitle("Set GCP attributes")
@@ -24,7 +25,11 @@ class MetaWindow(QDialog):
         self.combo_gid = QComboBox()
         self.combo_gid.setEditable(True)
         self.combo_gid.setInsertPolicy(QComboBox.InsertAtTop)
-
+        
+        combo_validator = QIntValidator()
+        combo_validator.setRange(1, 1000)
+        self.combo_gid.setValidator(combo_validator)
+        
         # creating a line edit
         self.line_img_x = QLineEdit()
         self.line_img_x.setReadOnly(True)
@@ -42,9 +47,9 @@ class MetaWindow(QDialog):
         self.line_obj_y.setReadOnly(True)
         self.line_obj_y.setEnabled(False)
         
-        self.line_obj_h = QLineEdit()
-        self.line_obj_h.setReadOnly(True)
-        self.line_obj_h.setEnabled(False)
+        self.line_obj_z = QLineEdit()
+        self.line_obj_z.setReadOnly(True)
+        self.line_obj_z.setEnabled(False)
                             
         # creating a line edit
         self.line_desc = QLineEdit()
@@ -71,14 +76,23 @@ class MetaWindow(QDialog):
   
         # setting lay out
         self.setLayout(mainLayout)
-    
+
+        self.error_dialog = QErrorMessage(parent=self)
+        self.gids_not_allowed = None
+        
     # def getMeta(self):
     #     return {"type":self.line_type.text(), "comment":self.line_comment.text()}
     
     # def clearFields(self):
     #     self.line_type.clear()
     #     self.line_comment.clear()
-  
+    
+    def accept(self):
+        if self.combo_gid.currentText() not in self.gids_not_allowed:
+            super().accept()
+        else:
+            self.error_dialog.showMessage('GID already in use!')
+            
     def createForm(self):
   
         # creating a form layout
@@ -93,7 +107,7 @@ class MetaWindow(QDialog):
         layout.addRow(QLabel("y"), self.line_img_y)
         layout.addRow(QLabel("X"), self.line_obj_x)
         layout.addRow(QLabel("Y"), self.line_obj_y)
-        layout.addRow(QLabel("H"), self.line_obj_h)
+        layout.addRow(QLabel("Z"), self.line_obj_z)
         layout.addRow(QLabel("Desc"), self.line_desc)
   
         # setting layout
