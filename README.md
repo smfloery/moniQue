@@ -1,5 +1,5 @@
 # moniQue
-QGIS plugin for monoplotting of oblique images.
+![moniQue - Main dialog](./moniQue/doc/main_dialog.jpg)
 
 ## Installation
 ### Additional Python packages
@@ -11,8 +11,6 @@ Open the OSGeo4W Shell and install From the OSGeo4W Shell install required pytho
 
 ### moniQue
 After installing the additional Python packages, moniQue can be installed as any QGIS plugin from `Plugins -> Manage plugins`. After the succesful installation you should see the logo in the QGIS main toolbar and a new entry in the `Plugin` menu is available.
-
-![moniQue - Main dialog](screenshot.png)
 
 ## Usage
 ### Terrain simplification
