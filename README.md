@@ -1,4 +1,5 @@
-# moniQue
+# moniQue - Monoplotting oblique images in QGIS
+
 ![moniQue - Main dialog](./moniQue/doc/main_dialog.jpg)
 
 ## Installation
