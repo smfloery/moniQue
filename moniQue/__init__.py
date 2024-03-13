@@ -32,10 +32,5 @@ def classFactory(iface):  # pylint: disable=invalid-name
     :type iface: QgsInterface
     """
     #
-<<<<<<< HEAD
-    from .main import MonoPlot
-    return MonoPlot(iface)
-=======
     from .monique import MoniQue
     return MoniQue(iface)
->>>>>>> restructure

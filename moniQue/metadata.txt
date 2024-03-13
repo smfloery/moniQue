@@ -10,8 +10,7 @@ version=0.1
 author=Sebastian Mikolka-Flöry
 email=s.floery@gmx.at
 
-about=With moniQue its possible to i) convert digital terrain model (DTM) to a mesh ii) estimate the interior and exterior
-orientation of onlique images iii) monoplot features of interest in real-time iv) estimate the uncertainty of monoplotted features.
+about=With moniQue its possible to i) convert digital terrain model (DTM) to a mesh ii) estimate the interior and exterior orientation of onlique images iii) monoplot features of interest in real-time iv) estimate the uncertainty of monoplotted features.
 
 tracker=https://github.com/smfloery/moniQue/issues
 repository=https://github.com/smfloery/moniQue
