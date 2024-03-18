@@ -32,3 +32,11 @@ Before we can calculate the camera parameters we need initial estimates for the 
 After we estimated the camera parameters we now can intersect image rays defined by the projection center through image pixels with the terrain. This allows us to obtain object coordinates of the image pixels and hence, directly document features of interest in the image. This is called monoplotting:
 ![moniQue - Main dialog](./moniQue/doc/monoplot.gif)
 To activate monoplotting click the icon next to the camera symbol in the main dialog. If you now move your mouse over the image canvas, moniQue automatically intersects the respective image rays with the terrain mesh. As a result you see the intersection point in the QGIS main canvas. By clicking the left mouse button vertices of a polyline are created and stored. You can finish a polyline by clicking the right mouse button.
+
+## Funding
+moniQue was developed within the SEHAG project which was funded by the DFG (Deutsche Forschungsgemeinschaft) under the grant [FOR 2793](https://gepris.dfg.de/gepris/projekt/394200609) and FWF (Österreichischer Wissenschaftsfond) under the grant [I 4062](https://www.fwf.ac.at/forschungsradar/10.55776/I4062).
+
+## Contact
+Sebastian Mikolka-Flöry (sebastian.floery@geo.tuwien.ac.at)
+
+## Further information
