@@ -39,4 +39,4 @@ moniQue was developed within the SEHAG project which was funded by the DFG (Deut
 ## Contact
 Sebastian Mikolka-Flöry (sebastian.floery@geo.tuwien.ac.at)
 
-## Further information
+## References
