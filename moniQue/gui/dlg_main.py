@@ -95,6 +95,11 @@ class MainDialog(QtWidgets.QDialog):
         self.import_action.triggered.connect(self.import_images)
         self.img_menu.addAction(self.import_action)
         
+        #TODO: for future import of camera/project from JSON
+        # self.import_json_action = QtWidgets.QAction("&Import from *.json", self)
+        # self.import_json_action.triggered.connect(self.import_from_json)
+        # self.img_menu.addAction(self.import_json_action)
+        
         self.main_toolbar = QtWidgets.QToolBar("My main toolbar")
         self.main_toolbar.setIconSize(QtCore.QSize(20, 20))
 
@@ -364,6 +369,22 @@ class MainDialog(QtWidgets.QDialog):
     def animate(self):
         self.obj_renderer.render(self.obj_scene, self.obj_camera)
     
+    #TODO for future import of camera/json
+    # def import_from_json(self):
+    #     json_path = QtWidgets.QFileDialog.getOpenFileName(None, "Import *.json", "", ("Oriented images (*.json)"))[0]
+        
+    #     json_file = open(json_path)
+    #     try:
+    #         json_data = json.load(json_file)
+    #     except:
+    #         print("Provided JSON does not appear to be valid.")
+        
+    #     loaded_imgs = [self.img_list.item(x).text() for x in range(self.img_list.count())]
+        
+    #     for name, data in json_data.items():
+    #         cam = Camera(iid=name).from_json(data)
+            
+        
     def import_images(self):
         """Import selected images.
         """

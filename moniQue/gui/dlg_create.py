@@ -57,7 +57,8 @@ class CreateDialog(QtWidgets.QDialog):
         main_layout = QtWidgets.QVBoxLayout()
         
         gpkg_layout = QtWidgets.QHBoxLayout()
-        gpkg_label = QtWidgets.QLabel("GPKG Path")
+        gpkg_label = QtWidgets.QLabel("GPKG:")
+        gpkg_label.setFixedWidth(50)
         self.gpkg_line = QtWidgets.QLineEdit()
         self.gpkg_line.setEnabled(False)
         self.gpkg_btn = QtWidgets.QPushButton()
@@ -69,7 +70,8 @@ class CreateDialog(QtWidgets.QDialog):
         gpkg_layout.addWidget(self.gpkg_btn)
 
         mesh_layout = QtWidgets.QHBoxLayout()
-        mesh_label = QtWidgets.QLabel("Mesh Path")
+        mesh_label = QtWidgets.QLabel("Mesh:")
+        mesh_label.setFixedWidth(50)
         self.mesh_line = QtWidgets.QLineEdit()
         self.mesh_line.setEnabled(False)
         self.mesh_btn = QtWidgets.QPushButton()
@@ -79,6 +81,20 @@ class CreateDialog(QtWidgets.QDialog):
         mesh_layout.addWidget(mesh_label)
         mesh_layout.addWidget(self.mesh_line)
         mesh_layout.addWidget(self.mesh_btn)
+        
+        
+        ortho_layout = QtWidgets.QHBoxLayout()
+        ortho_label = QtWidgets.QLabel("Ortho:")
+        ortho_label.setFixedWidth(50)
+        self.ortho_line = QtWidgets.QLineEdit()
+        self.ortho_line.setEnabled(False)
+        self.ortho_btn = QtWidgets.QPushButton()
+        self.ortho_btn.setIcon(QtGui.QIcon(os.path.join(self.icon_dir, "mActionFileOpen.png")))
+        self.ortho_btn.clicked.connect(self.set_ortho_path)
+
+        ortho_layout.addWidget(ortho_label)
+        ortho_layout.addWidget(self.ortho_line)
+        ortho_layout.addWidget(self.ortho_btn)
         
         crs_layout = QtWidgets.QHBoxLayout()
         crs_label = QtWidgets.QLabel("Project CRS")
@@ -98,6 +114,7 @@ class CreateDialog(QtWidgets.QDialog):
         
         main_layout.addLayout(gpkg_layout)
         main_layout.addLayout(mesh_layout)
+        main_layout.addLayout(ortho_layout)
         main_layout.addLayout(crs_layout)
         main_layout.addLayout(btn_layout)
         main_layout.addStretch(1)
@@ -119,6 +136,14 @@ class CreateDialog(QtWidgets.QDialog):
             if (self.gpkg_line.text()  is not "") & (self.crs_widget.crs().isValid()):
                 self.create_btn.setEnabled(True)
 
+    def set_ortho_path(self):
+        ortho_path = QtWidgets.QFileDialog.getOpenFileName(None, "Open orthophoto", "", ("Image (*.tif *.tiff)"))[0]   
+        if ortho_path:
+            self.ortho_line.setText(ortho_path)
+
+            # if (self.gpkg_line.text()  is not "") & (self.crs_widget.crs().isValid()):
+            #     self.create_btn.setEnabled(True)
+    
     def set_crs(self):
         if (self.gpkg_line.text() is not "") & (self.mesh_line.text() is not "") & (self.crs_widget.crs().isValid()):
             self.create_btn.setEnabled(True)
@@ -126,6 +151,7 @@ class CreateDialog(QtWidgets.QDialog):
     def create_project(self):
         gpkg_path = self.gpkg_line.text()
         mesh_path = self.mesh_line.text()
+        ortho_path = self.ortho_line.text()
         crs = self.crs_widget.crs().authid()
         
         QtWidgets.QApplication.instance().setOverrideCursor(QtCore.Qt.WaitCursor)
