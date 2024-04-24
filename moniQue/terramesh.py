@@ -32,7 +32,7 @@ def geo2px(coords, gt):
     feat_vx_row = np.floor((coords[:, 1] - gt[3]) / gt[5]).astype(int)
     return np.hstack((feat_vx_row.reshape(-1, 1), feat_vx_col.reshape(-1, 1)))
 
-def px2geo(coords, gt):   
+def px2geo(coords, gt, pixel_shift=True):   
     # xoffset, px_w, rot1, yoffset, rot2, px_h = gt
     # supposing x and y are your pixel coordinate this 
     # is how to get the coordinate in space.
@@ -40,8 +40,9 @@ def px2geo(coords, gt):
     pos_y = gt[4] * coords[:, 1] + gt[5] * coords[:, 0] + gt[3]
 
     # shift to the center of the pixel
-    pos_x += gt[1] * 0.5
-    pos_y += gt[5] * 0.5
+    if pixel_shift:
+        pos_x += gt[1] * 0.5
+        pos_y += gt[5] * 0.5
     
     return np.hstack((pos_x.reshape(-1, 1), pos_y.reshape(-1, 1)))
 
@@ -514,9 +515,10 @@ class MeshGrid:
                 
                 curr_tile = self.data[curr_tid]
                 
-                verts = curr_tile.vertices
+                verts = curr_tile.vertices                        
                 verts_h = curr_tile.tile_arr[verts[:, 0], verts[:, 1]]
-                verts_geo = np.hstack((px2geo(verts, curr_tile.tile_gt), verts_h.reshape(-1, 1)))
+                #tile_gt already contains the pixel shift towards the center; Hence, we don't add it again
+                verts_geo = np.hstack((px2geo(verts, curr_tile.tile_gt, pixel_shift=False), verts_h.reshape(-1, 1)))
                 
                 tris = curr_tile.triangles
                 

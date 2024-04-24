@@ -21,12 +21,12 @@
  *                                                                         *
  ***************************************************************************/
 """
-from qgis.PyQt.QtCore import QCoreApplication, Qt
+from qgis.PyQt.QtCore import Qt
 from qgis.PyQt.QtGui import QIcon
-from qgis.PyQt.QtWidgets import QAction, QApplication, QMenu
+from qgis.PyQt.QtWidgets import QAction, QApplication
 
-from qgis.core import QgsProject, QgsVectorLayer, QgsJsonUtils, QgsFeatureRequest
-from qgis.gui import QgsMapToolPan
+from qgis.core import QgsProject, QgsVectorLayer, QgsJsonUtils
+from qgis.gui import QgsMapToolPan, QgsMessageBar
 
 # # Initialize Qt resources from file resources.py
 # from .resources import *
@@ -79,78 +79,6 @@ class MoniQue:
         # Declare instance attributes
         self.actions = []
     
-    # def add_action(
-    #     self,
-    #     icon_path,
-    #     text,
-    #     callback,
-    #     enabled_flag=True,
-    #     add_to_menu=True,
-    #     add_to_toolbar=True,
-    #     status_tip=None,
-    #     whats_this=None,
-    #     parent=None):
-    #     """Add a toolbar icon to the toolbar.
-
-    #     :param icon_path: Path to the icon for this action. Can be a resource
-    #         path (e.g. ':/plugins/foo/bar.png') or a normal file system path.
-    #     :type icon_path: str
-
-    #     :param text: Text that should be shown in menu items for this action.
-    #     :type text: str
-
-    #     :param callback: Function to be called when the action is triggered.
-    #     :type callback: function
-
-    #     :param enabled_flag: A flag indicating if the action should be enabled
-    #         by default. Defaults to True.
-    #     :type enabled_flag: bool
-
-    #     :param add_to_menu: Flag indicating whether the action should also
-    #         be added to the menu. Defaults to True.
-    #     :type add_to_menu: bool
-
-    #     :param add_to_toolbar: Flag indicating whether the action should also
-    #         be added to the toolbar. Defaults to True.
-    #     :type add_to_toolbar: bool
-
-    #     :param status_tip: Optional text to show in a popup when mouse pointer
-    #         hovers over the action.
-    #     :type status_tip: str
-
-    #     :param parent: Parent widget for the new action. Defaults None.
-    #     :type parent: QWidget
-
-    #     :param whats_this: Optional text to show in the status bar when the
-    #         mouse pointer hovers over the action.
-
-    #     :returns: The action that was created. Note that the action is also
-    #         added to self.actions list.
-    #     :rtype: QAction
-    #     """
-
-    #     icon = QIcon(icon_path)
-    #     action = QAction(icon, text, parent)
-    #     action.triggered.connect(callback)
-    #     action.setEnabled(enabled_flag)
-
-    #     if status_tip is not None:
-    #         action.setStatusTip(status_tip)
-
-    #     if whats_this is not None:
-    #         action.setWhatsThis(whats_this)
-
-    #     if add_to_toolbar:
-    #         # Adds plugin icon to Plugins toolbar
-    #         self.iface.addToolBarIcon(action)
-
-    #     if add_to_menu:
-    #         self.iface.addPluginToMenu(self.menu, action)
-
-    #     self.actions.append(action)
-
-    #     return action
-
     def initGui(self):
         """Create the menu entries and toolbar icons inside the QGIS GUI."""
 
@@ -172,14 +100,6 @@ class MoniQue:
         
         self.actions.append(launch_action)
         self.actions.append(convert_action)
-        
-        # icon_path = ':/plugins/monique/icon.png'
-        # main_menu = self.add_action(os.path.join(self.plugin_dir, "icon.png"), text='moniQue', callback=self.run, parent=self.iface.mainWindow())
-        # QAction("DTM to Mesh", )
-        # self.add_action(os.path.join(self.plugin_dir, "icon.png"), text='moniQue', callback=self.run, parent=main_menu)
-        
-        # will be set False in run()
-        # self.first_start = True
 
     def unload(self):
         """Removes the plugin menu item and icon from QGIS GUI."""
@@ -200,7 +120,7 @@ class MoniQue:
         gpkg_reg_lyr = self.gpkg_path + "|layername=region"
         self.reg_lyr = QgsVectorLayer(gpkg_reg_lyr, "region", "ogr")
         self.reg_lyr.loadNamedStyle(self.map_region_qml_path)
-            
+                
         gpkg_cam_lyr = self.gpkg_path + "|layername=cameras"
         self.cam_lyr = QgsVectorLayer(gpkg_cam_lyr, "cameras", "ogr")           
         self.cam_lyr.loadNamedStyle(self.cam_qml_path)
@@ -217,11 +137,6 @@ class MoniQue:
         self.map_gcps_lyr = QgsVectorLayer(gpkg_map_gcps_lyr, "gcps", "ogr")
         self.map_gcps_lyr.loadNamedStyle(self.map_gcps_qml_path)       
         
-        # # map_gcps_lyr.committedFeaturesAdded.connect(self.map_gcp_added)
-        # # self.map_gcps_lyr.selectionChanged.connect(self.map_gcp_selected)
-        # # self.map_gcps_lyr.featuresDeleted.connect(self.map_gcp_deleted)
-        # self.map_gcps_lyr.geometryChanged.connect(self.map_gcp_changed)
-        
         gpkg_img_gcps_lyr = self.gpkg_path + "|layername=gcps_img"
         self.img_gcps_lyr = QgsVectorLayer(gpkg_img_gcps_lyr, "gcps_img", "ogr")
         self.img_gcps_lyr.loadNamedStyle(self.img_gcps_qml_path)       
@@ -230,10 +145,8 @@ class MoniQue:
         monoGroup = root.insertGroup(0, self.project_name)
         monoGroup.addLayer(self.map_line_lyr) 
         monoGroup.addLayer(self.cam_lyr) 
-        # monoGroup.addLayer(self.img_line_lyr) 
         monoGroup.addLayer(self.reg_lyr)
         monoGroup.addLayer(self.map_gcps_lyr)
-        # monoGroup.addLayer(self.img_gcps_lyr)
 
         expression = "iid = 'sth_not_existing'"
         self.img_line_lyr.setSubsetString(expression) #show only those lines which correspond to the currently selected image
@@ -247,15 +160,6 @@ class MoniQue:
         
         self.dlg_main.setWindowTitle(self.project_name)
         self.crs = self.cam_lyr.crs()
-        # self.activate_buttons()
-               
-        # self.mono_tool.set_layers(self.img_line_lyr, self.map_line_lyr)
-        # self.select_tool.set_layers(self.img_line_lyr, self.map_line_lyr)
-        # self.vertex_tool.set_layers(self.img_line_lyr, self.map_line_lyr)
-        # self.img_picker_tool.set_layers(self.img_gcps_lyr, self.map_gcps_lyr)
-        # self.map_picker_tool.set_layers(self.img_gcps_lyr, self.map_gcps_lyr)
-        
-        # # self.orient_tool.set_layers(self.img_gcps_lyr, self.map_gcps_lyr)
         
         self.layer_collection = {"reg_lyr":self.reg_lyr,
                                  "cam_lyr":self.cam_lyr,
@@ -263,13 +167,11 @@ class MoniQue:
                                  "img_gcps_lyr":self.img_gcps_lyr,
                                  "map_line_lyr":self.map_line_lyr,
                                  "map_gcps_lyr":self.map_gcps_lyr}
+        
         self.dlg_main.set_layers(self.layer_collection)
-        
-        self.load_mesh()
-        
         self.dlg_main.activate_gui_elements()
         
-        
+        self.load_mesh()        
         self.load_cameras_from_gpkg()
         
         QApplication.instance().restoreOverrideCursor()
@@ -290,32 +192,42 @@ class MoniQue:
             
         reg_feat = list(self.reg_lyr.getFeatures())[0]
         mesh_path = reg_feat["path"]
+        ortho_path = reg_feat["op_path"]
+        print(ortho_path)
+        
         if not os.path.exists(mesh_path):
-            #!raise Error message that mesh could no be found/loaded
-            pass
-        
-        reg_minx = reg_feat["minx"]
-        reg_miny = reg_feat["miny"]
-        reg_minz = reg_feat["minz"]
-        
-        mesh = o3d.io.read_triangle_mesh(mesh_path)
-        
-        verts = np.asarray(mesh.vertices)
-        verts -= [reg_minx, reg_miny, reg_minz]
-        tris = np.asarray(mesh.triangles)
-        
-        o3d_mesh = o3d.geometry.TriangleMesh(o3d.utility.Vector3dVector(verts),
-                                             o3d.utility.Vector3iVector(tris))
-        o3d_mesh.compute_vertex_normals()
-        
-        scene = o3d.t.geometry.RaycastingScene()
-        scene.add_triangles(o3d.t.geometry.TriangleMesh.from_legacy(o3d_mesh))
-        
-        self.ray_scene = scene
-        self.dlg_main.add_mesh_to_obj_canvas(o3d_mesh, [reg_minx, reg_miny, reg_minz])
-        
-        # self.mono_tool.set_scene(scene)
-        # self.vertex_tool.set_scene(scene)
+            self.iface.messageBar().pushError("Error", 
+                                              "Could not load mesh. Does the file exist?")
+        else:
+            
+            mesh_minx = reg_feat["minx"]
+            mesh_maxx = reg_feat["maxx"]
+            mesh_miny = reg_feat["miny"]
+            mesh_maxy = reg_feat["maxy"]
+            mesh_minz = reg_feat["minz"]
+            mesh_maxz = reg_feat["maxz"]
+            mesh_bounds = [[mesh_minx, mesh_miny, mesh_minz], 
+                           [mesh_maxx, mesh_maxy, mesh_maxz]]
+            
+            mesh = o3d.io.read_triangle_mesh(mesh_path)
+            
+            verts = np.asarray(mesh.vertices)
+            verts_local = verts - [mesh_minx, mesh_miny, mesh_minz]
+            tris = np.asarray(mesh.triangles)
+
+            u = (verts[:, 0] - mesh_minx)/(mesh_maxx - mesh_minx)
+            v = (verts[:, 1] - mesh_miny)/(mesh_maxy - mesh_miny)
+            uv_coords = np.hstack((u.reshape(-1, 1), v.reshape(-1, 1)))
+            
+            o3d_mesh = o3d.geometry.TriangleMesh(o3d.utility.Vector3dVector(verts_local),
+                                                 o3d.utility.Vector3iVector(tris))
+            o3d_mesh.compute_vertex_normals()
+            
+            scene = o3d.t.geometry.RaycastingScene()
+            scene.add_triangles(o3d.t.geometry.TriangleMesh.from_legacy(o3d_mesh))
+            
+            self.ray_scene = scene
+            self.dlg_main.add_mesh_to_obj_canvas(o3d_mesh, mesh_bounds, uvs=uv_coords, ortho_path=ortho_path)
         
     def reset_plugin(self):
         

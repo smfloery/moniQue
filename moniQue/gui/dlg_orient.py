@@ -25,6 +25,7 @@
 import os
 import open3d as o3d
 import numpy as np
+import pandas as pd
 
 from qgis.PyQt import QtWidgets, QtCore, QtGui
 from qgis.gui import QgsProjectionSelectionWidget
@@ -48,6 +49,7 @@ class OrientDialog(QtWidgets.QDialog):
     gcp_selected_signal = QtCore.pyqtSignal(object)
     gcp_deselected_signal = QtCore.pyqtSignal()
     gcp_delete_signal = QtCore.pyqtSignal(object)
+    gcp_imported_signal = QtCore.pyqtSignal(object)
     get_camera_signal = QtCore.pyqtSignal()
     camera_estimated_signal = QtCore.pyqtSignal(object)
     save_orientation_signal = QtCore.pyqtSignal()
@@ -88,17 +90,19 @@ class OrientDialog(QtWidgets.QDialog):
         self.btn_init_ori = QtWidgets.QAction("Set initial orientation from camera view.", self)
         self.btn_init_ori.setIcon(QtGui.QIcon(os.path.join(self.icon_dir, "mActionMeasureBearing.png")))
         self.btn_init_ori.triggered.connect(self.get_camera_signal.emit)
-        # self.btn_ori_tool.setCheckable(True)
-        # self.btn_ori_tool.setEnabled(False)
         params_toolbar.addAction(self.btn_init_ori)
 
         self.btn_delete_gcp = QtWidgets.QAction("Delete selected GCP.", self)
         self.btn_delete_gcp.setIcon(QtGui.QIcon(os.path.join(self.icon_dir, "mActionDeleteSelectedFeatures.png")))
         self.btn_delete_gcp.triggered.connect(self.delete_selected_gcp)
-        # self.btn_ori_tool.setCheckable(True)
         self.btn_delete_gcp.setEnabled(False)
         table_toolbar.addAction(self.btn_delete_gcp)
-
+        
+        self.btn_import_gcps = QtWidgets.QAction("Import GCPs from *.csv.", self)
+        self.btn_import_gcps.setIcon(QtGui.QIcon(os.path.join(self.icon_dir, "mActionCapturePoint.png")))
+        self.btn_import_gcps.triggered.connect(self.import_gcps_from_csv)
+        table_toolbar.addAction(self.btn_import_gcps)
+    
         self.table_gcps = QtWidgets.QTableWidget()
         
         self.table_gcps.setSizeAdjustPolicy(QtWidgets.QAbstractScrollArea.AdjustToContents)
@@ -187,7 +191,6 @@ class OrientDialog(QtWidgets.QDialog):
         self.kappa_line = kappa_line
         self.kappa_std_line = kappa_std_line
         
-
         focal_layout, focal_line, focal_std_line = create_cam_param_layout(param="f: ", unit=" [px]")      
         img_x0_layout, img_x0_line, img_x0_std_line = create_cam_param_layout(param="x<sub>0</sub>: ", unit=" [px]")
         img_y0_layout, img_y0_line, img_y0_std_line = create_cam_param_layout(param="y<sub>0</sub>: ", unit=" [px]")
@@ -285,6 +288,21 @@ class OrientDialog(QtWidgets.QDialog):
             else:
                 self.btn_calc_ori.setEnabled(False)
     
+    def import_gcps_from_csv(self):
+        csv_path = QtWidgets.QFileDialog.getOpenFileName(None, "Load *.csv", "", ("GCPs (*.csv)"))[0]
+        pd_csv = pd.read_csv(csv_path, sep=";", encoding="utf-8")
+        
+        cols = list(pd_csv.columns)
+        
+        if cols != ["gid", "img_x", "img_y", "obj_x", "obj_y", "obj_z"]:
+            print("Provided .csv does not match the required format!")            
+        else:
+            gcps = pd_csv.to_dict(orient='records')
+            
+            for gcp in gcps:
+                self.add_gcp_to_table(gcp)
+                self.gcp_imported_signal.emit(gcp)
+        
     def delete_selected_gcp(self):
         self.gcp_delete_signal.emit({"gid":self.sel_gid})
         
@@ -349,7 +367,16 @@ class OrientDialog(QtWidgets.QDialog):
             elif gcp_type == "img_space":
                 self.table_gcps.setItem(nr_rows, self.name2ix["x"], QtWidgets.QTableWidgetItem("%.1f" % (data["img_x"])))
                 self.table_gcps.setItem(nr_rows, self.name2ix["y"], QtWidgets.QTableWidgetItem("%.1f" % (data["img_y"])))
-        
+            else:
+                self.table_gcps.setItem(nr_rows, self.name2ix["x"], QtWidgets.QTableWidgetItem("%.1f" % (data["img_x"])))
+                self.table_gcps.setItem(nr_rows, self.name2ix["y"], QtWidgets.QTableWidgetItem("%.1f" % (data["img_y"])))
+                self.table_gcps.setItem(nr_rows, self.name2ix["X"], QtWidgets.QTableWidgetItem("%.1f" % (data["obj_x"])))
+                self.table_gcps.setItem(nr_rows, self.name2ix["Y"], QtWidgets.QTableWidgetItem("%.1f" % (data["obj_y"])))
+                self.table_gcps.setItem(nr_rows, self.name2ix["Z"], QtWidgets.QTableWidgetItem("%.1f" % (data["obj_z"])))
+                
+                self.table_gcps.item(nr_rows, 0).setCheckState(QtCore.Qt.Checked)
+                self.table_gcps.item(nr_rows, 0).setFlags(QtCore.Qt.ItemIsUserCheckable | QtCore.Qt.ItemIsEnabled)
+                
     def add_gcps_from_lyr(self, gcps):
         
         self.active_gcps = 0
@@ -414,7 +441,6 @@ class OrientDialog(QtWidgets.QDialog):
         self.obj_y0_line.setText("%.1f" % (data["obj_y0"]))
         self.obj_z0_line.setText("%.1f" % (data["obj_z0"]))
         
-
         #display euler angles in degrees; but in data array its still in radiant
         self.alpha_line.setText("%.3f" % (np.rad2deg(data["alpha"])))
         self.zeta_line.setText("%.3f" % (np.rad2deg(data["zeta"])))

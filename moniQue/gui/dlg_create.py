@@ -193,7 +193,7 @@ class CreateDialog(QtWidgets.QDialog):
         feat.setGeometry(QgsGeometry.fromPolygonXY([mesh_bbox]))
         feat.setAttributes([os.path.basename(mesh_path), 
                             mesh_path,
-                            "",
+                            ortho_path,
                             nr_verts,
                             nr_faces, 
                             float(minx), 
@@ -281,19 +281,7 @@ class CreateDialog(QtWidgets.QDialog):
                               QgsField("img_dy", QtCore.QVariant.Double, "double", 10, 1),
                               QgsField("active", QtCore.QVariant.String)])
         gcps_img_lyr.updateFields()
-        
-        # cam_hfov_lyr = QgsVectorLayer("Polygon?crs=%s" % (crs), "cameras_hfov", "memory")
-        # cam_hfov_pr = cam_hfov_lyr.dataProvider()
-        # cam_hfov_pr.addAttributes([QgsField("iid", QtCore.QVariant.String),
-        #                            QgsField("is_oriented", QtCore.QVariant.Int),
-        #                             QgsField("path", QtCore.QVariant.String),
-        #                             QgsField("ext", QtCore.QVariant.String),
-        #                             QgsField("w", QtCore.QVariant.Int),
-        #                             QgsField("h", QtCore.QVariant.Int),
-        #                             QgsField("hfov", QtCore.QVariant.Double, "double", 6, 3),
-        #                             QgsField("vfov", QtCore.QVariant.Double, "double", 6, 3)])
-        # cam_hfov_lyr.updateFields() 
-        
+                
         map_line_lyr = QgsVectorLayer("LineString?crs=%s" % (crs), "lines", "memory")
         map_line_pr = map_line_lyr.dataProvider()
         map_line_pr.addAttributes([QgsField("iid", QtCore.QVariant.String), 

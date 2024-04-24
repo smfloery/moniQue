@@ -31,11 +31,12 @@ import pygfx as gfx
 import open3d as o3d
 import numpy as np
 from PIL import Image
+from osgeo import gdal
 import json
 from collections import OrderedDict
 
-from qgis.core import QgsFeature, QgsPoint, QgsFeatureRequest, QgsRasterLayer, QgsProject, QgsJsonUtils, QgsGeometry
-from qgis.gui import QgsMapToolPan
+from qgis.core import QgsFeature, QgsPoint, QgsRasterLayer, QgsProject, QgsJsonUtils, QgsGeometry
+from qgis.gui import QgsMapToolPan, QgsMessageBar
 
 from .dlg_create import CreateDialog
 from .dlg_orient import OrientDialog
@@ -61,6 +62,7 @@ class MainDialog(QtWidgets.QDialog):
         super(MainDialog, self).__init__()
         
         self.parent = parent
+        self.msg_bar = self.parent.iface.messageBar()
         self.plugin_dir = plugin_dir
         self.icon_dir = os.path.join(self.plugin_dir, "gfx", "icon")
         
@@ -147,7 +149,6 @@ class MainDialog(QtWidgets.QDialog):
         btn_img_pan = QtWidgets.QAction("Pan (Image)", self)
         btn_img_pan.setIcon(QtGui.QIcon(os.path.join(self.icon_dir, "mActionPan.png")))
         btn_img_pan.setCheckable(True)
-        # btn_img_pan.triggered.connect(self.load_mesh)
         self.img_toolbar.addAction(btn_img_pan)
         
         btn_img_extent = QtWidgets.QAction("Zoom to image extent.", self)
@@ -163,7 +164,6 @@ class MainDialog(QtWidgets.QDialog):
         btn_obj_extent = QtWidgets.QAction("Zoom to image extent.", self)
         btn_obj_extent.setIcon(QtGui.QIcon(os.path.join(self.icon_dir, "mActionZoomFullExtent.png")))
         self.obj_toolbar.addAction(btn_obj_extent)
-        # btn_img_pan.triggered.connect(self.load_mesh)
         
         self.obj_renderer = gfx.WgpuRenderer(self.obj_canvas)
         self.obj_scene = gfx.Scene()
@@ -277,6 +277,7 @@ class MainDialog(QtWidgets.QDialog):
             self.dlg_orient.gcp_selected_signal.connect(self.select_gcp)
             self.dlg_orient.gcp_deselected_signal.connect(self.deselect_gcp)
             self.dlg_orient.gcp_delete_signal.connect(self.delete_gcp)
+            self.dlg_orient.gcp_imported_signal.connect(self.save_gcp_to_lyr)
             self.dlg_orient.get_camera_signal.connect(self.get_obj_canvas_camera)
             self.dlg_orient.camera_estimated_signal.connect(self.process_estimated_camera)
             self.dlg_orient.save_orientation_signal.connect(self.save_orientation_to_lyr)
@@ -335,15 +336,76 @@ class MainDialog(QtWidgets.QDialog):
         self.img_canvas.refresh()
         self.close_dialog_signal.emit()
     
-    def add_mesh_to_obj_canvas(self, o3d_mesh, min_xyz):
+    def add_mesh_to_obj_canvas(self, o3d_mesh, bounds, uvs=None, ortho_path=None):
+        
+        min_xyz = bounds[0]
+        max_xyz = bounds[1]
         
         verts = np.asarray(o3d_mesh.vertices)
         faces = np.asarray(o3d_mesh.triangles).astype(np.uint32)
         norms = np.asarray(o3d_mesh.vertex_normals).astype(np.float32)
                         
         # print("Loading mesh...")
-        mesh_geom = gfx.geometries.Geometry(indices=faces, positions=verts.astype(np.float32), normals=norms)
-        mesh_material = gfx.MeshNormalMaterial(side="FRONT")
+        mesh_geom = gfx.geometries.Geometry(indices=faces, 
+                                            positions=verts.astype(np.float32), 
+                                            normals=norms, 
+                                            texcoords=uvs.astype(np.float32))
+        
+        if ortho_path is None:
+            mesh_material = gfx.MeshNormalMaterial(side="FRONT")
+        else:
+            
+            if os.path.exists(ortho_path):
+                img_ds = gdal.Open(ortho_path)
+                
+                img_h = img_ds.RasterYSize
+                img_w = img_ds.RasterXSize
+                img_d = img_ds.RasterCount
+                img_dt = gdal.GetDataTypeName(img_ds.GetRasterBand(1).DataType)
+                
+                img_geo = img_ds.GetGeoTransform()
+
+                ul_x = img_geo[0] 
+                ul_y = img_geo[3]
+                lr_x = ul_x + (img_w * img_geo[1])
+                lr_y = ul_y + (img_h * img_geo[5])
+                
+                #correct for pixel center not corners
+                ul_x += img_geo[1]/2.
+                ul_y += img_geo[5]/2.
+                lr_x -= img_geo[1]/2.
+                lr_y -= img_geo[5]/2.
+                                                
+                d_ul = np.linalg.norm(np.array([ul_x, ul_y]) - np.array([min_xyz[0], max_xyz[1]]))
+                d_lr = np.linalg.norm(np.array([lr_x, lr_y]) - np.array([max_xyz[0], min_xyz[1]]))
+                
+                #if corners of orthophoto and mesh differ more than 1m --> Skip!
+                if max((d_ul, d_lr)) > 1:
+                    self.msg_bar.pushWarning("Warning",
+                                             "Extents of orthophoto and mesh differ. Using normals instead.")
+                    mesh_material = gfx.MeshNormalMaterial(side="FRONT")
+                    
+                else:
+                    if img_dt != "Byte":
+                        self.msg_bar.pushWarning("Warning", 
+                                                "Only 8-bit images are currently supported. Using normals instead.")
+                        
+                        mesh_material = gfx.MeshNormalMaterial(side="FRONT")
+                    else:
+                    
+                        img_arr = np.zeros((img_h, img_w, img_d), dtype=np.uint8)
+                        
+                        for bx in range(img_d):
+                            bx_arr = img_ds.GetRasterBand(bx+1).ReadAsArray()
+                            img_arr[:, :, bx] = bx_arr
+                                        
+                        img_arr = np.flipud(img_arr)
+                        tex = gfx.Texture(img_arr, dim=2)
+                        mesh_material = gfx.MeshBasicMaterial(map=tex)
+                
+            else:
+                mesh_material = gfx.MeshNormalMaterial(side="FRONT")
+                
         # mesh_material = gfx.MeshPhongMaterial(color="#BEBEBE", side="FRONT", shininess=10)
 
         # print("Adding mesh to canvas...")
@@ -531,8 +593,7 @@ class MainDialog(QtWidgets.QDialog):
         img_lyr = QgsRasterLayer(path, iid)
                 
         if not img_lyr.isValid():
-            pass
-            # self.msg_bar.pushMessage("Error", "Could not load %s!" % (img_path), level=Qgis.Critical, duration=3)
+            self.msg_bar.pushError("Error", "Could not load %s!" % (path))
         else:
             if self.img_lyr is not None:
                 QgsProject.instance().removeMapLayer(self.img_lyr.id())
@@ -624,7 +685,38 @@ class MainDialog(QtWidgets.QDialog):
                 self.map_gcps_lyr.changeAttributeValue(gcp_fid, gcp.fieldNameIndex("active"), "1")
             else:
                 self.map_gcps_lyr.changeAttributeValue(gcp_fid, gcp.fieldNameIndex("active"), "0")
+    
+    def save_gcp_to_lyr(self, data):
+        img_feat_geom = QgsPoint(data["img_x"], data["img_y"])
         
+        img_feat = QgsFeature(self.img_gcps_lyr.fields())
+        img_feat.setGeometry(img_feat_geom)
+        img_feat.setAttribute("iid", self.active_camera.iid)
+        img_feat.setAttribute("gid", data["gid"])
+        img_feat.setAttribute("img_x", data["img_x"])
+        img_feat.setAttribute("img_y", data["img_x"])
+        img_feat.setAttribute("desc", "")
+        img_feat.setAttribute("active", 1)
+        
+        map_feat = QgsFeature(self.map_gcps_lyr.fields())
+        map_feat.setGeometry(QgsPoint(data["obj_x"], data["obj_y"]))
+        map_feat["iid"] = self.active_camera.iid
+        map_feat["gid"] = data["gid"]
+        map_feat["obj_x"] = data["obj_x"]
+        map_feat["obj_y"] = data["obj_y"]
+        map_feat["obj_z"] = data["obj_z"]
+        map_feat["desc"] = ""
+        map_feat["active"] = 1
+        
+        _ = self.map_gcps_lyr.dataProvider().addFeatures([map_feat])
+        _ = self.img_gcps_lyr.dataProvider().addFeatures([img_feat])
+                
+        self.map_gcps_lyr.commitChanges()                      
+        self.img_gcps_lyr.commitChanges()
+        
+        self.map_gcps_lyr.triggerRepaint()
+        self.img_gcps_lyr.triggerRepaint() 
+    
     def save_orientation_to_lyr(self):
         self.cam_lyr.commitChanges()
         self.img_gcps_lyr.commitChanges()
@@ -858,9 +950,9 @@ class MainDialog(QtWidgets.QDialog):
                     self.obj_canvas.request_draw(self.animate)
                     
                     self.dlg_orient.add_gcp_to_table({"obj_x":click_pos_global[0], 
-                                                    "obj_y":click_pos_global[1],
-                                                    "obj_z":click_pos_global[2],
-                                                    "gid":curr_gid},
+                                                      "obj_y":click_pos_global[1],
+                                                      "obj_z":click_pos_global[2],
+                                                      "gid":curr_gid},
                                                     gcp_type="obj_space")
                     
                     feat = QgsFeature(self.map_gcps_lyr.fields())
@@ -875,7 +967,4 @@ class MainDialog(QtWidgets.QDialog):
                     feat.setAttribute("active", 0)
                     (res, afeat) = self.map_gcps_lyr.dataProvider().addFeatures([feat])
                     self.map_gcps_lyr.commitChanges()
-                    
                     self.map_gcps_lyr.triggerRepaint()
-                    # self.map_gcps_lyr.reload()
-                    # self.map_canvas.refresh()
