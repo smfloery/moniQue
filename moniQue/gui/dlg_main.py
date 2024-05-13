@@ -405,6 +405,7 @@ class MainDialog(QtWidgets.QDialog):
                 
             else:
                 mesh_material = gfx.MeshNormalMaterial(side="FRONT")
+                mesh_material.pick_write = True
                 
         # mesh_material = gfx.MeshPhongMaterial(color="#BEBEBE", side="FRONT", shininess=10)
 
