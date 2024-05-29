@@ -160,10 +160,21 @@ class MainDialog(QtWidgets.QDialog):
         self.obj_toolbar.setIconSize(QtCore.QSize(20, 20))
         self.obj_canvas = WgpuCanvas(parent=self)
         self.obj_canvas.setMinimumSize(QtCore.QSize(300, 16777215))
-        
-        btn_obj_extent = QtWidgets.QAction("Zoom to image extent.", self)
-        btn_obj_extent.setIcon(QtGui.QIcon(os.path.join(self.icon_dir, "mActionZoomFullExtent.png")))
-        self.obj_toolbar.addAction(btn_obj_extent)
+
+        btn_reset_obj_canvas_camera = QtWidgets.QAction("Reset to default camera position", self)
+        btn_reset_obj_canvas_camera.setIcon(QtGui.QIcon(os.path.join(self.icon_dir, "mActionZoomFullExtent.png")))
+        btn_reset_obj_canvas_camera.triggered.connect(self.reset_obj_canvas_camera)
+        self.obj_toolbar.addAction(btn_reset_obj_canvas_camera)
+
+        btn_load_obj_canvas_camera = QtWidgets.QAction("Zoom to saved camera position.", self)
+        btn_load_obj_canvas_camera.setIcon(QtGui.QIcon(os.path.join(self.icon_dir, "mActionZoomFullExtent.png")))
+        btn_load_obj_canvas_camera.triggered.connect(self.load_obj_canvas_camera)
+        self.obj_toolbar.addAction(btn_load_obj_canvas_camera)
+
+        btn_save_obj_canvas_camera = QtWidgets.QAction("Save camera position.", self)
+        btn_save_obj_canvas_camera.setIcon(QtGui.QIcon(os.path.join(self.icon_dir, "mActionZoomFullExtent.png")))
+        btn_save_obj_canvas_camera.triggered.connect(self.save_obj_canvas_camera)
+        self.obj_toolbar.addAction(btn_save_obj_canvas_camera)
         
         self.obj_renderer = gfx.WgpuRenderer(self.obj_canvas)
         self.obj_scene = gfx.Scene()
@@ -238,6 +249,9 @@ class MainDialog(QtWidgets.QDialog):
         self.setLayout(layout)
         
         self.sel_gid = None
+        self.obj_camera_state = None
+        self.obj_camera_origin = None
+        self.origin_memory = []
         
     def set_layers(self, lyr_dict):
         self.reg_lyr = lyr_dict["reg_lyr"]
@@ -412,6 +426,8 @@ class MainDialog(QtWidgets.QDialog):
         # print("Adding mesh to canvas...")
         self.mesh = gfx.Mesh(mesh_geom, mesh_material)
         self.obj_scene.add(self.mesh)
+
+        self.mesh.add_event_handler(self.zoom_to_point, "click")
         
         #group that will hold all the GCPs on object space
         self.obj_gcps_grp = gfx.Group()
@@ -420,6 +436,7 @@ class MainDialog(QtWidgets.QDialog):
         # print("Adding lights...")
         self.obj_scene.add(gfx.AmbientLight(intensity=1), gfx.DirectionalLight())
         self.obj_camera.show_object(self.obj_scene)
+        self.default_obj_camera_state = self.obj_camera.get_state()
         
         self.min_xyz = min_xyz
         
@@ -614,6 +631,7 @@ class MainDialog(QtWidgets.QDialog):
         # cam_state = self.obj_camera.get_state()
         
         cam_pos = self.obj_camera.local.position + self.min_xyz
+        #print('Kamera Position:',cam_pos)
 
         #the camera appears to be exactly what alzeka needs; hence, we can directly derive alzeka from the rotation matrix
         cam_rmat_pygfx = self.obj_camera.local.rotation_matrix[:3, :3]  #already transposed in contrast to self.obj_camera.view_matrix; otherweise the same
@@ -751,6 +769,21 @@ class MainDialog(QtWidgets.QDialog):
         
         self.obj_canvas.request_draw(self.animate)
 
+    def reset_obj_canvas_camera(self):
+        self.obj_camera.set_state(self.default_obj_camera_state)
+        self.obj_canvas.request_draw(self.animate)
+
+    def save_obj_canvas_camera(self):
+        self.obj_camera_state = None
+        self.obj_camera_state = self.obj_camera.get_state()
+    
+    def load_obj_canvas_camera(self):
+        if self.obj_camera_state is None:
+            pass
+        else:
+            self.obj_camera.set_state(self.obj_camera_state)
+            self.obj_canvas.request_draw(self.animate)
+
     def toggle_camera(self):
         
         #before for the first time an image is loaded
@@ -806,7 +839,7 @@ class MainDialog(QtWidgets.QDialog):
             self.btn_ori_tool.setEnabled(False)
             self.btn_mono_select.setEnabled(False)
             self.btn_mono_vertex.setEnabled(False)
-            #during monoplotting user cant adjust image orientation
+            #during monoplotting user cant adjust image orientation            
             self.img_canvas.setMapTool(self.mono_tool)
             self.mono_tool.reset()
         else:                                               #deactivate
@@ -969,3 +1002,48 @@ class MainDialog(QtWidgets.QDialog):
                     (res, afeat) = self.map_gcps_lyr.dataProvider().addFeatures([feat])
                     self.map_gcps_lyr.commitChanges()
                     self.map_gcps_lyr.triggerRepaint()
+    
+    def zoom_to_point(self, event):
+        if event.button == 2 and "Control" in event.modifiers:
+ 
+            face_ix = event.pick_info["face_index"]
+
+            face_coords = np.array(event.pick_info["face_coord"]).reshape(3, 1) 
+            face_coords /= np.sum(face_coords)
+            
+            face_vertex_ix = event.pick_info["world_object"].geometry.indices.data[face_ix, :]
+            face_vertex_pos = event.pick_info["world_object"].geometry.positions.data[face_vertex_ix, :]
+            
+            click_pos = np.sum(face_vertex_pos*face_coords, axis=0) 
+
+            self.obj_camera_origin = self.obj_camera.get_state()
+            
+            self.obj_camera_origin = self.obj_camera.get_state()
+            self.origin_memory.append(self.obj_camera_origin)
+
+            vektor = [click_pos[0] - self.obj_camera_origin['position'][0], click_pos[1] - self.obj_camera_origin['position'][1], click_pos[2] - self.obj_camera_origin['position'][2]]
+            position = [self.obj_camera_origin['position'][0] + vektor[0]/1.05, self.obj_camera_origin['position'][1] + vektor[1]/1.05, self.obj_camera_origin['position'][2] + vektor[2]/1.05]
+
+            self.obj_camera_target = {'position':np.array([position[0], position[1], position[2]]),
+                                        'rotation':self.obj_camera_origin['rotation'], 
+                                        'scale':self.obj_camera_origin['scale'],
+                                        'reference_up':self.obj_camera_origin['reference_up'], 
+                                        'fov':self.obj_camera_origin['fov'], 
+                                        'width':self.obj_camera_origin['width'], 
+                                        'height':self.obj_camera_origin['height'], 
+                                        'zoom':self.obj_camera_origin['zoom'], 
+                                        'maintain_aspect':self.obj_camera_origin['maintain_aspect'],
+                                        'depth_range':self.obj_camera_origin['depth_range']}
+            self.obj_camera.set_state(self.obj_camera_target)
+            self.obj_canvas.request_draw(self.animate)
+            
+        if event.button == 2 and "Shift" in event.modifiers:
+            if len(self.origin_memory) > 0:
+                self.obj_camera.set_state(self.origin_memory[-1])
+                self.origin_memory.pop(-1)
+                self.obj_canvas.request_draw(self.animate)
+            else:
+                pass
+
+
+            

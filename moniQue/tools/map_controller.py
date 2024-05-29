@@ -45,6 +45,8 @@ class OrbitController(PanZoomController):
         "mouse4": ("quickzoom", "peek", 2),
         "wheel": ("zoom", "push", -0.001),
         "alt+wheel": ("fov", "push", -0.01),
+        "alt+mouse1": ("rotate", "drag", (0.005, 0)),
+        "shift+mouse1": ("rotate", "drag", (0, 0.005)),
     }
 
     def rotate(self, delta: Tuple, rect: Tuple, *, animate=False):
