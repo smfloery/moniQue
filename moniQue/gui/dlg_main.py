@@ -32,7 +32,7 @@ from wgpu.gui.offscreen import WgpuCanvas as offscreenCanvas
 import pygfx as gfx
 import open3d as o3d
 import numpy as np
-import imageio.v3 as iio
+# import imageio.v3 as iio
 from PIL import Image
 from osgeo import gdal
 import json
@@ -800,7 +800,9 @@ class MainDialog(QtWidgets.QDialog):
 
     def export_obj_canvas(self):
 
-        text, okPressed = QtWidgets.QInputDialog.getText(None, "Export", "Resolution (e.g.: 1920,1080):", QtWidgets.QLineEdit.Normal, "")   
+        def_res = "%i,%i" % (self.active_camera.img_w, self.active_camera.img_h)
+        
+        text, okPressed = QtWidgets.QInputDialog.getText(None, "Export", "Resolution (e.g.: 1920,1080):", QtWidgets.QLineEdit.Normal, def_res)   
         if okPressed and text != '':
             res = text    
 
@@ -824,13 +826,13 @@ class MainDialog(QtWidgets.QDialog):
         for pnts in self.obj_gcps_grp.children:
             pnts.visible = False
 
-        bg = gfx.Background(None, gfx.BackgroundMaterial([0.53, 0.81, 0.92, 1]))
+        bg = gfx.Background(None, gfx.BackgroundMaterial([0.086, 0.475, 0.671, 1]))
         self.obj_scene.remove(self.background)
         self.obj_scene.add(bg)
 
         offscreen_canvas.request_draw(offscreen_renderer.render(self.obj_scene, self.obj_camera))
-        im = np.asarray(offscreen_canvas.draw())
-        iio.imwrite("H:/QGIS/DATA/Offscreen_Renderer/offscreen.png", im)
+        img = Image.fromarray(np.asarray(offscreen_canvas.draw()))
+        img.save(os.path.join(os.path.dirname(self.parent.gpkg_path), self.parent.project_name + "_render.png"))
 
         self.obj_scene.remove(bg)
         self.obj_scene.add(self.background)
