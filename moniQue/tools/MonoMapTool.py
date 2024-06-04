@@ -158,17 +158,17 @@ class MonoMapTool(QgsMapTool):
                 
     def canvasMoveEvent(self, e):
         pos = self.toMapCoordinates(e.pos())
-    
+        print(pos)
         mx, my = float(pos.x()), float(pos.y())
         
         if (mx >= 0) and (mx <= self.camera.img_w):
             if (my <= 0) and (my >= self.camera.img_h*(-1)):
-        
+                
                 ray = self.camera.ray(img_x=mx, img_y=my)
                 ray[0, :3] -= self.min_xyz
                 o3d_ray = o3d.core.Tensor(ray, dtype=o3d.core.Dtype.Float32)
                 ans = self.ray_scene.cast_rays(o3d_ray)
-    
+
                 if self.is_drawing:
                     if self.rubberImg_prev.numberOfVertices() == 2:
                         self.rubberImg_prev.removeLastPoint()
