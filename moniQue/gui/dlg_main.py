@@ -306,7 +306,7 @@ class MainDialog(QtWidgets.QDialog):
             self.dlg_orient.gcp_deselected_signal.connect(self.deselect_gcp)
             self.dlg_orient.gcp_delete_signal.connect(self.delete_gcp)
             self.dlg_orient.gcp_imported_signal.connect(self.save_gcp_to_lyr)
-            self.dlg_orient.get_camera_signal.connect(self.get_obj_canvas_camera)
+            self.dlg_orient.get_camera_signal.connect(self.get_wpgu_camera)
             self.dlg_orient.camera_estimated_signal.connect(self.process_estimated_camera)
             self.dlg_orient.save_orientation_signal.connect(self.save_orientation_to_lyr)
             
@@ -641,7 +641,7 @@ class MainDialog(QtWidgets.QDialog):
         self.img_canvas.setExtent(self.img_lyr.extent())
         self.img_canvas.refresh()
     
-    def get_obj_WgpuCanvas_camera(self):
+    def get_wpgu_camera(self):
         # cam_state = self.obj_camera.get_state()
         
         cam_pos = self.obj_camera.local.position + self.min_xyz
