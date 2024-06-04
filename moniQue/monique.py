@@ -193,7 +193,6 @@ class MoniQue:
         reg_feat = list(self.reg_lyr.getFeatures())[0]
         mesh_path = reg_feat["path"]
         ortho_path = reg_feat["op_path"]
-        print(ortho_path)
         
         if not os.path.exists(mesh_path):
             self.iface.messageBar().pushError("Error", 

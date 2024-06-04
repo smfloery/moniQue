@@ -25,15 +25,20 @@
 import os
 
 from qgis.PyQt import QtWidgets, QtCore, QtGui
+from qgis.PyQt.QtWidgets import QMessageBox
 from qgis.gui import QgsMapCanvas
 from wgpu.gui.qt import WgpuCanvas
+from wgpu.gui.offscreen import WgpuCanvas as offscreenCanvas
 import pygfx as gfx
 import open3d as o3d
 import numpy as np
+import imageio.v3 as iio
 from PIL import Image
 from osgeo import gdal
 import json
+import sys
 from collections import OrderedDict
+
 
 from qgis.core import QgsFeature, QgsPoint, QgsRasterLayer, QgsProject, QgsJsonUtils, QgsGeometry
 from qgis.gui import QgsMapToolPan, QgsMessageBar
@@ -80,6 +85,10 @@ class MainDialog(QtWidgets.QDialog):
         self.img_menu = QtWidgets.QMenu("&Images", self)
         self.img_menu.setEnabled(False)
         self.menu.addMenu(self.img_menu)
+
+        self.export_menu = QtWidgets.QMenu("&Export", self)
+        self.export_menu.setEnabled(False)
+        self.menu.addMenu(self.export_menu)
         
         self.create_action = QtWidgets.QAction("&New project", self)
         self.create_action.triggered.connect(self.show_dlg_create)
@@ -96,6 +105,10 @@ class MainDialog(QtWidgets.QDialog):
         self.import_action = QtWidgets.QAction("&Import images", self)
         self.import_action.triggered.connect(self.import_images)
         self.img_menu.addAction(self.import_action)
+
+        self.export_action = QtWidgets.QAction("&Export Object View to PNG", self)
+        self.export_action.triggered.connect(self.export_obj_canvas)
+        self.export_menu.addAction(self.export_action)
         
         #TODO: for future import of camera/project from JSON
         # self.import_json_action = QtWidgets.QAction("&Import from *.json", self)
@@ -180,8 +193,8 @@ class MainDialog(QtWidgets.QDialog):
         self.obj_scene = gfx.Scene()
         
         # light_gray = np.array((100, 100, 100, 255)) / 255
-        background = gfx.Background(None, gfx.BackgroundMaterial([1, 1, 1, 1]))
-        self.obj_scene.add(background)
+        self.background = gfx.Background(None, gfx.BackgroundMaterial([1, 1, 1, 1]))
+        self.obj_scene.add(self.background)
         
         self.obj_camera = gfx.PerspectiveCamera(fov=45, depth_range=(1, 100000))
         
@@ -252,6 +265,7 @@ class MainDialog(QtWidgets.QDialog):
         self.obj_camera_state = None
         self.obj_camera_origin = None
         self.origin_memory = []
+        
         
     def set_layers(self, lyr_dict):
         self.reg_lyr = lyr_dict["reg_lyr"]
@@ -394,7 +408,7 @@ class MainDialog(QtWidgets.QDialog):
                 d_lr = np.linalg.norm(np.array([lr_x, lr_y]) - np.array([max_xyz[0], min_xyz[1]]))
                 
                 #if corners of orthophoto and mesh differ more than 1m --> Skip!
-                if max((d_ul, d_lr)) > 1:
+                if max((d_ul, d_lr)) > 10:
                     self.msg_bar.pushWarning("Warning",
                                              "Extents of orthophoto and mesh differ. Using normals instead.")
                     mesh_material = gfx.MeshNormalMaterial(side="FRONT")
@@ -627,11 +641,11 @@ class MainDialog(QtWidgets.QDialog):
         self.img_canvas.setExtent(self.img_lyr.extent())
         self.img_canvas.refresh()
     
-    def get_obj_canvas_camera(self):
+    def get_obj_WgpuCanvas_camera(self):
         # cam_state = self.obj_camera.get_state()
         
         cam_pos = self.obj_camera.local.position + self.min_xyz
-        #print('Kamera Position:',cam_pos)
+        print('Kamera Position:',cam_pos)
 
         #the camera appears to be exactly what alzeka needs; hence, we can directly derive alzeka from the rotation matrix
         cam_rmat_pygfx = self.obj_camera.local.rotation_matrix[:3, :3]  #already transposed in contrast to self.obj_camera.view_matrix; otherweise the same
@@ -784,6 +798,48 @@ class MainDialog(QtWidgets.QDialog):
             self.obj_camera.set_state(self.obj_camera_state)
             self.obj_canvas.request_draw(self.animate)
 
+    def export_obj_canvas(self):
+
+        text, okPressed = QtWidgets.QInputDialog.getText(None, "Export", "Resolution (e.g.: 1920,1080):", QtWidgets.QLineEdit.Normal, "")   
+        if okPressed and text != '':
+            res = text    
+
+        try:
+            resolution = [float(res.split(',')[0]), float(res.split(',')[1])]
+            print(resolution)
+            if len(resolution) != 2:
+                raise ValueError('Resolution must have two values!')
+            if resolution[0] <= 0 or resolution[1] <= 0:
+                raise ValueError('Resolution must be a positive value!')
+        except:
+            print('No valid resolution has been given: Using default value!')
+            resolution = [1920, 1080]
+
+        offscreen_canvas = offscreenCanvas(size=(resolution[0], resolution[1]), pixel_ratio=1)
+        offscreen_renderer = gfx.WgpuRenderer(offscreen_canvas)
+          
+        curr_depth = self.obj_camera.depth_range
+        self.obj_camera.depth_range = (100, curr_depth[1])
+
+        for pnts in self.obj_gcps_grp.children:
+            pnts.visible = False
+
+        bg = gfx.Background(None, gfx.BackgroundMaterial([0.53, 0.81, 0.92, 1]))
+        self.obj_scene.remove(self.background)
+        self.obj_scene.add(bg)
+
+        offscreen_canvas.request_draw(offscreen_renderer.render(self.obj_scene, self.obj_camera))
+        im = np.asarray(offscreen_canvas.draw())
+        iio.imwrite("H:/QGIS/DATA/Offscreen_Renderer/offscreen.png", im)
+
+        self.obj_scene.remove(bg)
+        self.obj_scene.add(self.background)
+
+        for pnts in self.obj_gcps_grp.children:
+            pnts.visible = True
+        
+
+
     def toggle_camera(self):
         
         #before for the first time an image is loaded
@@ -891,6 +947,7 @@ class MainDialog(QtWidgets.QDialog):
     def activate_gui_elements(self):
         self.img_list.setEnabled(True)
         self.img_menu.setEnabled(True)
+        self.export_menu.setEnabled(True)
         self.project_name = self.windowTitle()
                 
     def activate_gcp_picking(self):
@@ -1005,7 +1062,10 @@ class MainDialog(QtWidgets.QDialog):
     
     def zoom_to_point(self, event):
         if event.button == 2 and "Control" in event.modifiers:
- 
+            print(event.pick_info["world_object"])
+            
+
+            
             face_ix = event.pick_info["face_index"]
 
             face_coords = np.array(event.pick_info["face_coord"]).reshape(3, 1) 
@@ -1035,6 +1095,9 @@ class MainDialog(QtWidgets.QDialog):
                                         'maintain_aspect':self.obj_camera_origin['maintain_aspect'],
                                         'depth_range':self.obj_camera_origin['depth_range']}
             self.obj_camera.set_state(self.obj_camera_target)
+
+            self.obj_camera.show_pos((click_pos[0], click_pos[1], click_pos[2]), up=(0,0,1))
+            
             self.obj_canvas.request_draw(self.animate)
             
         if event.button == 2 and "Shift" in event.modifiers:
@@ -1046,4 +1109,7 @@ class MainDialog(QtWidgets.QDialog):
                 pass
 
 
-            
+
+
+      
+
