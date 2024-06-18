@@ -46,6 +46,7 @@ from qgis.gui import QgsMapToolPan, QgsMessageBar
 from .dlg_create import CreateDialog
 from .dlg_orient import OrientDialog
 from .dlg_meta_gcp import GcpMetaDialog
+from .dlg_meta_export import ExportMetaDialog
 from .dlg_meta_mono import MonoMetaDialog
 from ..tools.ImgPickerTool import ImgPickerTool
 from ..tools.MonoMapTool import MonoMapTool
@@ -381,8 +382,9 @@ class MainDialog(QtWidgets.QDialog):
         
         if ortho_path is None:
             mesh_material = gfx.MeshNormalMaterial(side="FRONT")
+            mesh_material.pick_write = True
+
         else:
-            
             if os.path.exists(ortho_path):
                 img_ds = gdal.Open(ortho_path)
                 
@@ -420,7 +422,6 @@ class MainDialog(QtWidgets.QDialog):
                         
                         mesh_material = gfx.MeshNormalMaterial(side="FRONT")
                     else:
-                    
                         img_arr = np.zeros((img_h, img_w, img_d), dtype=np.uint8)
                         
                         for bx in range(img_d):
@@ -433,8 +434,9 @@ class MainDialog(QtWidgets.QDialog):
                 
             else:
                 mesh_material = gfx.MeshNormalMaterial(side="FRONT")
-                mesh_material.pick_write = True
-                
+
+            mesh_material.pick_write = True   
+            
         # mesh_material = gfx.MeshPhongMaterial(color="#BEBEBE", side="FRONT", shininess=10)
 
         # print("Adding mesh to canvas...")
@@ -799,47 +801,60 @@ class MainDialog(QtWidgets.QDialog):
             self.obj_canvas.request_draw(self.animate)
 
     def export_obj_canvas(self):
-
-        def_res = "%i,%i" % (self.active_camera.img_w, self.active_camera.img_h)
-        
-        text, okPressed = QtWidgets.QInputDialog.getText(None, "Export", "Resolution (e.g.: 1920,1080):", QtWidgets.QLineEdit.Normal, def_res)   
-        if okPressed and text != '':
-            res = text    
-
         try:
-            resolution = [float(res.split(',')[0]), float(res.split(',')[1])]
-            print(resolution)
-            if len(resolution) != 2:
-                raise ValueError('Resolution must have two values!')
-            if resolution[0] <= 0 or resolution[1] <= 0:
-                raise ValueError('Resolution must be a positive value!')
+            def_res = [str(self.active_camera.img_w), str(self.active_camera.img_h)]
         except:
-            print('No valid resolution has been given: Using default value!')
-            resolution = [1920, 1080]
+            def_res = ['1920','1080']
 
-        offscreen_canvas = offscreenCanvas(size=(resolution[0], resolution[1]), pixel_ratio=1)
-        offscreen_renderer = gfx.WgpuRenderer(offscreen_canvas)
-          
-        curr_depth = self.obj_camera.depth_range
-        self.obj_camera.depth_range = (100, curr_depth[1])
+        def_name = self.parent.project_name
 
-        for pnts in self.obj_gcps_grp.children:
-            pnts.visible = False
+        export_dialog = ExportMetaDialog(def_res, def_name)
+        export_dialog.exec_()
+        depth_set = False
 
-        bg = gfx.Background(None, gfx.BackgroundMaterial([0.086, 0.475, 0.671, 1]))
-        self.obj_scene.remove(self.background)
-        self.obj_scene.add(bg)
+        if export_dialog.ok == True:
+            export_path = QtWidgets.QFileDialog.getExistingDirectory(self)
+        else:
+            export_path=''
 
-        offscreen_canvas.request_draw(offscreen_renderer.render(self.obj_scene, self.obj_camera))
-        img = Image.fromarray(np.asarray(offscreen_canvas.draw()))
-        img.save(os.path.join(os.path.dirname(self.parent.gpkg_path), self.parent.project_name + "_render.png"))
+        if len(export_path) > 0:
+            resolution = [int(export_dialog.res_width.text()), int(export_dialog.res_height.text())]
+            
+            offscreen_canvas = offscreenCanvas(size=(resolution[0], resolution[1]), pixel_ratio=1)
+            offscreen_renderer = gfx.WgpuRenderer(offscreen_canvas)
 
-        self.obj_scene.remove(bg)
-        self.obj_scene.add(self.background)
+            if export_dialog.depth_offset.text() == '':
+                pass
+            else:
+                if int(export_dialog.depth_offset.text()) > 0:
+                    depth_set = True  
+                    curr_depth = self.obj_camera.depth_range
+                    self.obj_camera.depth_range = (int(export_dialog.depth_offset.text()), curr_depth[1])
+                else:
+                    pass
 
-        for pnts in self.obj_gcps_grp.children:
-            pnts.visible = True
+            for pnts in self.obj_gcps_grp.children:
+                pnts.visible = False
+
+            bg = gfx.Background(None, gfx.BackgroundMaterial([0.086, 0.475, 0.671, 1]))
+            self.obj_scene.remove(self.background)
+            self.obj_scene.add(bg)
+
+            offscreen_canvas.request_draw(offscreen_renderer.render(self.obj_scene, self.obj_camera))
+            img = Image.fromarray(np.asarray(offscreen_canvas.draw()))
+            img.save(os.path.join(export_path, export_dialog.file_name.text() + "_render.png"))
+
+            self.obj_scene.remove(bg)
+            self.obj_scene.add(self.background)
+
+            for pnts in self.obj_gcps_grp.children:
+                pnts.visible = True
+
+            if depth_set:
+                self.obj_camera.depth_range = (curr_depth[0], curr_depth[1])
         
+        else:
+            pass
 
 
     def toggle_camera(self):
@@ -1064,10 +1079,6 @@ class MainDialog(QtWidgets.QDialog):
     
     def zoom_to_point(self, event):
         if event.button == 2 and "Control" in event.modifiers:
-            print(event.pick_info["world_object"])
-            
-
-            
             face_ix = event.pick_info["face_index"]
 
             face_coords = np.array(event.pick_info["face_coord"]).reshape(3, 1) 
