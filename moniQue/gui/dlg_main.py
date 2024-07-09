@@ -52,6 +52,7 @@ from ..tools.ImgPickerTool import ImgPickerTool
 from ..tools.MonoMapTool import MonoMapTool
 from ..tools.SelectTool import SelectTool
 from ..tools.VertexTool import VertexTool
+from ..tools.jsonImport import jsonImport
 
 from ..camera import Camera
 from ..helpers import create_point_3d, rot2alzeka, alzeka2rot, calc_hfov, calc_vfov
@@ -106,6 +107,10 @@ class MainDialog(QtWidgets.QDialog):
         self.import_action = QtWidgets.QAction("&Import images", self)
         self.import_action.triggered.connect(self.import_images)
         self.img_menu.addAction(self.import_action)
+
+        self.import_json_action = QtWidgets.QAction("&Import from *.json", self)
+        self.import_json_action.triggered.connect(self.import_json)
+        self.img_menu.addAction(self.import_json_action)
 
         self.export_action = QtWidgets.QAction("&Export Object View to PNG", self)
         self.export_action.triggered.connect(self.export_obj_canvas)
@@ -266,6 +271,8 @@ class MainDialog(QtWidgets.QDialog):
         self.obj_camera_state = None
         self.obj_camera_origin = None
         self.origin_memory = []
+
+        self.json_check = False
         
         
     def set_layers(self, lyr_dict):
@@ -300,7 +307,7 @@ class MainDialog(QtWidgets.QDialog):
         self.dlg_create.show()
     
     def show_dlg_orient(self):
-        if self.btn_ori_tool.isChecked():
+        if self.btn_ori_tool.isChecked() or self.json_check == True:
             self.dlg_orient = OrientDialog(parent=self, icon_dir=self.icon_dir, active_iid=self.active_camera.iid)
 
             self.dlg_orient.gcp_selected_signal.connect(self.select_gcp)
@@ -503,6 +510,41 @@ class MainDialog(QtWidgets.QDialog):
                 
                 self.add_camera_to_list(cam)
                 self.add_camera_to_cam_lyr(cam)
+
+
+    def import_json(self):
+        """Import position and orientation from selected JSON.
+        """
+
+        json_path = QtWidgets.QFileDialog.getOpenFileName(None, "Import position/orientation from json", "", ("JSON (*.json)"))[0]
+
+        try: 
+            self.appr_cam_pos = jsonImport(json_path)
+        except:
+            print("Provided JSON does not appear to be valid.")
+            return
+        
+        try:           
+            cam_pos = self.appr_cam_pos.get_pos()[self.active_camera.iid]
+            cam_ori = self.appr_cam_pos.get_ori()[self.active_camera.iid]
+
+            data = {"obj_x0":cam_pos['X0'], "obj_y0":cam_pos['Y0'], "obj_z0":cam_pos['Z0'], 
+                    "alpha":cam_ori['alpha'], "zeta":cam_ori['beta'], "kappa":cam_ori['gamma'],
+                    "img_x0":self.active_camera.img_w/2., "img_y0":self.active_camera.img_h/2.*(-1), "f":np.sqrt(self.active_camera.img_w**2 + self.active_camera.img_h**2)}
+            
+            self.json_check = True
+
+            self.show_dlg_orient()
+            self.dlg_orient.set_init_params(data)
+            self.process_estimated_camera(data)
+
+            self.json_check = False
+
+        except:
+            print("Something went wrong while setting the initial camera parameters! \nPlease check if an image has been selected and try again.")
+            self.json_check = False
+            return   
+        
     
     def get_gcps_from_gpkg(self):
         gcps = OrderedDict()
@@ -667,8 +709,10 @@ class MainDialog(QtWidgets.QDialog):
         data["vfov"] = est_vfov
         
         self.set_obj_canvas_camera(data)
-        self.update_camera(data)
-        self.update_gcps(data)
+
+        if self.json_check == False:
+            self.update_camera(data)
+            self.update_gcps(data)
         
     def update_camera(self, data):
         curr_cam = list(self.cam_lyr.getFeatures(expression = "iid = '%s'" % (self.active_camera.iid)))[0]
