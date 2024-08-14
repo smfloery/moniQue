@@ -110,11 +110,15 @@ class MainDialog(QtWidgets.QDialog):
         self.import_action.triggered.connect(self.import_images)
         self.img_menu.addAction(self.import_action)
 
+<<<<<<< HEAD
         self.import_akon_action = QtWidgets.QAction("&Import images from AKON", self)
         self.import_akon_action.triggered.connect(self.import_akon)
         self.img_menu.addAction(self.import_akon_action)
 
         self.import_json_action = QtWidgets.QAction("&Get initial orientation from *.json", self)
+=======
+        self.import_json_action = QtWidgets.QAction("&Import from *.json", self)
+>>>>>>> 49f293ec503c6c573cdec001a7db617f1f463824
         self.import_json_action.triggered.connect(self.import_json)
         self.img_menu.addAction(self.import_json_action)
 
@@ -288,6 +292,7 @@ class MainDialog(QtWidgets.QDialog):
         self.origin_memory = []
 
         self.json_check = False
+<<<<<<< HEAD
         self.map_check = False
         self.akon_check = False
 
@@ -299,6 +304,8 @@ class MainDialog(QtWidgets.QDialog):
 
         with open(settings_path, 'r') as file:
             settings = [s for s in file]
+=======
+>>>>>>> 49f293ec503c6c573cdec001a7db617f1f463824
         
         self.settings = {}
         for i in settings:
@@ -540,6 +547,10 @@ class MainDialog(QtWidgets.QDialog):
                 self.add_camera_to_list(cam)
                 self.add_camera_to_cam_lyr(cam)
 
+<<<<<<< HEAD
+=======
+
+>>>>>>> 49f293ec503c6c573cdec001a7db617f1f463824
     def import_json(self):
         """Import position and orientation from selected JSON.
         """
@@ -552,7 +563,11 @@ class MainDialog(QtWidgets.QDialog):
             print("Provided JSON does not appear to be valid.")
             return
         
+<<<<<<< HEAD
         try:    
+=======
+        try:           
+>>>>>>> 49f293ec503c6c573cdec001a7db617f1f463824
             cam_pos = self.appr_cam_pos.get_pos()[self.active_camera.iid]
             cam_ori = self.appr_cam_pos.get_ori()[self.active_camera.iid]
 
@@ -573,6 +588,7 @@ class MainDialog(QtWidgets.QDialog):
             self.json_check = False
             return   
         
+<<<<<<< HEAD
     def import_akon(self):
         imp_akon_dlg = ImportAkonDialog()
         imp_akon_dlg.exec_()
@@ -635,6 +651,9 @@ class MainDialog(QtWidgets.QDialog):
             #cancelMessage.pushMessage('Process has been canceled!')
         
         
+=======
+    
+>>>>>>> 49f293ec503c6c573cdec001a7db617f1f463824
     def get_gcps_from_gpkg(self):
         gcps = OrderedDict()
         gcp_data = {"obj_x":None, "obj_y":None, "obj_z":None, "img_x":None, "img_y":None, "img_dx":None, "img_dy":None, "active":None}
