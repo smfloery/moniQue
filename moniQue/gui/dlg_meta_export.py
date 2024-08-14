@@ -10,7 +10,7 @@ class ExportMetaDialog(QDialog):
         self.setWindowTitle("Export Object View as PNG")
   
         # setting geometry to the window
-        self.setGeometry(100, 100, 300, 250)
+        self.setGeometry(1000, 500, 300, 250)
   
         # creating a group box
         self.formGroupBox = QGroupBox()
@@ -18,8 +18,8 @@ class ExportMetaDialog(QDialog):
         self.file_name = QLineEdit()
         self.file_name.setReadOnly(False)
         self.file_name.setEnabled(True)
-        #self.file_name.setText(def_name)
-        self.file_name.setPlaceholderText('myFile')
+        self.file_name.setText(def_name)
+        self.file_name.setPlaceholderText('myRendering')
         
         self.res_width = QLineEdit()
         self.res_width.setReadOnly(False)

@@ -18,7 +18,7 @@ def _get_axis_aligned_up_vector(up):
     return ref_up
 
 
-class OrbitController(PanZoomController):
+class OrbitFlightController(PanZoomController):
     """A controller to move a camera in an orbit around a center position.
 
     Supports panning parallel to the screen, zooming, orbiting.
@@ -45,9 +45,44 @@ class OrbitController(PanZoomController):
         "mouse4": ("quickzoom", "peek", 2),
         "wheel": ("zoom", "push", -0.001),
         "alt+wheel": ("fov", "push", -0.01),
-        "alt+mouse1": ("rotate", "drag", (0.005, 0)),
-        "shift+mouse1": ("rotate", "drag", (0, 0.005)),
+        "control+wheel": ("speed", "push", -0.001),
+        "control+mouse1": ("rotate", "drag", (0.005, 0)),
+        "alt+mouse1": ("rotate", "drag", (0, 0.005)),
+        "q": ("roll", "repeat", -2),
+        "e": ("roll", "repeat", +2),
+        "w": ("move", "repeat", (0, 0, -1)),
+        "s": ("move", "repeat", (0, 0, +1)),
+        "a": ("move", "repeat", (-1, 0, 0)),
+        "d": ("move", "repeat", (+1, 0, 0)),
+        "arrowup": ("pitch", "repeat", -2),
+        "arrowdown": ("pitch", "repeat", +2),
+        "arrowleft": ("yaw", "repeat", -2),
+        "arrowright": ("yaw", "repeat", +2),
+        " ": ("move", "repeat", (0, +1, 0)),
+        "shift": ("move", "repeat", (0, -1, 0)),
     }
+
+    def __init__(self, camera, *, speed=None, **kwargs):
+        super().__init__(camera, **kwargs)
+
+        if speed is None:
+            cam_state = camera.get_state()
+            approx_scene_size = 0.5 * (cam_state["width"] + cam_state["height"])
+            scene_fly_thru_time = 5  # seconds
+            speed = approx_scene_size / scene_fly_thru_time
+        self.speed = speed
+
+    @property
+    def speed(self):
+        """The (maximum) speed that the camera will move, in units per second.
+        By default it's based off the width and height of the camera.
+        """
+        return self._speed
+
+    @speed.setter
+    def speed(self, value):
+        self._speed = float(value)
+
 
     def rotate(self, delta: Tuple, rect: Tuple, *, animate=False):
         """Rotate in an orbit around the target, using two angles (azimuth and elevation, in radians).
@@ -116,3 +151,123 @@ class OrbitController(PanZoomController):
         # # Apply new state
         new_camera_state = {"position": pos2, "rotation": rot2}
         self._set_camera_state(new_camera_state)
+
+
+    def roll(self, delta: float, rect: Tuple, *, animate=False):
+        """Rotate the camera over the z-axis (roll, in radians).
+
+        If animate is True, the motion is damped. This requires the
+        controller to receive events from the renderer/viewport.
+        """
+        if animate:
+            action_tuple = ("roll", "push", 1.0)
+            action = self._create_action(None, action_tuple, 0.0, None, rect)
+            action.set_target(delta)
+            action.snap_distance = 0.01
+            action.done = True
+        elif self._cameras:
+            self._update_rotate(delta)
+            return self._update_cameras()
+
+    def _update_roll(self, delta):
+        assert isinstance(delta, float)
+
+        camera_state = self._get_camera_state()
+        rotation = camera_state["rotation"]
+
+        qz = la.quat_from_axis_angle((0, 0, 1), -delta)
+        new_rotation = la.quat_mul(rotation, qz)
+
+        new_camera_state = {"rotation": new_rotation}
+        self._set_camera_state(new_camera_state)
+
+
+    def pitch(self, delta: float, rect: Tuple, *, animate=False):
+        if animate:
+            action_tuple = ("pitch", "push", 1.0)
+            action = self._create_action(None, action_tuple, 0.0, None, rect)
+            action.set_target(delta)
+            action.snap_distance = 0.01
+            action.done = True
+        elif self._cameras:
+            self._update_rotate(delta)
+            return self._update_cameras()
+
+    def _update_pitch(self, delta):
+        assert isinstance(delta, float)
+
+        camera_state = self._get_camera_state()
+        rotation = camera_state["rotation"]
+
+        qz = la.quat_from_axis_angle((1, 0, 0), -delta)
+        new_rotation = la.quat_mul(rotation, qz)
+
+        new_camera_state = {"rotation": new_rotation}
+        self._set_camera_state(new_camera_state)
+
+
+    def yaw(self, delta: float, rect: Tuple, *, animate=False):
+        if animate:
+            action_tuple = ("yaw", "push", 1.0)
+            action = self._create_action(None, action_tuple, 0.0, None, rect)
+            action.set_target(delta)
+            action.snap_distance = 0.01
+            action.done = True
+        elif self._cameras:
+            self._update_rotate(delta)
+            return self._update_cameras()
+
+    def _update_yaw(self, delta):
+        assert isinstance(delta, float)
+
+        camera_state = self._get_camera_state()
+        rotation = camera_state["rotation"]
+
+        qz = la.quat_from_axis_angle((0, 1, 0), -delta)
+        new_rotation = la.quat_mul(rotation, qz)
+
+        new_camera_state = {"rotation": new_rotation}
+        self._set_camera_state(new_camera_state)
+
+
+    def move(self, delta: Tuple, rect: Tuple, *, animate=False):
+        """Move the camera in the given (x, y, z) direction.
+
+        The delta is expressed in the camera's local coordinate frame.
+        Forward is in -z direction, because as (per the gltf spec) a
+        camera looks down it's negative Z-axis.
+
+        If animate is True, the motion is damped. This requires the
+        controller to receive events from the renderer/viewport.
+        """
+
+        if animate:
+            action_tuple = ("move", "push", (1.0, 1.0, 1.0))
+            action = self._create_action(
+                None, action_tuple, (0.0, 0.0, 0.0), None, rect
+            )
+            action.set_target(delta)
+            action.done = True
+        elif self._cameras:
+            self._update_move(delta)
+            return self._update_cameras()
+
+    def _update_move(self, delta):
+        assert isinstance(delta, tuple) and len(delta) == 3
+
+        cam_state = self._get_camera_state()
+        position = cam_state["position"]
+        rotation = cam_state["rotation"]
+        delta_world = la.vec_transform_quat(delta, rotation)
+
+        new_position = position + delta_world * self.speed
+        self._set_camera_state({"position": new_position})
+
+
+    def _update_speed(self, delta):
+        assert isinstance(delta, float)
+        speed = self.speed * 2**delta
+        self.speed = max(0.001, speed)
+
+    def get_speed(self):
+        return self.speed
