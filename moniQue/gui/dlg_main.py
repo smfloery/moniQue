@@ -23,7 +23,7 @@
 """
 
 import os
-
+import time
 from qgis.PyQt import QtWidgets, QtCore, QtGui
 from qgis.PyQt.QtWidgets import QMessageBox
 from qgis.gui import QgsMapCanvas
@@ -191,7 +191,9 @@ class MainDialog(QtWidgets.QDialog):
         
         self.obj_renderer = gfx.WgpuRenderer(self.obj_canvas)
         self.obj_scene = gfx.Scene()
-        
+        self.obj_stats = gfx.Stats(viewport=self.obj_renderer)
+
+
         # light_gray = np.array((100, 100, 100, 255)) / 255
         self.background = gfx.Background(None, gfx.BackgroundMaterial([1, 1, 1, 1]))
         self.obj_scene.add(self.background)
@@ -293,6 +295,10 @@ class MainDialog(QtWidgets.QDialog):
         self.mono_select_tool.set_layers(self.img_line_lyr, self.map_line_lyr)
         self.mono_vertex_tool.set_layers(self.img_line_lyr, self.map_line_lyr)
         
+        # self.tiles_lyr = lyr_dict["tiles_lyr"]
+        # self.tiles_data = lyr_dict["tiles_data"]
+        # print(self.tiles_data)
+        
     def show_dlg_create(self):
         self.dlg_create = CreateDialog(parent=self, icon_dir=self.icon_dir)
         self.dlg_create.created_signal.connect(self.on_created_signal)
@@ -364,120 +370,154 @@ class MainDialog(QtWidgets.QDialog):
         self.img_canvas.refresh()
         self.close_dialog_signal.emit()
     
-    def add_mesh_to_obj_canvas(self, o3d_mesh, bounds, uvs=None, ortho_path=None):
+    # def add_mesh_to_obj_canvas(self, o3d_mesh, bounds, uvs=None, ortho_path=None):        
+    def add_mesh_to_obj_canvas(self, tiles_data):
         
-        min_xyz = bounds[0]
-        max_xyz = bounds[1]
+        self.tiles_data = tiles_data
         
-        verts = np.asarray(o3d_mesh.vertices)
-        faces = np.asarray(o3d_mesh.triangles).astype(np.uint32)
-        norms = np.asarray(o3d_mesh.vertex_normals).astype(np.float32)
-                        
-        # print("Loading mesh...")
-        mesh_geom = gfx.geometries.Geometry(indices=faces, 
-                                            positions=verts.astype(np.float32), 
-                                            normals=norms, 
-                                            texcoords=uvs.astype(np.float32))
+        lod_lvls = self.tiles_data["op_lvls"]
+        self.terrain = gfx.Group()
+        self.min_xyz = np.array(self.tiles_data["min_xyz"])
         
-        if ortho_path is None:
-            mesh_material = gfx.MeshNormalMaterial(side="FRONT")
-        else:
-            
-            if os.path.exists(ortho_path):
-                img_ds = gdal.Open(ortho_path)
-                
-                img_h = img_ds.RasterYSize
-                img_w = img_ds.RasterXSize
-                img_d = img_ds.RasterCount
-                img_dt = gdal.GetDataTypeName(img_ds.GetRasterBand(1).DataType)
-                
-                img_geo = img_ds.GetGeoTransform()
+        for tile in self.tiles_data["tiles"]:
+            tile["op"] = {}
+            tile_path = os.path.join(self.tiles_data["tile_dir"], "%s.ply" % (tile["tid"]))
+            tile_mesh = o3d.io.read_triangle_mesh(tile_path)
 
-                ul_x = img_geo[0] 
-                ul_y = img_geo[3]
-                lr_x = ul_x + (img_w * img_geo[1])
-                lr_y = ul_y + (img_h * img_geo[5])
-                
-                #correct for pixel center not corners
-                ul_x += img_geo[1]/2.
-                ul_y += img_geo[5]/2.
-                lr_x -= img_geo[1]/2.
-                lr_y -= img_geo[5]/2.
-                                                
-                d_ul = np.linalg.norm(np.array([ul_x, ul_y]) - np.array([min_xyz[0], max_xyz[1]]))
-                d_lr = np.linalg.norm(np.array([lr_x, lr_y]) - np.array([max_xyz[0], min_xyz[1]]))
-                
-                #if corners of orthophoto and mesh differ more than 1m --> Skip!
-                if max((d_ul, d_lr)) > 10:
-                    self.msg_bar.pushWarning("Warning",
-                                             "Extents of orthophoto and mesh differ. Using normals instead.")
-                    mesh_material = gfx.MeshNormalMaterial(side="FRONT")
+            verts = np.asarray(tile_mesh.vertices)
+            
+            u = (verts[:, 0] - tile["min_xyz"][0])/(tile["max_xyz"][0] - tile["min_xyz"][0])
+            v = (verts[:, 1] - tile["min_xyz"][1])/(tile["max_xyz"][1] - tile["min_xyz"][1])
+            uv = np.hstack((u.reshape(-1, 1), v.reshape(-1, 1)))
+            
+            verts -= self.min_xyz
+            faces = np.asarray(tile_mesh.triangles).astype(np.uint32)
+                                
+            # print("Loading mesh...")
+            mesh_geom = gfx.geometries.Geometry(indices=faces, 
+                                                positions=verts.astype(np.float32),
+                                                texcoords=uv.astype(np.float32),
+                                                tid=[int(tile["tid_int"])])
+            
+            if len(lod_lvls) > 0:
+            
+                for lod in lod_lvls:
+                    lod_path = os.path.join(self.tiles_data["op_dir"], "%s_mesh" % lod, "%s.tif" % (tile["tid"]))
+                                
+                    img_ds = gdal.Open(lod_path)
+                    img_h = img_ds.RasterYSize
+                    img_w = img_ds.RasterXSize
+                    img_arr = np.zeros((img_h, img_w, 3), dtype=np.uint8)
+                                
+                    for bx in range(3):
+                        bx_arr = img_ds.GetRasterBand(bx+1).ReadAsArray()
+                        img_arr[:, :, bx] = bx_arr
+                                    
+                    img_arr = np.flipud(img_arr)
+                    tex = gfx.Texture(img_arr, dim=2)
+                    mesh_material = gfx.MeshBasicMaterial(map=tex, side="FRONT", map_interpolation="nearest", pick_write=True )
                     
-                else:
-                    if img_dt != "Byte":
-                        self.msg_bar.pushWarning("Warning", 
-                                                "Only 8-bit images are currently supported. Using normals instead.")
-                        
-                        mesh_material = gfx.MeshNormalMaterial(side="FRONT")
-                    else:
-                    
-                        img_arr = np.zeros((img_h, img_w, img_d), dtype=np.uint8)
-                        
-                        for bx in range(img_d):
-                            bx_arr = img_ds.GetRasterBand(bx+1).ReadAsArray()
-                            img_arr[:, :, bx] = bx_arr
-                                        
-                        img_arr = np.flipud(img_arr)
-                        tex = gfx.Texture(img_arr, dim=2)
-                        mesh_material = gfx.MeshBasicMaterial(map=tex)
+                    tile["op"][lod] = tex
                 
             else:
-                mesh_material = gfx.MeshNormalMaterial(side="FRONT")
-                mesh_material.pick_write = True
+                mesh_material = gfx.MeshNormalMaterial(side="FRONT", pick_write=True)
+            
+            #add lowest resolution material to mesh at startup
+            mesh = gfx.Mesh(mesh_geom, mesh_material, visible=False)
+            mesh.add_event_handler(self.zoom_to_point, "click")
+            self.terrain.add(mesh)
                 
-        # mesh_material = gfx.MeshPhongMaterial(color="#BEBEBE", side="FRONT", shininess=10)
-
-        # print("Adding mesh to canvas...")
-        self.mesh = gfx.Mesh(mesh_geom, mesh_material)
-        self.obj_scene.add(self.mesh)
-
-        self.mesh.add_event_handler(self.zoom_to_point, "click")
-        
+        self.obj_scene.add(self.terrain)
+        cx_local = self.tiles_data["cx"] - self.min_xyz
+        self.obj_camera.local.position = cx_local + np.array([0, 0, 2500])
+        self.obj_camera.show_pos(cx_local)
+        self.obj_canvas.request_draw()  #request draw calls animate     
+               
         #group that will hold all the GCPs on object space
         self.obj_gcps_grp = gfx.Group()
         self.obj_scene.add(self.obj_gcps_grp)
         
         # print("Adding lights...")
         self.obj_scene.add(gfx.AmbientLight(intensity=1), gfx.DirectionalLight())
-        self.obj_camera.show_object(self.obj_scene)
-        self.default_obj_camera_state = self.obj_camera.get_state()
         
-        self.min_xyz = min_xyz
+        self.default_obj_camera_state = self.obj_camera.get_state()
         
         self.mono_tool.set_minxyz(self.min_xyz)
         self.mono_vertex_tool.set_minxyz(self.min_xyz)
         
-        self.mono_tool.set_scene(self.parent.ray_scene)
-        self.mono_vertex_tool.set_scene(self.parent.ray_scene)
+        #! TODO How to define and set raycating scene in future?
+        # self.mono_tool.set_scene(self.parent.ray_scene)
+        # self.mono_vertex_tool.set_scene(self.parent.ray_scene)
 
-    def animate(self):
-        self.obj_renderer.render(self.obj_scene, self.obj_camera)
-    
-    #TODO for future import of camera/json
-    # def import_from_json(self):
-    #     json_path = QtWidgets.QFileDialog.getOpenFileName(None, "Import *.json", "", ("Oriented images (*.json)"))[0]
+    def animate(self):     
         
-    #     json_file = open(json_path)
-    #     try:
-    #         json_data = json.load(json_file)
-    #     except:
-    #         print("Provided JSON does not appear to be valid.")
-        
-    #     loaded_imgs = [self.img_list.item(x).text() for x in range(self.img_list.count())]
-        
-    #     for name, data in json_data.items():
-    #         cam = Camera(iid=name).from_json(data)
+        with self.obj_stats:
             
+            cam_pos = self.obj_camera.local.position
+            frustum = self.obj_camera.frustum
+            corners_flat = frustum.reshape((-1, 3))
+                    
+            corners_by_plane = np.stack([
+                corners_flat[[0, 3, 7, 4], :],
+                corners_flat[[5, 6, 2, 1], :],
+                corners_flat[[3, 2, 6, 7], :],
+                corners_flat[[4, 5, 1, 0], :],
+                corners_flat[[1, 2, 3, 0], :],
+                corners_flat[[4, 7, 6, 5], :]], axis=0)
+                        
+            # planes in normal form (normals point away from the frustum area)
+            normals = np.cross(
+                corners_by_plane[:, 0, :] - corners_by_plane[:, 3, :],
+                corners_by_plane[:, 2, :] - corners_by_plane[:, 3, :]
+            )
+            
+            normals /= np.linalg.norm(normals, axis=-1)[:, None] # normal normals ^_^
+            # offset = np.sum(normals * corners_by_plane[:, 3, :], axis=-1)  #d=n*r0; r0 some point on the plane            
+            
+            for tile in self.tiles_data["tiles"]:
+                result = "INSIDE"
+                tile_cx = np.array(tile["cx_r"][:3]) - self.min_xyz
+                
+                for nx in range(6):
+                    
+                    #normal distance between any point on the plane and the sphere center                
+                    #https://www.w3schools.blog/distance-of-a-point-from-a-plane
+                    #simplest frustum culling technique; renderes more tiles than actually visible;
+                    cx_c_vec = tile_cx - corners_by_plane[nx, 0, :]                    
+                    cx_dist = np.dot(cx_c_vec, normals[nx, :])
+                                    
+                    if cx_dist > tile["cx_r"][-1]:
+                        result="OUTSIDE"
+                        break
+                                    
+                # #first tile added to group has tid_pygfx = 0; Hence, we can use this id to directly access the 
+                # #respective children within the list; no need for an additional for loop;
+                if result == "INSIDE":
+                    
+                    dist_from_cam = np.linalg.norm(tile_cx-cam_pos)
+                    
+                    if dist_from_cam >= 25000:
+                        lod_lvl = "10"
+                    elif ((dist_from_cam < 25000) & (dist_from_cam >= 15000)):
+                        lod_lvl = "11"
+                    elif ((dist_from_cam < 15000) & (dist_from_cam >= 10000)):
+                        lod_lvl = "12"
+                    elif ((dist_from_cam < 10000) & (dist_from_cam >= 5000)):
+                        lod_lvl = "13"
+                    # elif ((dist_from_cam < 5000) & (dist_from_cam >= 2500)):
+                    #     lod_lvl = "14"
+                    else:
+                        lod_lvl = "17"
+                    
+                    self.terrain.children[int(tile["tid_int"])].material.map = tile["op"][lod_lvl]
+                    self.terrain.children[int(tile["tid_int"])].visible = True
+                    
+                else:
+                    self.terrain.children[int(tile["tid_int"])].visible = False
+                            
+            self.obj_renderer.render(self.obj_scene, self.obj_camera, flush=False)
+              
+        self.obj_stats.render()
         
     def import_images(self):
         """Import selected images.
@@ -550,7 +590,7 @@ class MainDialog(QtWidgets.QDialog):
             else:
                 pnts.material = gfx.PointsMaterial(color=(0.78, 0, 0, 1), size=10)
         
-        self.obj_canvas.request_draw(self.animate)
+        self.obj_canvas.request_draw()
     
     def deselect_gcp(self):
         self.sel_gid = None
@@ -560,7 +600,7 @@ class MainDialog(QtWidgets.QDialog):
         for pnts in self.obj_gcps_grp.children:
             pnts.material = gfx.PointsMaterial(color=(0.78, 0, 0, 1), size=10)
         
-        self.obj_canvas.request_draw(self.animate)
+        self.obj_canvas.request_draw()
         
     def delete_gcp(self, data):
         if self.map_gcps_lyr.selectedFeatureCount() > 0:
@@ -580,7 +620,7 @@ class MainDialog(QtWidgets.QDialog):
                 
         if del_gcp_obj:
             self.obj_gcps_grp.remove(del_gcp_obj)
-            self.obj_canvas.request_draw(self.animate)
+            self.obj_canvas.request_draw()
             
     def add_camera_to_list(self, camera):
         """Add camera to the image list.
@@ -764,10 +804,10 @@ class MainDialog(QtWidgets.QDialog):
         self.camera_collection[cam.iid] = cam
         self.active_camera = self.camera_collection[cam.iid]
         
-    def discard_changes(self):
-        self.img_gcps_lyr.rollBack()
-        self.map_gcps_lyr.rollBack()
-        self.cam_lyr.rollBack()
+    # def discard_changes(self):
+    #     self.img_gcps_lyr.rollBack()
+    #     self.map_gcps_lyr.rollBack()
+    #     self.cam_lyr.rollBack()
          
     def set_obj_canvas_camera(self, data):
         self.obj_camera.local.position = np.array([data["obj_x0"], data["obj_y0"], data["obj_z0"]]) - self.min_xyz
@@ -781,12 +821,12 @@ class MainDialog(QtWidgets.QDialog):
         
         self.obj_camera.fov = np.rad2deg(data["hfov"])
         
-        self.obj_canvas.request_draw(self.animate)
+        self.obj_canvas.request_draw()
 
     def reset_obj_canvas_camera(self):
         self.obj_camera.set_state(self.default_obj_camera_state)
-        self.obj_canvas.request_draw(self.animate)
-
+        self.obj_canvas.request_draw()
+            
     def save_obj_canvas_camera(self):
         self.obj_camera_state = None
         self.obj_camera_state = self.obj_camera.get_state()
@@ -796,7 +836,7 @@ class MainDialog(QtWidgets.QDialog):
             pass
         else:
             self.obj_camera.set_state(self.obj_camera_state)
-            self.obj_canvas.request_draw(self.animate)
+            self.obj_canvas.request_draw()
 
     def export_obj_canvas(self):
 
@@ -890,7 +930,7 @@ class MainDialog(QtWidgets.QDialog):
         else:
             self.btn_mono_tool.setEnabled(False)
             
-        self.obj_canvas.request_draw(self.animate)
+        self.obj_canvas.request_draw()
         
     def toggle_mono_tool(self):
         if self.btn_mono_tool.isChecked():                  #activate
@@ -965,10 +1005,12 @@ class MainDialog(QtWidgets.QDialog):
         self.img_canvas.setMapTool(self.img_picker_tool)
         
         #GCP picking ib object space
-        self.mesh.add_event_handler(self.mesh_picking, "click")
+        for mesh in self.terrain.children:
+            mesh.add_event_handler(self.mesh_picking, "click")
 
     def deactivate_gcp_picking(self):
-        self.mesh.remove_event_handler(self.mesh_picking, "click")
+        for mesh in self.terrain.children:
+            mesh.remove_event_handler(self.mesh_picking, "click")
         self.img_canvas.setMapTool(self.img_pan_tool)
         
     def img_gcp_added(self, data):
@@ -978,8 +1020,9 @@ class MainDialog(QtWidgets.QDialog):
         self.dlg_orient.update_selected_gcp(data, gcp_type="img_space")
     
     def mesh_picking(self, event):
-            
+                
         if event.button == 1 and "Control" in event.modifiers:
+            print(event.pick_info)
             face_ix = event.pick_info["face_index"]
             
             #face_coords are not normalized; hence, divide by their sum first before using the further
@@ -1010,7 +1053,7 @@ class MainDialog(QtWidgets.QDialog):
                         pnts.children[0].local.position = pnts.geometry.positions.data[0, :] + [0, 0, 10]   #update position of label
                         break
                     
-                self.obj_canvas.request_draw(self.animate)
+                self.obj_canvas.request_draw()
                 self.dlg_orient.update_selected_gcp({"obj_x":click_pos_global[0],
                                                      "obj_y":click_pos_global[1],
                                                      "obj_z":click_pos_global[2]}, gcp_type="obj_space")
@@ -1040,7 +1083,7 @@ class MainDialog(QtWidgets.QDialog):
                     
                     click_obj = create_point_3d(click_pos, curr_gid)
                     self.obj_gcps_grp.add(click_obj)
-                    self.obj_canvas.request_draw(self.animate)
+                    self.obj_canvas.request_draw()
                     
                     self.dlg_orient.add_gcp_to_table({"obj_x":click_pos_global[0], 
                                                       "obj_y":click_pos_global[1],
@@ -1064,10 +1107,7 @@ class MainDialog(QtWidgets.QDialog):
     
     def zoom_to_point(self, event):
         if event.button == 2 and "Control" in event.modifiers:
-            print(event.pick_info["world_object"])
-            
-
-            
+ 
             face_ix = event.pick_info["face_index"]
 
             face_coords = np.array(event.pick_info["face_coord"]).reshape(3, 1) 
@@ -1100,13 +1140,13 @@ class MainDialog(QtWidgets.QDialog):
 
             self.obj_camera.show_pos((click_pos[0], click_pos[1], click_pos[2]), up=(0,0,1))
             
-            self.obj_canvas.request_draw(self.animate)
+            self.obj_canvas.request_draw()
             
         if event.button == 2 and "Shift" in event.modifiers:
             if len(self.origin_memory) > 0:
                 self.obj_camera.set_state(self.origin_memory[-1])
                 self.origin_memory.pop(-1)
-                self.obj_canvas.request_draw(self.animate)
+                self.obj_canvas.request_draw()
             else:
                 pass
 

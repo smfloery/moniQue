@@ -23,8 +23,9 @@
 """
 
 import os
-import open3d as o3d
+# import open3d as o3d
 import numpy as np
+import json
 
 from qgis.PyQt import QtWidgets, QtCore, QtGui
 from qgis.gui import QgsProjectionSelectionWidget
@@ -47,6 +48,7 @@ class CreateDialog(QtWidgets.QDialog):
         """Constructor."""
         super(CreateDialog, self).__init__()
         
+        self.parent = parent
         self.icon_dir = icon_dir
 
         self.setWindowTitle("Create new project...")
@@ -69,33 +71,19 @@ class CreateDialog(QtWidgets.QDialog):
         gpkg_layout.addWidget(self.gpkg_line)
         gpkg_layout.addWidget(self.gpkg_btn)
 
-        mesh_layout = QtWidgets.QHBoxLayout()
-        mesh_label = QtWidgets.QLabel("Mesh:")
-        mesh_label.setFixedWidth(50)
-        self.mesh_line = QtWidgets.QLineEdit()
-        self.mesh_line.setEnabled(False)
-        self.mesh_btn = QtWidgets.QPushButton()
-        self.mesh_btn.setIcon(QtGui.QIcon(os.path.join(self.icon_dir, "mActionFileOpen.png")))
-        self.mesh_btn.clicked.connect(self.set_mesh_path)
+        tiles_layout = QtWidgets.QHBoxLayout()
+        tiles_label = QtWidgets.QLabel("Mesh:")
+        tiles_label.setFixedWidth(50)
+        self.tiles_line = QtWidgets.QLineEdit()
+        self.tiles_line.setEnabled(False)
+        self.tiles_btn = QtWidgets.QPushButton()
+        self.tiles_btn.setIcon(QtGui.QIcon(os.path.join(self.icon_dir, "mActionFileOpen.png")))
+        self.tiles_btn.clicked.connect(self.set_tiles_path)
 
-        mesh_layout.addWidget(mesh_label)
-        mesh_layout.addWidget(self.mesh_line)
-        mesh_layout.addWidget(self.mesh_btn)
-        
-        
-        ortho_layout = QtWidgets.QHBoxLayout()
-        ortho_label = QtWidgets.QLabel("Ortho:")
-        ortho_label.setFixedWidth(50)
-        self.ortho_line = QtWidgets.QLineEdit()
-        self.ortho_line.setEnabled(False)
-        self.ortho_btn = QtWidgets.QPushButton()
-        self.ortho_btn.setIcon(QtGui.QIcon(os.path.join(self.icon_dir, "mActionFileOpen.png")))
-        self.ortho_btn.clicked.connect(self.set_ortho_path)
-
-        ortho_layout.addWidget(ortho_label)
-        ortho_layout.addWidget(self.ortho_line)
-        ortho_layout.addWidget(self.ortho_btn)
-        
+        tiles_layout.addWidget(tiles_label)
+        tiles_layout.addWidget(self.tiles_line)
+        tiles_layout.addWidget(self.tiles_btn)
+                
         crs_layout = QtWidgets.QHBoxLayout()
         crs_label = QtWidgets.QLabel("Project CRS")
         self.crs_widget = QgsProjectionSelectionWidget()
@@ -113,8 +101,7 @@ class CreateDialog(QtWidgets.QDialog):
         btn_layout.addWidget(self.create_btn)
         
         main_layout.addLayout(gpkg_layout)
-        main_layout.addLayout(mesh_layout)
-        main_layout.addLayout(ortho_layout)
+        main_layout.addLayout(tiles_layout)
         main_layout.addLayout(crs_layout)
         main_layout.addLayout(btn_layout)
         main_layout.addStretch(1)
@@ -125,48 +112,34 @@ class CreateDialog(QtWidgets.QDialog):
         if gpkg_path:
             self.gpkg_line.setText(gpkg_path)
 
-            if (self.mesh_line.text() is not "") & (self.crs_widget.crs().isValid()):
+            if (self.tiles_line.text() is not "") & (self.crs_widget.crs().isValid()):
                 self.create_btn.setEnabled(True)
                 
-    def set_mesh_path(self):
-        mesh_path = QtWidgets.QFileDialog.getOpenFileName(None, "Open mesh", "", ("Mesh (*.ply)"))[0]   
-        if mesh_path:
-            self.mesh_line.setText(mesh_path)
+    def set_tiles_path(self):
+        tiles_path = QtWidgets.QFileDialog.getOpenFileName(None, "Open tiles", "", ("Tiles (*.json)"))[0]   
+        if tiles_path:
+            self.tiles_line.setText(tiles_path)
 
             if (self.gpkg_line.text()  is not "") & (self.crs_widget.crs().isValid()):
                 self.create_btn.setEnabled(True)
-
-    def set_ortho_path(self):
-        ortho_path = QtWidgets.QFileDialog.getOpenFileName(None, "Open orthophoto", "", ("Image (*.tif *.tiff)"))[0]   
-        if ortho_path:
-            self.ortho_line.setText(ortho_path)
-
-            # if (self.gpkg_line.text()  is not "") & (self.crs_widget.crs().isValid()):
-            #     self.create_btn.setEnabled(True)
     
     def set_crs(self):
-        if (self.gpkg_line.text() is not "") & (self.mesh_line.text() is not "") & (self.crs_widget.crs().isValid()):
+        if (self.gpkg_line.text() is not "") & (self.tiles_line.text() is not "") & (self.crs_widget.crs().isValid()):
             self.create_btn.setEnabled(True)
     
     def create_project(self):
         gpkg_path = self.gpkg_line.text()
-        mesh_path = self.mesh_line.text()
-        ortho_path = self.ortho_line.text()
+        tiles_path = self.tiles_line.text()
         crs = self.crs_widget.crs().authid()
         
         QtWidgets.QApplication.instance().setOverrideCursor(QtCore.Qt.WaitCursor)
         transform_context = QgsProject.instance().transformContext() #necessary for writing
                 
-        mesh = o3d.io.read_triangle_mesh(mesh_path)
-        
-        verts = np.asarray(mesh.vertices)
-        
-        nr_verts = int(verts.shape[0])
-        nr_faces = int(np.asarray(mesh.triangles).shape[0])
-        
-        minx, miny, minz = np.min(verts, axis=0)
-        maxx, maxy, maxz = np.max(verts, axis=0)
-
+        with open(tiles_path, "r") as f:
+            tiles_data = json.load(f)
+            minx, miny, minz = tiles_data["min_xyz"]
+            maxx, maxy, maxz = tiles_data["max_xyz"]
+            
         mesh_bbox = [QgsPointXY(minx, maxy),
                      QgsPointXY(maxx, maxy),
                      QgsPointXY(maxx, miny),
@@ -176,10 +149,7 @@ class CreateDialog(QtWidgets.QDialog):
         reg_lyr = QgsVectorLayer("Polygon?crs=%s" % (crs), "region", "memory")
         pr = reg_lyr.dataProvider()
         pr.addAttributes([QgsField("name", QtCore.QVariant.String), 
-                          QgsField("path", QtCore.QVariant.String),
-                          QgsField("op_path", QtCore.QVariant.String), 
-                          QgsField("nr_verts", QtCore.QVariant.Int), 
-                          QgsField("nr_faces", QtCore.QVariant.Int), 
+                          QgsField("json_path", QtCore.QVariant.String),
                           QgsField("minx", QtCore.QVariant.Double, "double", 10, 3), 
                           QgsField("miny", QtCore.QVariant.Double, "double", 10, 3),
                           QgsField("minz", QtCore.QVariant.Double, "double", 10, 3),
@@ -191,11 +161,8 @@ class CreateDialog(QtWidgets.QDialog):
         # add a feature
         feat = QgsFeature()
         feat.setGeometry(QgsGeometry.fromPolygonXY([mesh_bbox]))
-        feat.setAttributes([os.path.basename(mesh_path), 
-                            mesh_path,
-                            ortho_path,
-                            nr_verts,
-                            nr_faces, 
+        feat.setAttributes([os.path.basename(gpkg_path).split(".")[0], 
+                            tiles_path,
                             float(minx), 
                             float(miny), 
                             float(minz), 
@@ -223,7 +190,7 @@ class CreateDialog(QtWidgets.QDialog):
         if _writer[0] == QgsVectorFileWriter.NoError:
             pass
         else:
-            self.msg_bar.pushMessage("Error", "Could not create project.", level=Qgis.Critical, duration=3)
+            self.parent.msg_bar.pushMessage("Error", "Could not create project.", level=Qgis.Critical, duration=3)
             raise ValueError("Could not create project!")
                             
         #create additionally needed layers and add them to the geopackage as well
@@ -316,10 +283,6 @@ class CreateDialog(QtWidgets.QDialog):
             if _writer[0] == QgsVectorFileWriter.NoError:
                 pass
             else:
-                #! does not work; no message bar in the create dialog; necessary to send signal to main_dialog
-                #! with error message as parameter
-                # self.msg_bar.pushMessage("Error", "Could not create project.", level=Qgis.Critical, duration=3)
-                # raise ValueError("Could not create project!")
                 pass
         
         QtWidgets.QApplication.instance().restoreOverrideCursor()

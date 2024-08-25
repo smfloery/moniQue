@@ -3,3 +3,4 @@ monique/scripts_pc/
 monique/doc/svg/
 monique/doc/raw/
 *.zip
+monique/__pycache__/

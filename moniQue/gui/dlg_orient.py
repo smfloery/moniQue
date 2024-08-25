@@ -290,18 +290,20 @@ class OrientDialog(QtWidgets.QDialog):
     
     def import_gcps_from_csv(self):
         csv_path = QtWidgets.QFileDialog.getOpenFileName(None, "Load *.csv", "", ("GCPs (*.csv)"))[0]
-        pd_csv = pd.read_csv(csv_path, sep=";", encoding="utf-8")
         
-        cols = list(pd_csv.columns)
-        
-        if cols != ["gid", "img_x", "img_y", "obj_x", "obj_y", "obj_z"]:
-            print("Provided .csv does not match the required format!")            
-        else:
-            gcps = pd_csv.to_dict(orient='records')
+        if csv_path:
+            pd_csv = pd.read_csv(csv_path, sep=";", encoding="utf-8")
             
-            for gcp in gcps:
-                self.add_gcp_to_table(gcp)
-                self.gcp_imported_signal.emit(gcp)
+            cols = list(pd_csv.columns)
+            
+            if cols != ["gid", "img_x", "img_y", "obj_x", "obj_y", "obj_z"]:
+                print("Provided .csv does not match the required format!")            
+            else:
+                gcps = pd_csv.to_dict(orient='records')
+                
+                for gcp in gcps:
+                    self.add_gcp_to_table(gcp)
+                    self.gcp_imported_signal.emit(gcp)
         
     def delete_selected_gcp(self):
         self.gcp_delete_signal.emit({"gid":self.sel_gid})

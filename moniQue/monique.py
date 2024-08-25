@@ -37,6 +37,9 @@ import os.path
 import json
 import open3d as o3d
 import numpy as np
+import requests 
+import xml.etree.ElementTree as ET
+
 from .camera import Camera
 
 class MoniQue:
@@ -86,7 +89,6 @@ class MoniQue:
         launch_action = QAction(launch_icon, 'Run moniQue...', self.iface.mainWindow())
         launch_action.triggered.connect(self.open_main_dlg)
         launch_action.setEnabled(True)
-        
         
         convert_icon = QIcon(os.path.join(self.icon_dir, "mActionAddMeshLayer.png"))
         convert_action = QAction(convert_icon, "Convert DTM to mesh...", self.iface.mainWindow())
@@ -140,9 +142,9 @@ class MoniQue:
         gpkg_img_gcps_lyr = self.gpkg_path + "|layername=gcps_img"
         self.img_gcps_lyr = QgsVectorLayer(gpkg_img_gcps_lyr, "gcps_img", "ogr")
         self.img_gcps_lyr.loadNamedStyle(self.img_gcps_qml_path)       
-        
+                    
         root = QgsProject.instance().layerTreeRoot()
-        monoGroup = root.insertGroup(0, self.project_name)
+        monoGroup = root.insertGroup(0, self.project_name)  
         monoGroup.addLayer(self.map_line_lyr) 
         monoGroup.addLayer(self.cam_lyr) 
         monoGroup.addLayer(self.reg_lyr)
@@ -171,7 +173,7 @@ class MoniQue:
         self.dlg_main.set_layers(self.layer_collection)
         self.dlg_main.activate_gui_elements()
         
-        self.load_mesh()        
+        self.load_mesh()        #commented to switch loading single mesh to tiles
         self.load_cameras_from_gpkg()
         
         QApplication.instance().restoreOverrideCursor()
@@ -189,44 +191,30 @@ class MoniQue:
             self.dlg_main.add_camera_to_list(cam)
     
     def load_mesh(self):
-            
-        reg_feat = list(self.reg_lyr.getFeatures())[0]
-        mesh_path = reg_feat["path"]
-        ortho_path = reg_feat["op_path"]
         
-        if not os.path.exists(mesh_path):
-            self.iface.messageBar().pushError("Error", 
-                                              "Could not load mesh. Does the file exist?")
-        else:
+        reg_feat = list(self.reg_lyr.getFeatures())[0]
+        json_path = reg_feat["json_path"]
+        
+        with open(json_path, "r") as f:
+            tiles_data = json.load(f)
+            tiles_data["tile_dir"] = os.path.join(os.path.dirname(json_path), "mesh")
+            tiles_data["op_dir"] = os.path.join(os.path.dirname(json_path), "op")
             
-            mesh_minx = reg_feat["minx"]
-            mesh_maxx = reg_feat["maxx"]
-            mesh_miny = reg_feat["miny"]
-            mesh_maxy = reg_feat["maxy"]
-            mesh_minz = reg_feat["minz"]
-            mesh_maxz = reg_feat["maxz"]
-            mesh_bounds = [[mesh_minx, mesh_miny, mesh_minz], 
-                           [mesh_maxx, mesh_maxy, mesh_maxz]]
-            
-            mesh = o3d.io.read_triangle_mesh(mesh_path)
-            
-            verts = np.asarray(mesh.vertices)
-            verts_local = verts - [mesh_minx, mesh_miny, mesh_minz]
-            tris = np.asarray(mesh.triangles)
-
-            u = (verts[:, 0] - mesh_minx)/(mesh_maxx - mesh_minx)
-            v = (verts[:, 1] - mesh_miny)/(mesh_maxy - mesh_miny)
-            uv_coords = np.hstack((u.reshape(-1, 1), v.reshape(-1, 1)))
-            
-            o3d_mesh = o3d.geometry.TriangleMesh(o3d.utility.Vector3dVector(verts_local),
-                                                 o3d.utility.Vector3iVector(tris))
-            o3d_mesh.compute_vertex_normals()
-            
-            scene = o3d.t.geometry.RaycastingScene()
-            scene.add_triangles(o3d.t.geometry.TriangleMesh.from_legacy(o3d_mesh))
-            
-            self.ray_scene = scene
-            self.dlg_main.add_mesh_to_obj_canvas(o3d_mesh, mesh_bounds, uvs=uv_coords, ortho_path=ortho_path)
+            if os.path.exists(tiles_data["op_dir"]):
+    
+                op_lvls = []            
+                sd_names = next(os.walk(tiles_data["op_dir"]))[1]
+                for sd in sd_names:
+                    if "mesh" in sd:
+                        op_lvls.append(int(sd.split("_")[0]))
+                op_lvls.sort(reverse=True)
+                tiles_data["op_lvls"] = list(map(str, op_lvls))
+            else:
+                tiles_data["op_lvls"] = []
+        
+        ##! WIE IN ZUKUNFT DIE RAYCASTING SCENE SETZEN?
+        # self.ray_scene = scene
+        self.dlg_main.add_mesh_to_obj_canvas(tiles_data)
         
     def reset_plugin(self):
         

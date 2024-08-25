@@ -1,8 +1,9 @@
 import open3d as o3d
 import numpy as np
-from osgeo import gdal
+from osgeo import gdal, osr
 from pymartini import Martini
 import os
+from json import dump
 
 gdal.UseExceptions()
  
@@ -15,7 +16,7 @@ def load_geoimg(img_path, nr_bands=3, band_dtype=np.uint8):
     
     ds_gt = ds.GetGeoTransform()
     ds_geo = ds.GetProjection()
-    
+   
     band_arr = np.zeros((ds_h, ds_w, nr_bands), dtype=band_dtype)
     
     for i in range(nr_bands):
@@ -216,6 +217,11 @@ class MeshGrid:
     def build(self):
         dgm_arr, dgm_gt, dgm_prj, dgm_h, dgm_w, dgm_nd = load_geoimg(self.path, nr_bands=1, band_dtype=np.float32)        
         dgm_arr[dgm_arr == dgm_nd] = -1
+        
+        dgm_prj = osr.SpatialReference(wkt=dgm_prj)
+        dgm_prj.AutoIdentifyEPSG()
+        dgm_epsg = dgm_prj.GetAttrValue('AUTHORITY',1)
+        self.epsg = dgm_epsg
             
         r_steps = np.arange(0, dgm_h, self.tile_size)
         c_steps = np.arange(0, dgm_w, self.tile_size)
@@ -498,6 +504,100 @@ class MeshGrid:
     #     with open(path, 'w') as f:
     #         dump(tile_collection, f)
     
+    def save_tiles(self, odir):
+               
+        if not os.path.exists(odir):
+            os.mkdir(odir)
+        
+        rows = range(0, self.nr_rows-1)
+        cols = range(0, self.nr_cols-1)
+        
+        global_min_x = np.inf
+        global_min_y = np.inf
+        global_min_z = np.inf
+        
+        global_max_x = -np.inf
+        global_max_y = -np.inf
+        global_max_z = -np.inf
+        
+        meta = {}
+        
+        tidi = 0
+        
+        tile_meta_list = []
+        
+        odir_mesh = os.path.join(odir, "mesh")
+        if not os.path.exists(odir_mesh):
+            os.mkdir(odir_mesh)
+        
+        for r in rows:
+            for c in cols:
+                
+                tile_meta = {}
+            
+                curr_tid = "%s_%s" % (r, c)
+                
+                if curr_tid not in self.data.keys():
+                    continue
+                
+                tile_meta["tid"] = curr_tid
+                tile_meta["tid_int"] = tidi
+                
+                opath = os.path.join(odir_mesh, "%s.ply" % (curr_tid))
+                
+                curr_tile = self.data[curr_tid]
+                
+                verts = curr_tile.vertices                        
+                verts_h = curr_tile.tile_arr[verts[:, 0], verts[:, 1]]
+                #tile_gt already contains the pixel shift towards the center; Hence, we don't add it again
+                verts_geo = np.hstack((px2geo(verts, curr_tile.tile_gt, pixel_shift=False), verts_h.reshape(-1, 1)))
+                
+                min_xyz = np.min(verts_geo, axis=0)
+                max_xyz = np.max(verts_geo, axis=0)
+                cx_xyz = ((min_xyz + max_xyz)/2.)
+                cx_rad = np.max(np.sqrt(np.sum((verts_geo[:, :2]-cx_xyz[:2])**2,axis=1)))
+                
+                if min_xyz[0] < global_min_x:
+                    global_min_x = min_xyz[0]
+                if min_xyz[1] < global_min_y:
+                    global_min_y = min_xyz[1]
+                if min_xyz[2] < global_min_z:
+                    global_min_z = min_xyz[2]
+                
+                if max_xyz[0] > global_max_x:
+                    global_max_x = max_xyz[0]
+                if max_xyz[1] > global_max_y:
+                    global_max_y = max_xyz[1]
+                if max_xyz[2] > global_max_z:
+                    global_max_z = max_xyz[2]
+                                
+                tile_meta["min_xyz"] = np.round(min_xyz, 3).ravel().tolist()
+                tile_meta["max_xyz"] = np.round(max_xyz, 3).ravel().tolist()
+                tile_meta["cx_r"] = np.round(cx_xyz, 3).ravel().tolist() + [np.round(cx_rad, 1)]
+                tile_meta_list.append(tile_meta)
+                
+                tris = curr_tile.triangles
+
+                o3d_mesh = o3d.geometry.TriangleMesh(vertices=o3d.utility.Vector3dVector(verts_geo),
+                                                     triangles=o3d.utility.Vector3iVector(tris))
+                o3d_mesh.remove_duplicated_vertices()
+                
+                o3d.io.write_triangle_mesh(opath, o3d_mesh)
+
+                tidi += 1
+                
+        meta["epsg"] = self.epsg
+        meta["min_xyz"] = [round(global_min_x, 3), round(global_min_y, 3), round(global_min_z, 3)]
+        meta["max_xyz"] = [round(global_max_x, 3), round(global_max_y, 3), round(global_max_z, 3)]
+        meta["cx"] = [round((global_min_x + global_max_x)/2., 3),
+                      round((global_min_y + global_max_y)/2., 3),
+                      round((global_min_z + global_max_z)/2., 3)]
+        
+        meta["tiles"] = tile_meta_list
+        
+        with open(os.path.join(odir, "tiles.json"), 'w') as f:
+            dump(meta, f, indent=4)
+        
     def merge_tiles(self, opath):
         
         out_verts = None

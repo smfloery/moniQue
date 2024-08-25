@@ -70,11 +70,7 @@ class OrbitController(PanZoomController):
         assert isinstance(delta, tuple) and len(delta) == 2
 
         delta_azimuth, delta_elevation = delta
-        
-        print(delta_azimuth, delta_elevation)
-        
         camera_state = self._get_camera_state()
-        print(camera_state)
         
         # Note: this code does not use la.vec_euclidean_to_spherical and
         # la.vec_spherical_to_euclidean, because those functions currently
