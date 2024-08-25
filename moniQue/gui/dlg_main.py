@@ -25,7 +25,6 @@
 import os
 import time
 from qgis.PyQt import QtWidgets, QtCore, QtGui
-from qgis.PyQt.QtWidgets import QMessageBox
 from qgis.gui import QgsMapCanvas
 from wgpu.gui.qt import WgpuCanvas
 from wgpu.gui.offscreen import WgpuCanvas as offscreenCanvas
@@ -37,25 +36,30 @@ from PIL import Image
 from osgeo import gdal
 import json
 import sys
+import urllib.request
+
 from collections import OrderedDict
+from qgis.utils import iface
 
-
-from qgis.core import QgsFeature, QgsPoint, QgsRasterLayer, QgsProject, QgsJsonUtils, QgsGeometry
+from qgis.core import QgsFeature, QgsPoint, QgsRasterLayer, QgsProject, QgsJsonUtils, QgsGeometry, QgsCoordinateReferenceSystem, QgsCoordinateTransform, QgsFileDownloader
 from qgis.gui import QgsMapToolPan, QgsMessageBar
 
 from .dlg_create import CreateDialog
 from .dlg_orient import OrientDialog
 from .dlg_meta_gcp import GcpMetaDialog
+from .dlg_meta_export import ExportMetaDialog
+from .dlg_import_akon import ImportAkonDialog
 from .dlg_meta_mono import MonoMetaDialog
 from ..tools.ImgPickerTool import ImgPickerTool
 from ..tools.MonoMapTool import MonoMapTool
 from ..tools.SelectTool import SelectTool
 from ..tools.VertexTool import VertexTool
+from ..tools.jsonImport import jsonImport
 
 from ..camera import Camera
 from ..helpers import create_point_3d, rot2alzeka, alzeka2rot, calc_hfov, calc_vfov
 
-from ..tools.map_controller import OrbitController
+from ..tools.map_controller import OrbitFlightController
 
 class MainDialog(QtWidgets.QDialog):
     
@@ -106,14 +110,22 @@ class MainDialog(QtWidgets.QDialog):
         self.import_action.triggered.connect(self.import_images)
         self.img_menu.addAction(self.import_action)
 
+<<<<<<< HEAD
+        self.import_akon_action = QtWidgets.QAction("&Import images from AKON", self)
+        self.import_akon_action.triggered.connect(self.import_akon)
+        self.img_menu.addAction(self.import_akon_action)
+
+        self.import_json_action = QtWidgets.QAction("&Get initial orientation from *.json", self)
+=======
+        self.import_json_action = QtWidgets.QAction("&Import from *.json", self)
+>>>>>>> 49f293ec503c6c573cdec001a7db617f1f463824
+        self.import_json_action.triggered.connect(self.import_json)
+        self.img_menu.addAction(self.import_json_action)
+
         self.export_action = QtWidgets.QAction("&Export Object View to PNG", self)
         self.export_action.triggered.connect(self.export_obj_canvas)
         self.export_menu.addAction(self.export_action)
-        
-        #TODO: for future import of camera/project from JSON
-        # self.import_json_action = QtWidgets.QAction("&Import from *.json", self)
-        # self.import_json_action.triggered.connect(self.import_from_json)
-        # self.img_menu.addAction(self.import_json_action)
+
         
         self.main_toolbar = QtWidgets.QToolBar("My main toolbar")
         self.main_toolbar.setIconSize(QtCore.QSize(20, 20))
@@ -147,6 +159,13 @@ class MainDialog(QtWidgets.QDialog):
         self.btn_mono_vertex.setCheckable(True)
         self.btn_mono_vertex.triggered.connect(self.toggle_mono_vertex_tool)
         self.main_toolbar.addAction(self.btn_mono_vertex)
+
+        self.main_toolbar.addSeparator()
+
+        self.speed = 2500
+        self.speed_bar = QtWidgets.QStatusBar()
+        self.main_toolbar.addWidget(self.speed_bar)
+        self.speed_bar.showMessage('Speed: ' + str(self.speed) + ' [units/s]')
         
         self.img_toolbar = QtWidgets.QToolBar()
         self.img_toolbar.setIconSize(QtCore.QSize(20, 20))
@@ -179,15 +198,20 @@ class MainDialog(QtWidgets.QDialog):
         btn_reset_obj_canvas_camera.triggered.connect(self.reset_obj_canvas_camera)
         self.obj_toolbar.addAction(btn_reset_obj_canvas_camera)
 
+        btn_save_obj_canvas_camera = QtWidgets.QAction("Save camera position.", self)
+        btn_save_obj_canvas_camera.setIcon(QtGui.QIcon(os.path.join(self.icon_dir, "saveView.png")))
+        btn_save_obj_canvas_camera.triggered.connect(self.save_obj_canvas_camera)
+        self.obj_toolbar.addAction(btn_save_obj_canvas_camera)
+
         btn_load_obj_canvas_camera = QtWidgets.QAction("Zoom to saved camera position.", self)
-        btn_load_obj_canvas_camera.setIcon(QtGui.QIcon(os.path.join(self.icon_dir, "mActionZoomFullExtent.png")))
+        btn_load_obj_canvas_camera.setIcon(QtGui.QIcon(os.path.join(self.icon_dir, "loadView.png")))
         btn_load_obj_canvas_camera.triggered.connect(self.load_obj_canvas_camera)
         self.obj_toolbar.addAction(btn_load_obj_canvas_camera)
 
-        btn_save_obj_canvas_camera = QtWidgets.QAction("Save camera position.", self)
-        btn_save_obj_canvas_camera.setIcon(QtGui.QIcon(os.path.join(self.icon_dir, "mActionZoomFullExtent.png")))
-        btn_save_obj_canvas_camera.triggered.connect(self.save_obj_canvas_camera)
-        self.obj_toolbar.addAction(btn_save_obj_canvas_camera)
+        btn_obj_canvas_camera_from_map = QtWidgets.QAction("Set camera position from current QGIS map canvas", self)
+        btn_obj_canvas_camera_from_map.setIcon(QtGui.QIcon(os.path.join(self.icon_dir, "mLayoutItemMap.png")))
+        btn_obj_canvas_camera_from_map.triggered.connect(self.obj_canvas_camera_from_map)
+        self.obj_toolbar.addAction(btn_obj_canvas_camera_from_map)
         
         self.obj_renderer = gfx.WgpuRenderer(self.obj_canvas)
         self.obj_scene = gfx.Scene()
@@ -198,11 +222,12 @@ class MainDialog(QtWidgets.QDialog):
         self.background = gfx.Background(None, gfx.BackgroundMaterial([1, 1, 1, 1]))
         self.obj_scene.add(self.background)
         
-        self.obj_camera = gfx.PerspectiveCamera(fov=45, depth_range=(1, 100000))
+        self.obj_camera = gfx.PerspectiveCamera(fov=45, depth_range=(1, 1000000))
         
         self.obj_canvas.request_draw(self.animate)
+
         # self.obj_controller = gfx.TrackballController(self.obj_camera, register_events=self.obj_renderer, damping=0)
-        self.obj_controller = OrbitController(self.obj_camera, register_events=self.obj_renderer, damping=0)
+        self.obj_controller = OrbitFlightController(self.obj_camera, speed=self.speed, register_events=self.obj_renderer, damping=0)
         
         # self.obj_scene.add(gfx.AxesHelper(size=1000, thickness=3))
         
@@ -267,7 +292,27 @@ class MainDialog(QtWidgets.QDialog):
         self.obj_camera_state = None
         self.obj_camera_origin = None
         self.origin_memory = []
+
+        self.json_check = False
+<<<<<<< HEAD
+        self.map_check = False
+        self.akon_check = False
+
+        self.get_settings()
+
+
+    def get_settings(self):
+        settings_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'settings.txt'))
+
+        with open(settings_path, 'r') as file:
+            settings = [s for s in file]
+=======
+>>>>>>> 49f293ec503c6c573cdec001a7db617f1f463824
         
+        self.settings = {}
+        for i in settings:
+            key_value_pair = i.split('=')
+            self.settings[key_value_pair[0].strip()] = key_value_pair[1].strip()
         
     def set_layers(self, lyr_dict):
         self.reg_lyr = lyr_dict["reg_lyr"]
@@ -305,7 +350,7 @@ class MainDialog(QtWidgets.QDialog):
         self.dlg_create.show()
     
     def show_dlg_orient(self):
-        if self.btn_ori_tool.isChecked():
+        if self.btn_ori_tool.isChecked() or self.json_check == True:
             self.dlg_orient = OrientDialog(parent=self, icon_dir=self.icon_dir, active_iid=self.active_camera.iid)
 
             self.dlg_orient.gcp_selected_signal.connect(self.select_gcp)
@@ -375,6 +420,7 @@ class MainDialog(QtWidgets.QDialog):
         
         self.tiles_data = tiles_data
         
+<<<<<<< HEAD
         lod_lvls = self.tiles_data["op_lvls"]
         self.terrain = gfx.Group()
         self.min_xyz = np.array(self.tiles_data["min_xyz"])
@@ -383,6 +429,31 @@ class MainDialog(QtWidgets.QDialog):
             tile["op"] = {}
             tile_path = os.path.join(self.tiles_data["tile_dir"], "%s.ply" % (tile["tid"]))
             tile_mesh = o3d.io.read_triangle_mesh(tile_path)
+=======
+        verts = np.asarray(o3d_mesh.vertices)
+        faces = np.asarray(o3d_mesh.triangles).astype(np.uint32)
+        norms = np.asarray(o3d_mesh.vertex_normals).astype(np.float32)
+                        
+        mesh_geom = gfx.geometries.Geometry(indices=faces, 
+                                            positions=verts.astype(np.float32), 
+                                            normals=norms, 
+                                            texcoords=uvs.astype(np.float32))
+        
+        if ortho_path is None:
+            mesh_material = gfx.MeshNormalMaterial(side="FRONT")
+            mesh_material.pick_write = True
+
+        else:
+            if os.path.exists(ortho_path):
+                img_ds = gdal.Open(ortho_path)
+                
+                img_h = img_ds.RasterYSize
+                img_w = img_ds.RasterXSize
+                img_d = img_ds.RasterCount
+                img_dt = gdal.GetDataTypeName(img_ds.GetRasterBand(1).DataType)
+                
+                img_geo = img_ds.GetGeoTransform()
+>>>>>>> 011337936ae2f800c11d92cb24b1c50c4f5de792
 
             verts = np.asarray(tile_mesh.vertices)
             
@@ -417,6 +488,7 @@ class MainDialog(QtWidgets.QDialog):
                     tex = gfx.Texture(img_arr, dim=2)
                     mesh_material = gfx.MeshBasicMaterial(map=tex, side="FRONT", map_interpolation="nearest", pick_write=True )
                     
+<<<<<<< HEAD
                     tile["op"][lod] = tex
                 
             else:
@@ -433,11 +505,42 @@ class MainDialog(QtWidgets.QDialog):
         self.obj_camera.show_pos(cx_local)
         self.obj_canvas.request_draw()  #request draw calls animate     
                
+=======
+                else:
+                    if img_dt != "Byte":
+                        self.msg_bar.pushWarning("Warning", 
+                                                "Only 8-bit images are currently supported. Using normals instead.")
+                        
+                        mesh_material = gfx.MeshNormalMaterial(side="FRONT")
+                    else:
+                        img_arr = np.zeros((img_h, img_w, img_d), dtype=np.uint8)
+                        
+                        for bx in range(img_d):
+                            bx_arr = img_ds.GetRasterBand(bx+1).ReadAsArray()
+                            img_arr[:, :, bx] = bx_arr
+                                        
+                        img_arr = np.flipud(img_arr)
+                        tex = gfx.Texture(img_arr, dim=2)
+                        mesh_material = gfx.MeshBasicMaterial(map=tex)
+                
+            else:
+                mesh_material = gfx.MeshNormalMaterial(side="FRONT")
+
+            mesh_material.pick_write = True   
+            
+        # mesh_material = gfx.MeshPhongMaterial(color="#BEBEBE", side="FRONT", shininess=10)
+
+        self.mesh = gfx.Mesh(mesh_geom, mesh_material)
+        self.obj_scene.add(self.mesh)
+
+        self.mesh.add_event_handler(self.zoom_to_point, "click")
+        self.mesh.add_event_handler(self.show_speed, "wheel")
+        
+>>>>>>> 011337936ae2f800c11d92cb24b1c50c4f5de792
         #group that will hold all the GCPs on object space
         self.obj_gcps_grp = gfx.Group()
         self.obj_scene.add(self.obj_gcps_grp)
         
-        # print("Adding lights...")
         self.obj_scene.add(gfx.AmbientLight(intensity=1), gfx.DirectionalLight())
         
         self.default_obj_camera_state = self.obj_camera.get_state()
@@ -451,6 +554,7 @@ class MainDialog(QtWidgets.QDialog):
 
     def animate(self):     
         
+<<<<<<< HEAD
         with self.obj_stats:
             
             cam_pos = self.obj_camera.local.position
@@ -518,12 +622,26 @@ class MainDialog(QtWidgets.QDialog):
             self.obj_renderer.render(self.obj_scene, self.obj_camera, flush=False)
               
         self.obj_stats.render()
+=======
+    #     json_file = open(json_path)
+    #     try:
+    #         json_data = json.load(json_file)
+    #     except:
+    #         print("Provided JSON does not appear to be valid.")
+        
+    #     loaded_imgs = [self.img_list.item(x).text() for x in range(self.img_list.count())]
+        
+    #     for name, data in json_data.items():
+    #         cam = Camera(iid=name).from_json(data)       
+>>>>>>> 011337936ae2f800c11d92cb24b1c50c4f5de792
         
     def import_images(self):
         """Import selected images.
         """
-        
-        img_paths = QtWidgets.QFileDialog.getOpenFileNames(None, "Load images", "", ("Image (*.tif *.tiff *.png *.jpg *.jpeg)"))[0]
+        if self.akon_check == False:
+            img_paths = QtWidgets.QFileDialog.getOpenFileNames(None, "Load images", "", ("Image (*.tif *.tiff *.png *.jpg *.jpeg)"))[0]
+        else:
+            img_paths = [self.akon_img_path]
         
         loaded_imgs = [self.img_list.item(x).text() for x in range(self.img_list.count())]
         
@@ -541,7 +659,114 @@ class MainDialog(QtWidgets.QDialog):
                 
                 self.add_camera_to_list(cam)
                 self.add_camera_to_cam_lyr(cam)
+
+<<<<<<< HEAD
+=======
+
+>>>>>>> 49f293ec503c6c573cdec001a7db617f1f463824
+    def import_json(self):
+        """Import position and orientation from selected JSON.
+        """
+
+        json_path = QtWidgets.QFileDialog.getOpenFileName(None, "Import position/orientation from json", "", ("JSON (*.json)"))[0]
+
+        try: 
+            self.appr_cam_pos = jsonImport(json_path)
+        except:
+            print("Provided JSON does not appear to be valid.")
+            return
+        
+<<<<<<< HEAD
+        try:    
+=======
+        try:           
+>>>>>>> 49f293ec503c6c573cdec001a7db617f1f463824
+            cam_pos = self.appr_cam_pos.get_pos()[self.active_camera.iid]
+            cam_ori = self.appr_cam_pos.get_ori()[self.active_camera.iid]
+
+            data = {"obj_x0":cam_pos['X0'], "obj_y0":cam_pos['Y0'], "obj_z0":cam_pos['Z0'], 
+                    "alpha":cam_ori['alpha'], "zeta":cam_ori['beta'], "kappa":cam_ori['gamma'],
+                    "img_x0":self.active_camera.img_w/2., "img_y0":self.active_camera.img_h/2.*(-1), "f":np.sqrt(self.active_camera.img_w**2 + self.active_camera.img_h**2)}
+            
+            self.json_check = True
+
+            self.show_dlg_orient()
+            self.dlg_orient.set_init_params(data)
+            self.process_estimated_camera(data)
+
+            self.json_check = False
+
+        except:
+            print("Something went wrong while setting the initial camera parameters! \nPlease check if an image has been selected and try again.")
+            self.json_check = False
+            return   
+        
+<<<<<<< HEAD
+    def import_akon(self):
+        imp_akon_dlg = ImportAkonDialog()
+        imp_akon_dlg.exec_()
+
+        url_base = self.settings['url_base']
+        url_extent = self.settings['url_extent']
+
+        ids = imp_akon_dlg.akon_id.toPlainText().split(';')
+        save_path = QtWidgets.QFileDialog.getExistingDirectory(self)
+
+        for id in ids:
+            img_name = id.strip()
+            self.akon_img_path = save_path+'/'+img_name+'.jpeg'
+            
+            try:
+                urllib.request.urlretrieve(url_base+img_name+'/'+img_name[-3:]+url_extent, self.akon_img_path)
+                
+                self.akon_check = True
+                self.import_images()
+                self.akon_check = False
+
+            except:
+                errorMessage = QgsMessageBar()
+                errorMessage.pushMessage('Could not find an image with the AKON_ID', img_name)
+
+        #try:
+            #img_found = False
+            #layer = QgsProject.instance().mapLayersByName('akon_postcards_pd — akon_postcards_public_domain')[0]
+            #features = layer.getFeatures()
+
+            #for feat in features:
+                #attrs = feat.attributes()
+                #if attrs[1] == id :
+                    #img_found = True
+                    #url = attrs[-2]
+                    #img_name = attrs[1]
+
+            #if img_found:
+                #if imp_akon_dlg.ok == True:
+                    #save_path = QtWidgets.QFileDialog.getExistingDirectory(self)
+                #else:
+                    #save_path=''
+
+                #if len(save_path) > 0:
+                    #urllib.request.urlretrieve(url, save_path + '/' + img_name + '.jpeg')
+
+                    #self.akon_img_path = save_path + '/' + img_name + '.jpeg'
+                    #self.akon_check = True
+                    #self.import_images()
+                    #self.akon_check = False
+                #else:
+                    #pass
+
+            #else:
+                #errorMessage = QgsMessageBar()
+                #errorMessage.pushMessage('Could not find an image with this AKON_ID!')
+        
+        #except:
+            #cancelMessage = QgsMessageBar()
+            #cancelMessage.pushMessage('Process has been canceled!')
+        
+        
+=======
     
+>>>>>>> 49f293ec503c6c573cdec001a7db617f1f463824
     def get_gcps_from_gpkg(self):
         gcps = OrderedDict()
         gcp_data = {"obj_x":None, "obj_y":None, "obj_z":None, "img_x":None, "img_y":None, "img_dx":None, "img_dy":None, "active":None}
@@ -685,7 +910,7 @@ class MainDialog(QtWidgets.QDialog):
         # cam_state = self.obj_camera.get_state()
         
         cam_pos = self.obj_camera.local.position + self.min_xyz
-        print('Kamera Position:',cam_pos)
+        print('Camera Position:',cam_pos)
 
         #the camera appears to be exactly what alzeka needs; hence, we can directly derive alzeka from the rotation matrix
         cam_rmat_pygfx = self.obj_camera.local.rotation_matrix[:3, :3]  #already transposed in contrast to self.obj_camera.view_matrix; otherweise the same
@@ -705,8 +930,10 @@ class MainDialog(QtWidgets.QDialog):
         data["vfov"] = est_vfov
         
         self.set_obj_canvas_camera(data)
-        self.update_camera(data)
-        self.update_gcps(data)
+
+        if self.json_check == False:
+            self.update_camera(data)
+            self.update_gcps(data)
         
     def update_camera(self, data):
         curr_cam = list(self.cam_lyr.getFeatures(expression = "iid = '%s'" % (self.active_camera.iid)))[0]
@@ -816,12 +1043,22 @@ class MainDialog(QtWidgets.QDialog):
         pygfx_rmat = np.zeros((4,4))
         pygfx_rmat[3, 3] = 1
         pygfx_rmat[:3, :3] = photo_rmat
-        
+            
         self.obj_camera.local.rotation_matrix = pygfx_rmat
+<<<<<<< HEAD
         
         self.obj_camera.fov = np.rad2deg(data["hfov"])
         
         self.obj_canvas.request_draw()
+=======
+
+        if self.map_check == True:
+            self.obj_camera.fov = 45
+        else:   
+            self.obj_camera.fov = np.rad2deg(data["hfov"])
+            
+        self.obj_canvas.request_draw(self.animate)
+>>>>>>> 011337936ae2f800c11d92cb24b1c50c4f5de792
 
     def reset_obj_canvas_camera(self):
         self.obj_camera.set_state(self.default_obj_camera_state)
@@ -838,48 +1075,103 @@ class MainDialog(QtWidgets.QDialog):
             self.obj_camera.set_state(self.obj_camera_state)
             self.obj_canvas.request_draw()
 
-    def export_obj_canvas(self):
-
-        def_res = "%i,%i" % (self.active_camera.img_w, self.active_camera.img_h)
-        
-        text, okPressed = QtWidgets.QInputDialog.getText(None, "Export", "Resolution (e.g.: 1920,1080):", QtWidgets.QLineEdit.Normal, def_res)   
-        if okPressed and text != '':
-            res = text    
-
+    def coord_transform(self, point):
+        geom = QgsGeometry.fromPointXY(point)
+        sourceCRS = QgsCoordinateReferenceSystem(iface.mapCanvas().mapSettings().destinationCrs().authid())
+        targetCRS = QgsCoordinateReferenceSystem(self.cam_lyr.crs())
+        tr = QgsCoordinateTransform(sourceCRS, targetCRS, QgsProject.instance())
+        geom.transform(tr)
+        return geom.asPoint()
+    
+    def obj_canvas_camera_from_map(self):
         try:
-            resolution = [float(res.split(',')[0]), float(res.split(',')[1])]
-            print(resolution)
-            if len(resolution) != 2:
-                raise ValueError('Resolution must have two values!')
-            if resolution[0] <= 0 or resolution[1] <= 0:
-                raise ValueError('Resolution must be a positive value!')
+            map_pos = self.coord_transform(iface.mapCanvas().center())
+            map_extent = iface.mapCanvas().extent()
+
+            map_width = map_extent.xMaximum() - map_extent.xMinimum()
+            map_height = map_extent.yMaximum() - map_extent.yMinimum()
+            
+            map_z = map_width/np.tan(45/2)
+            if map_z < self.min_xyz[2]:
+                map_z = self.min_xyz[2]
+
+            min_xy = np.array([self.min_xyz[0], self.min_xyz[1], 0])
+            map_pos_loc = np.array([map_pos.x(), map_pos.y(), map_z]) - min_xy
+
+            obj_camera_target = {'position':map_pos_loc,
+                                        'rotation':np.array([0.,0.,0.,1.]), 
+                                        'scale':np.array([1.,1.,1.]),
+                                        'reference_up':np.array([0.,0.,1.]), 
+                                        'fov':45.0, 
+                                        'width':map_width, 
+                                        'height':map_height, 
+                                        'zoom':1.0, 
+                                        'maintain_aspect':True,
+                                        'depth_range':(1, 1000000)}
+            
+            self.obj_camera.set_state(obj_camera_target)
+            self.obj_camera.show_pos((map_pos_loc[0], map_pos_loc[1], self.min_xyz[2]), up=(0,0,1))
+            self.obj_canvas.request_draw(self.animate)
+
         except:
-            print('No valid resolution has been given: Using default value!')
-            resolution = [1920, 1080]
+            print('No project seems to be loaded!')
 
-        offscreen_canvas = offscreenCanvas(size=(resolution[0], resolution[1]), pixel_ratio=1)
-        offscreen_renderer = gfx.WgpuRenderer(offscreen_canvas)
-          
-        curr_depth = self.obj_camera.depth_range
-        self.obj_camera.depth_range = (100, curr_depth[1])
 
-        for pnts in self.obj_gcps_grp.children:
-            pnts.visible = False
+    def export_obj_canvas(self):
+        try:
+            def_res = [str(self.active_camera.img_w), str(self.active_camera.img_h)]
+        except:
+            def_res = ['1920','1080']
 
-        bg = gfx.Background(None, gfx.BackgroundMaterial([0.086, 0.475, 0.671, 1]))
-        self.obj_scene.remove(self.background)
-        self.obj_scene.add(bg)
+        def_name = self.parent.project_name
 
-        offscreen_canvas.request_draw(offscreen_renderer.render(self.obj_scene, self.obj_camera))
-        img = Image.fromarray(np.asarray(offscreen_canvas.draw()))
-        img.save(os.path.join(os.path.dirname(self.parent.gpkg_path), self.parent.project_name + "_render.png"))
+        export_dialog = ExportMetaDialog(def_res, def_name)
+        export_dialog.exec_()
+        depth_set = False
 
-        self.obj_scene.remove(bg)
-        self.obj_scene.add(self.background)
+        if export_dialog.ok == True:
+            export_path = QtWidgets.QFileDialog.getExistingDirectory(self)
+        else:
+            export_path=''
 
-        for pnts in self.obj_gcps_grp.children:
-            pnts.visible = True
+        if len(export_path) > 0:
+            resolution = [int(export_dialog.res_width.text()), int(export_dialog.res_height.text())]
+            
+            offscreen_canvas = offscreenCanvas(size=(resolution[0], resolution[1]), pixel_ratio=1)
+            offscreen_renderer = gfx.WgpuRenderer(offscreen_canvas)
+
+            if export_dialog.depth_offset.text() == '':
+                pass
+            else:
+                if int(export_dialog.depth_offset.text()) > 0:
+                    depth_set = True  
+                    curr_depth = self.obj_camera.depth_range
+                    self.obj_camera.depth_range = (int(export_dialog.depth_offset.text()), curr_depth[1])
+                else:
+                    pass
+
+            for pnts in self.obj_gcps_grp.children:
+                pnts.visible = False
+
+            bg = gfx.Background(None, gfx.BackgroundMaterial([0.086, 0.475, 0.671, 1]))
+            self.obj_scene.remove(self.background)
+            self.obj_scene.add(bg)
+
+            offscreen_canvas.request_draw(offscreen_renderer.render(self.obj_scene, self.obj_camera))
+            img = Image.fromarray(np.asarray(offscreen_canvas.draw()))
+            img.save(os.path.join(export_path, export_dialog.file_name.text() + "_render.png"))
+
+            self.obj_scene.remove(bg)
+            self.obj_scene.add(self.background)
+
+            for pnts in self.obj_gcps_grp.children:
+                pnts.visible = True
+
+            if depth_set:
+                self.obj_camera.depth_range = (curr_depth[0], curr_depth[1])
         
+        else:
+            pass
 
 
     def toggle_camera(self):
@@ -990,6 +1282,7 @@ class MainDialog(QtWidgets.QDialog):
         self.img_list.setEnabled(True)
         self.img_menu.setEnabled(True)
         self.export_menu.setEnabled(True)
+        #self.btn_fly_mode.setEnabled(True)
         self.project_name = self.windowTitle()
                 
     def activate_gcp_picking(self):
@@ -1107,7 +1400,10 @@ class MainDialog(QtWidgets.QDialog):
     
     def zoom_to_point(self, event):
         if event.button == 2 and "Control" in event.modifiers:
+<<<<<<< HEAD
  
+=======
+>>>>>>> 011337936ae2f800c11d92cb24b1c50c4f5de792
             face_ix = event.pick_info["face_index"]
 
             face_coords = np.array(event.pick_info["face_coord"]).reshape(3, 1) 
@@ -1117,8 +1413,6 @@ class MainDialog(QtWidgets.QDialog):
             face_vertex_pos = event.pick_info["world_object"].geometry.positions.data[face_vertex_ix, :]
             
             click_pos = np.sum(face_vertex_pos*face_coords, axis=0) 
-
-            self.obj_camera_origin = self.obj_camera.get_state()
             
             self.obj_camera_origin = self.obj_camera.get_state()
             self.origin_memory.append(self.obj_camera_origin)
@@ -1150,8 +1444,9 @@ class MainDialog(QtWidgets.QDialog):
             else:
                 pass
 
+    def show_speed(self, event):
+        if "Control" in event.modifiers:
+            self.speed_bar.showMessage('Speed: ' + str(int(self.obj_controller.get_speed())) + ' [units/s]')
 
 
-
-      
 
