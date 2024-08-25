@@ -33,7 +33,8 @@ if __name__ == "__main__":
     
     # json_path = "D:\\4_DATASETS\\at_10m_tirol\\grid_25832_25km\\tiles.json"
     # json_path = "D:\\4_DATASETS\\AKON\\innsbruck_25km_10m_25832\\tiles.json"
-    json_path = "D:\4_DATASETS\AKON\grossglockner_25km_10m_25833\\tiles.json"
+    json_path = "D:\\4_DATASETS\\AKON\\grossglockner_25km_10m_25833\\tiles.json"
+    
     with open(json_path, "r") as f:
             tiles_data = json.load(f)
     
@@ -107,7 +108,7 @@ if __name__ == "__main__":
                 my_vrt = None
                 
                 out_srs = osr.SpatialReference()
-                out_srs.ImportFromEPSG(tiles_data["epsg"])
+                out_srs.ImportFromEPSG(int(tiles_data["epsg"]))
                 
                 inp_srs = osr.SpatialReference()
                 inp_srs.ImportFromEPSG(3857)
