@@ -19,9 +19,11 @@ from terramesh import MeshGrid
 # dtm_path = "D:\\4_DATASETS\\AKON\\grossglockner_25km_10m_25833.tif"
 # out_dir = "D:\\4_DATASETS\\AKON\\grossglockner_25km_10m_25833"
 
-dtm_path = "D:\\4_DATASETS\\AKON\\innsbruck_25km_10m_25832.tif"
-out_dir = "D:\\4_DATASETS\\AKON\\innsbruck_25km_10m_25832"
+# dtm_path = "D:\\4_DATASETS\\AKON\\innsbruck_25km_10m_25832.tif"
+# out_dir = "D:\\4_DATASETS\\AKON\\innsbruck_25km_10m_25832"
 
+dtm_path = "D:\\4_DATASETS\\AKON\\bozen_25km_10m_25832.tif"
+out_dir = "D:\\4_DATASETS\\AKON\\bozen_25km_10m_25832"
 
 tile_grid = MeshGrid(path=dtm_path, tile_size=512, max_error=1)
 tile_grid.snap_boundaries()
