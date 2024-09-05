@@ -25,7 +25,7 @@
 import os
 import time
 from qgis.PyQt import QtWidgets, QtCore, QtGui
-from qgis.gui import QgsMapCanvas
+from qgis.gui import QgsMapCanvas, QgsRubberBand
 from wgpu.gui.qt import WgpuCanvas
 from wgpu.gui.offscreen import WgpuCanvas as offscreenCanvas
 import pygfx as gfx
@@ -41,8 +41,10 @@ import urllib.request
 from collections import OrderedDict
 from qgis.utils import iface
 
-from qgis.core import QgsFeature, QgsPoint, QgsRasterLayer, QgsProject, QgsJsonUtils, QgsGeometry, QgsCoordinateReferenceSystem, QgsCoordinateTransform, QgsFileDownloader
+from qgis.core import QgsFeature, QgsPoint, QgsRasterLayer, QgsProject, QgsJsonUtils, QgsGeometry, QgsCoordinateReferenceSystem, QgsCoordinateTransform, Qgis, QgsPointXY
 from qgis.gui import QgsMapToolPan, QgsMessageBar
+
+from PyQt5.QtGui import QColor
 
 from .dlg_create import CreateDialog
 from .dlg_orient import OrientDialog
@@ -60,6 +62,7 @@ from ..camera import Camera
 from ..helpers import create_point_3d, rot2alzeka, alzeka2rot, calc_hfov, calc_vfov
 
 from ..tools.map_controller import OrbitFlightController
+from ..tools.img_controller import ImageController
 
 class MainDialog(QtWidgets.QDialog):
     
@@ -77,6 +80,9 @@ class MainDialog(QtWidgets.QDialog):
         
         #will be set from monique.py
         self.camera_collection = None
+        self.tiles_data = None
+        self.project_pos_toggled = False
+        self.temporary_camera = None
         
         self.setWindowTitle("moniQue")
         self.setWindowFlag(QtCore.Qt.WindowMaximizeButtonHint, True)
@@ -122,7 +128,6 @@ class MainDialog(QtWidgets.QDialog):
         self.export_action.triggered.connect(self.export_obj_canvas)
         self.export_menu.addAction(self.export_action)
 
-        
         self.main_toolbar = QtWidgets.QToolBar("My main toolbar")
         self.main_toolbar.setIconSize(QtCore.QSize(20, 20))
 
@@ -155,13 +160,6 @@ class MainDialog(QtWidgets.QDialog):
         self.btn_mono_vertex.setCheckable(True)
         self.btn_mono_vertex.triggered.connect(self.toggle_mono_vertex_tool)
         self.main_toolbar.addAction(self.btn_mono_vertex)
-
-        self.main_toolbar.addSeparator()
-
-        self.speed = 2500
-        self.speed_bar = QtWidgets.QStatusBar()
-        self.main_toolbar.addWidget(self.speed_bar)
-        self.speed_bar.showMessage('Speed: ' + str(self.speed) + ' [units/s]')
         
         self.img_toolbar = QtWidgets.QToolBar()
         self.img_toolbar.setIconSize(QtCore.QSize(20, 20))
@@ -209,33 +207,40 @@ class MainDialog(QtWidgets.QDialog):
         btn_obj_canvas_camera_from_map.triggered.connect(self.obj_canvas_camera_from_map)
         self.obj_toolbar.addAction(btn_obj_canvas_camera_from_map)
         
+        self.btn_obj_canvas_show_img = QtWidgets.QAction("Render image in 3D canvas", self)
+        self.btn_obj_canvas_show_img.setIcon(QtGui.QIcon(os.path.join(self.icon_dir, "show_img_3D.png")))
+        self.btn_obj_canvas_show_img.triggered.connect(self.show_img_in_obj_canvas)
+        self.btn_obj_canvas_show_img.setEnabled(False)
+        self.btn_obj_canvas_show_img.setCheckable(True)
+        self.obj_toolbar.addAction(self.btn_obj_canvas_show_img)
+        
         self.obj_renderer = gfx.WgpuRenderer(self.obj_canvas)
         self.obj_scene = gfx.Scene()
         self.obj_stats = gfx.Stats(viewport=self.obj_renderer)
 
-
-        # light_gray = np.array((100, 100, 100, 255)) / 255
         self.background = gfx.Background(None, gfx.BackgroundMaterial([1, 1, 1, 1]))
         self.obj_scene.add(self.background)
+        
+        self.img_plane_grp = gfx.Group()
+        self.obj_scene.add(self.img_plane_grp)
         
         self.obj_camera = gfx.PerspectiveCamera(fov=45, depth_range=(1, 1000000))
         
         self.obj_canvas.request_draw(self.animate)
 
-        # self.obj_controller = gfx.TrackballController(self.obj_camera, register_events=self.obj_renderer, damping=0)
-        self.obj_controller = OrbitFlightController(self.obj_camera, speed=self.speed, register_events=self.obj_renderer, damping=0)
-        
-        # self.obj_scene.add(gfx.AxesHelper(size=1000, thickness=3))
-        
+        self.obj_controller = OrbitFlightController(self.obj_camera, speed=2500, register_events=self.obj_renderer, damping=0)
+        self.img_controller = ImageController(self.obj_camera, register_events=self.obj_renderer, damping=0)
+        self.img_controller.enabled = False
+
         self.list_toolbar = QtWidgets.QToolBar()
         self.list_toolbar.setIconSize(QtCore.QSize(20, 20))
         
         self.img_list = QtWidgets.QListWidget()
         self.img_list.setAlternatingRowColors(True)
         self.img_list.setSelectionMode(QtWidgets.QAbstractItemView.SingleSelection)
-        # self.img_list.itemChanged.connect(self.toggle_camera)
-        self.img_list.itemSelectionChanged.connect(self.toggle_camera)
-        self.img_list.setEnabled(False)
+        self.img_list.itemClicked.connect(self.camera_clicked)
+        
+        self.prev_img_item = None
         
         self.split_canvas = QtWidgets.QSplitter()
         split_max_width = QtWidgets.QApplication.primaryScreen().size().width()
@@ -333,10 +338,6 @@ class MainDialog(QtWidgets.QDialog):
         self.mono_select_tool.set_layers(self.img_line_lyr, self.map_line_lyr)
         self.mono_vertex_tool.set_layers(self.img_line_lyr, self.map_line_lyr)
         
-        # self.tiles_lyr = lyr_dict["tiles_lyr"]
-        # self.tiles_data = lyr_dict["tiles_data"]
-        # print(self.tiles_data)
-        
     def show_dlg_create(self):
         self.dlg_create = CreateDialog(parent=self, icon_dir=self.icon_dir)
         self.dlg_create.created_signal.connect(self.on_created_signal)
@@ -353,12 +354,14 @@ class MainDialog(QtWidgets.QDialog):
             self.dlg_orient.get_camera_signal.connect(self.get_wpgu_camera)
             self.dlg_orient.camera_estimated_signal.connect(self.process_estimated_camera)
             self.dlg_orient.save_orientation_signal.connect(self.save_orientation_to_lyr)
-            
+            self.dlg_orient.activate_mouse_projection_signal.connect(self.toggle_project_mouse_pos)
+            self.dlg_orient.deactivate_mouse_projection_signal.connect(self.untoggle_project_mouse_pos)
             self.dlg_orient.add_gcps_from_lyr(self.get_gcps_from_gpkg())
 
             if self.active_camera.is_oriented == 1:
                 self.dlg_orient.set_init_params(self.active_camera.asdict())
-            
+                self.dlg_orient.btn_preview_pos.setEnabled(True)
+                
             self.dlg_orient.show()
 
     def on_created_signal(self, data):
@@ -408,6 +411,64 @@ class MainDialog(QtWidgets.QDialog):
         self.img_canvas.refresh()
         self.close_dialog_signal.emit()
     
+    def show_img_in_obj_canvas(self):
+                
+        if self.btn_obj_canvas_show_img.isChecked():    #activate
+            
+            self.set_obj_canvas_camera(self.temporary_camera)
+            
+            self.img_list.setEnabled(False)
+            self.img_controller.enabled = True
+            self.obj_controller.enabled = False
+            
+            img_w = self.active_camera.img_w
+            img_h = self.active_camera.img_h
+                    
+            prc = np.array([self.temporary_camera["obj_x0"], self.temporary_camera["obj_y0"], self.temporary_camera["obj_z0"]]) - self.min_xyz
+            rmat = alzeka2rot([self.temporary_camera["alpha"], self.temporary_camera["zeta"], self.temporary_camera["kappa"]])
+            cmat = np.array([[1, 0, -self.temporary_camera["img_x0"]], 
+                            [0, 1, -self.temporary_camera["img_y0"]],
+                            [0, 0, -self.temporary_camera["f"]]])
+            
+            plane_pnts_img = np.array([[0, 0, 1],
+                                [img_w, 0, 1],
+                                [img_w, img_h*(-1), 1],
+                                [0, img_h*(-1), 1]]).T
+            
+            plane_pnts_dir = (rmat@cmat@plane_pnts_img).T
+            plane_pnts_dir = plane_pnts_dir / np.linalg.norm(plane_pnts_dir, axis=1).reshape(-1, 1)
+            
+            plane_pnts_obj = prc + 1000 * plane_pnts_dir
+            plane_faces = np.array([[3, 1, 0], [3, 2, 1]]).astype(np.uint32)
+            plane_uv = np.array([[0, 0], [1, 0], [1, 1], [0, 1]]).astype(np.uint32)
+            
+            plane_geom = gfx.geometries.Geometry(indices=plane_faces, 
+                                                positions=plane_pnts_obj.astype(np.float32),
+                                                texcoords=plane_uv.astype(np.float32))
+            
+            img_path = self.active_camera.path    
+            img = Image.open(img_path)
+            img_array = np.asarray(img)
+            tex = gfx.Texture(img_array, dim=2)
+            
+            plane_material = gfx.MeshBasicMaterial(map=tex, side="FRONT", map_interpolation="linear")
+            plane_mesh = gfx.Mesh(plane_geom, plane_material, visible=True)
+            
+            self.img_controller.set_image(plane_mesh, plane_pnts_dir, prc, distance=1000)
+            
+            self.img_plane_grp.clear()
+            self.img_plane_grp.add(plane_mesh)
+
+            self.obj_canvas.request_draw()
+            
+        else:
+            # self.img_list.setSelectionMode(QtWidgets.QAbstractItemView.SingleSelection)
+            self.img_list.setEnabled(True)
+            self.img_controller.enabled = False
+            self.obj_controller.enabled = True
+            self.img_plane_grp.clear()
+            self.obj_canvas.request_draw()
+        
     # def add_mesh_to_obj_canvas(self, o3d_mesh, bounds, uvs=None, ortho_path=None):        
     def add_mesh_to_obj_canvas(self, tiles_data):
         
@@ -453,7 +514,7 @@ class MainDialog(QtWidgets.QDialog):
                                     
                     img_arr = np.flipud(img_arr)
                     tex = gfx.Texture(img_arr, dim=2)
-                    mesh_material = gfx.MeshBasicMaterial(map=tex, side="FRONT", map_interpolation="nearest", pick_write=True )
+                    mesh_material = gfx.MeshBasicMaterial(map=tex, side="FRONT", map_interpolation="linear", pick_write=True )
                     
                     tile["op"][lod] = tex
                 
@@ -488,7 +549,11 @@ class MainDialog(QtWidgets.QDialog):
 
     def animate(self):     
         
-        with self.obj_stats:
+        # with self.obj_stats:
+            
+        if self.tiles_data is not None:
+            
+            # start_time = time.time()
             
             cam_pos = self.obj_camera.local.position
             frustum = self.obj_camera.frustum
@@ -511,6 +576,10 @@ class MainDialog(QtWidgets.QDialog):
             normals /= np.linalg.norm(normals, axis=-1)[:, None] # normal normals ^_^
             # offset = np.sum(normals * corners_by_plane[:, 3, :], axis=-1)  #d=n*r0; r0 some point on the plane            
             
+            # end_time = time.time()
+            # print("%.6f" % (end_time - start_time))
+            
+            # start_time = time.time()
             for tile in self.tiles_data["tiles"]:
                 result = "INSIDE"
                 tile_cx = np.array(tile["cx_r"][:3]) - self.min_xyz
@@ -551,10 +620,18 @@ class MainDialog(QtWidgets.QDialog):
                     
                 else:
                     self.terrain.children[int(tile["tid_int"])].visible = False
-                            
-            self.obj_renderer.render(self.obj_scene, self.obj_camera, flush=False)
-              
-        self.obj_stats.render()
+            
+            # end_time = time.time()
+            # print("%.6f" % (end_time - start_time))
+            # # print("========")
+        
+        # start_time = time.time()
+        self.obj_renderer.render(self.obj_scene, self.obj_camera)#, flush=False)
+        # end_time = time.time()
+        # print("%.6f" % (end_time - start_time))
+        # print("========")  
+        
+        # self.obj_stats.render()
         
     def import_images(self):
         """Import selected images.
@@ -674,8 +751,7 @@ class MainDialog(QtWidgets.QDialog):
         #except:
             #cancelMessage = QgsMessageBar()
             #cancelMessage.pushMessage('Process has been canceled!')
-        
-        
+              
     def get_gcps_from_gpkg(self):
         gcps = OrderedDict()
         gcp_data = {"obj_x":None, "obj_y":None, "obj_z":None, "img_x":None, "img_y":None, "img_dx":None, "img_dy":None, "active":None}
@@ -799,7 +875,7 @@ class MainDialog(QtWidgets.QDialog):
         img_lyr = QgsRasterLayer(path, iid)
                 
         if not img_lyr.isValid():
-            self.msg_bar.pushError("Error", "Could not load %s!" % (path))
+            self.msg_bar.pushCritical("Error", "Could not load %s!" % (path))
         else:
             if self.img_lyr is not None:
                 QgsProject.instance().removeMapLayer(self.img_lyr.id())
@@ -839,7 +915,8 @@ class MainDialog(QtWidgets.QDialog):
         data["vfov"] = est_vfov
         
         self.set_obj_canvas_camera(data)
-
+        self.show_img_in_obj_canvas()
+        
         if self.json_check == False:
             self.update_camera(data)
             self.update_gcps(data)
@@ -849,8 +926,8 @@ class MainDialog(QtWidgets.QDialog):
         curr_cam_fid = curr_cam.id()
         
         self.cam_lyr.startEditing()
-        self.cam_lyr.changeGeometry(curr_cam_fid, QgsGeometry.fromPoint(QgsPoint(data["obj_x0"], data["obj_y0"])))
         
+        self.cam_lyr.changeGeometry(curr_cam_fid, QgsGeometry.fromPoint(QgsPoint(data["obj_x0"], data["obj_y0"])))
         self.cam_lyr.changeAttributeValue(curr_cam_fid, curr_cam.fieldNameIndex("is_oriented"), 1)
         
         attrs = ["obj_x0", "obj_y0", "obj_z0", "alpha", "zeta", "kappa", "img_x0", "img_y0", "f", "hfov","vfov"]
@@ -940,10 +1017,10 @@ class MainDialog(QtWidgets.QDialog):
         self.camera_collection[cam.iid] = cam
         self.active_camera = self.camera_collection[cam.iid]
         
-    # def discard_changes(self):
-    #     self.img_gcps_lyr.rollBack()
-    #     self.map_gcps_lyr.rollBack()
-    #     self.cam_lyr.rollBack()
+    def discard_changes(self):
+        self.img_gcps_lyr.rollBack()
+        self.map_gcps_lyr.rollBack()
+        self.cam_lyr.rollBack()
          
     def set_obj_canvas_camera(self, data):
         self.obj_camera.local.position = np.array([data["obj_x0"], data["obj_y0"], data["obj_z0"]]) - self.min_xyz
@@ -955,8 +1032,21 @@ class MainDialog(QtWidgets.QDialog):
             
         self.obj_camera.local.rotation_matrix = pygfx_rmat
         
-        self.obj_camera.fov = np.rad2deg(data["hfov"])
+        #we add 5 degrees as border
+        if data["hfov"] >= data["vfov"]:
+            self.obj_camera.fov = np.rad2deg(data["hfov"])+5
+        else:
+            self.obj_camera.fov = np.rad2deg(data["hfov"]*(data["vfov"]/data["hfov"]))+5
+
+        prc = np.array([data["obj_x0"], data["obj_y0"], data["obj_z0"]])
+        rmat = alzeka2rot([data["alpha"], data["zeta"], data["kappa"]])
+        kmat = np.array([[-data["f"], 0, data["img_x0"]], 
+                        [0, -data["f"], data["img_y0"]],
+                        [0, 0, 1]])
+        pmat = kmat@rmat.T@np.hstack((np.eye(3), -prc.reshape(3, 1)))
+        data["pmat"] = pmat
         
+        self.temporary_camera = data
         self.obj_canvas.request_draw()
 
     def reset_obj_canvas_camera(self):
@@ -1015,7 +1105,6 @@ class MainDialog(QtWidgets.QDialog):
         except:
             print('No project seems to be loaded!')
 
-
     def export_obj_canvas(self):
         try:
             def_res = [str(self.active_camera.img_w), str(self.active_camera.img_h)]
@@ -1072,8 +1161,39 @@ class MainDialog(QtWidgets.QDialog):
         else:
             pass
 
+    def camera_clicked(self, item):
+        if item.isSelected():
+            if item == self.prev_img_item:
+                self.untoggle_camera(item)
+                self.prev_img_item = None
+            else:
+                self.toggle_camera(item)
+                self.prev_img_item = item
 
-    def toggle_camera(self):
+    def untoggle_camera(self, item):
+        
+        item.setCheckState(QtCore.Qt.Unchecked)
+        self.img_list.clearSelection()
+        
+        self.obj_gcps_grp.clear()        
+        self.img_plane_grp.clear()
+        self.obj_canvas.request_draw()
+        
+        self.btn_obj_canvas_show_img.setChecked(False)
+        self.btn_obj_canvas_show_img.setEnabled(False)
+        
+        expression = "iid = 'some_crap_that_doesnt_exist'"
+        self.img_line_lyr.setSubsetString(expression)
+        self.img_gcps_lyr.setSubsetString(expression)
+        self.map_gcps_lyr.setSubsetString(expression)
+        
+        self.img_canvas.setLayers([])
+        self.img_canvas.refresh()        
+        
+        self.active_camera = None
+        self.setWindowTitle("%s" % (self.project_name))
+        
+    def toggle_camera(self, item):
         
         #before for the first time an image is loaded
         #into to canvas self.img_lyr is None; Hence, until
@@ -1081,7 +1201,7 @@ class MainDialog(QtWidgets.QDialog):
         if self.img_lyr is None:
             self.btn_ori_tool.setEnabled(True)
         
-        item = self.img_list.selectedItems()[0]
+        # item = self.img_list.selectedItems()[0]
         item.setCheckState(QtCore.Qt.Checked)
         self.uncheck_list_items(item)
                     
@@ -1114,12 +1234,14 @@ class MainDialog(QtWidgets.QDialog):
             self.btn_mono_tool.setEnabled(True)
             self.btn_mono_select.setEnabled(True)
             self.btn_mono_vertex.setEnabled(True)
-            
+            self.btn_obj_canvas_show_img.setEnabled(True)
+                        
             self.mono_tool.set_camera(self.active_camera)
             self.mono_vertex_tool.set_camera(self.active_camera)
             
         else:
             self.btn_mono_tool.setEnabled(False)
+            # self.btn_obj_canvas_show_img.setEnabled(False)
             
         self.obj_canvas.request_draw()
         
@@ -1211,21 +1333,25 @@ class MainDialog(QtWidgets.QDialog):
     def img_gcp_updated(self, data):
         self.dlg_orient.update_selected_gcp(data, gcp_type="img_space")
     
+    def pick_to_world(self, event):
+        face_ix = event.pick_info["face_index"]
+            
+        #face_coords are not normalized; hence, divide by their sum first before using the further
+        face_coords = np.array(event.pick_info["face_coord"]).reshape(3, 1) 
+        face_coords /= np.sum(face_coords)
+        
+        face_vertex_ix = event.pick_info["world_object"].geometry.indices.data[face_ix, :]
+        face_vertex_pos = event.pick_info["world_object"].geometry.positions.data[face_vertex_ix, :]
+        
+        click_pos = np.sum(face_vertex_pos*face_coords, axis=0) 
+        click_pos_global = click_pos + self.min_xyz
+        return click_pos, click_pos_global
+    
     def mesh_picking(self, event):
                 
         if event.button == 1 and "Control" in event.modifiers:
-            print(event.pick_info)
-            face_ix = event.pick_info["face_index"]
-            
-            #face_coords are not normalized; hence, divide by their sum first before using the further
-            face_coords = np.array(event.pick_info["face_coord"]).reshape(3, 1) 
-            face_coords /= np.sum(face_coords)
-            
-            face_vertex_ix = event.pick_info["world_object"].geometry.indices.data[face_ix, :]
-            face_vertex_pos = event.pick_info["world_object"].geometry.positions.data[face_vertex_ix, :]
-            
-            click_pos = np.sum(face_vertex_pos*face_coords, axis=0) 
-            click_pos_global = click_pos + self.min_xyz
+                       
+            click_pos_local, click_pos_global = self.pick_to_world(event)
             
             feat_geom = QgsPoint(click_pos_global[0], click_pos_global[1])
 
@@ -1240,7 +1366,7 @@ class MainDialog(QtWidgets.QDialog):
                 
                 for pnts in self.obj_gcps_grp.children:
                     if int(self.sel_gid) == int(pnts.geometry.gid.data[0]):
-                        pnts.geometry.positions.data[0, :] = click_pos                                      #update point geometry position
+                        pnts.geometry.positions.data[0, :] = click_pos_local                                      #update point geometry position
                         pnts.geometry.positions.update_range(0)
                         pnts.children[0].local.position = pnts.geometry.positions.data[0, :] + [0, 0, 10]   #update position of label
                         break
@@ -1273,7 +1399,7 @@ class MainDialog(QtWidgets.QDialog):
                     
                     curr_gid = dlg_meta.combo_gid.currentText() 
                     
-                    click_obj = create_point_3d(click_pos, curr_gid)
+                    click_obj = create_point_3d(click_pos_local, curr_gid)
                     self.obj_gcps_grp.add(click_obj)
                     self.obj_canvas.request_draw()
                     
@@ -1298,51 +1424,73 @@ class MainDialog(QtWidgets.QDialog):
                     self.map_gcps_lyr.triggerRepaint()
     
     def zoom_to_point(self, event):
-        if event.button == 2 and "Control" in event.modifiers:
- 
-            face_ix = event.pick_info["face_index"]
+        
+        #only conduct zoom to point if image is not currently shown in the object canvas
+        if not self.btn_obj_canvas_show_img.isChecked():
+        
+            if event.button == 2 and "Control" in event.modifiers:
+    
+                click_pos_local, _ = self.pick_to_world(event)
+                
+                self.obj_camera_origin = self.obj_camera.get_state()
+                self.origin_memory.append(self.obj_camera_origin)
 
-            face_coords = np.array(event.pick_info["face_coord"]).reshape(3, 1) 
-            face_coords /= np.sum(face_coords)
-            
-            face_vertex_ix = event.pick_info["world_object"].geometry.indices.data[face_ix, :]
-            face_vertex_pos = event.pick_info["world_object"].geometry.positions.data[face_vertex_ix, :]
-            
-            click_pos = np.sum(face_vertex_pos*face_coords, axis=0) 
-            
-            self.obj_camera_origin = self.obj_camera.get_state()
-            self.origin_memory.append(self.obj_camera_origin)
+                vektor = [click_pos_local[0] - self.obj_camera_origin['position'][0], click_pos_local[1] - self.obj_camera_origin['position'][1], click_pos_local[2] - self.obj_camera_origin['position'][2]]
+                position = [self.obj_camera_origin['position'][0] + vektor[0]/1.05, self.obj_camera_origin['position'][1] + vektor[1]/1.05, self.obj_camera_origin['position'][2] + vektor[2]/1.05]
 
-            vektor = [click_pos[0] - self.obj_camera_origin['position'][0], click_pos[1] - self.obj_camera_origin['position'][1], click_pos[2] - self.obj_camera_origin['position'][2]]
-            position = [self.obj_camera_origin['position'][0] + vektor[0]/1.05, self.obj_camera_origin['position'][1] + vektor[1]/1.05, self.obj_camera_origin['position'][2] + vektor[2]/1.05]
+                self.obj_camera_target = {'position':np.array([position[0], position[1], position[2]]),
+                                            'rotation':self.obj_camera_origin['rotation'], 
+                                            'scale':self.obj_camera_origin['scale'],
+                                            'reference_up':self.obj_camera_origin['reference_up'], 
+                                            'fov':self.obj_camera_origin['fov'], 
+                                            'width':self.obj_camera_origin['width'], 
+                                            'height':self.obj_camera_origin['height'], 
+                                            'zoom':self.obj_camera_origin['zoom'], 
+                                            'maintain_aspect':self.obj_camera_origin['maintain_aspect'],
+                                            'depth_range':self.obj_camera_origin['depth_range']}
+                self.obj_camera.set_state(self.obj_camera_target)
 
-            self.obj_camera_target = {'position':np.array([position[0], position[1], position[2]]),
-                                        'rotation':self.obj_camera_origin['rotation'], 
-                                        'scale':self.obj_camera_origin['scale'],
-                                        'reference_up':self.obj_camera_origin['reference_up'], 
-                                        'fov':self.obj_camera_origin['fov'], 
-                                        'width':self.obj_camera_origin['width'], 
-                                        'height':self.obj_camera_origin['height'], 
-                                        'zoom':self.obj_camera_origin['zoom'], 
-                                        'maintain_aspect':self.obj_camera_origin['maintain_aspect'],
-                                        'depth_range':self.obj_camera_origin['depth_range']}
-            self.obj_camera.set_state(self.obj_camera_target)
-
-            self.obj_camera.show_pos((click_pos[0], click_pos[1], click_pos[2]), up=(0,0,1))
-            
-            self.obj_canvas.request_draw()
-            
-        if event.button == 2 and "Shift" in event.modifiers:
-            if len(self.origin_memory) > 0:
-                self.obj_camera.set_state(self.origin_memory[-1])
-                self.origin_memory.pop(-1)
+                self.obj_camera.show_pos((click_pos_local[0], click_pos_local[1], click_pos_local[2]), up=(0,0,1))
+                
                 self.obj_canvas.request_draw()
-            else:
-                pass
+                
+            if event.button == 2 and "Alt" in event.modifiers:
+                if len(self.origin_memory) > 0:
+                    self.obj_camera.set_state(self.origin_memory[-1])
+                    self.origin_memory.pop(-1)
+                    self.obj_canvas.request_draw()
+                else:
+                    pass
 
-    def show_speed(self, event):
-        if "Control" in event.modifiers:
-            self.speed_bar.showMessage('Speed: ' + str(int(self.obj_controller.get_speed())) + ' [units/s]')
-
-
-
+    def toggle_project_mouse_pos(self):
+        self.project_pos_toggled = True
+        
+        #rubber band for storing reprojected poin from 3d canvas into image
+        self.img_rubber = QgsRubberBand(self.img_canvas, Qgis.GeometryType.Point)
+        self.img_rubber.setIcon(1)
+        self.img_rubber.setColor(QColor(252,15,192, 255))
+        self.img_rubber.setIconSize(15)
+        
+        for mesh in self.terrain.children:
+            mesh.add_event_handler(self.reproject_pos, "pointer_move")
+    
+    def untoggle_project_mouse_pos(self):
+                
+        if self.project_pos_toggled:
+            for mesh in self.terrain.children:
+                mesh.remove_event_handler(self.reproject_pos, "pointer_move")
+            self.project_pos_toggled = False
+            self.img_rubber.reset()
+            
+    def reproject_pos(self, event):
+        _, click_pos_global = self.pick_to_world(event)
+        
+        click_pos_img_hom = self.temporary_camera["pmat"]@np.append(click_pos_global.ravel(), values=1)
+        click_pos_img = click_pos_img_hom[:2] / click_pos_img_hom[-1]
+        
+        #display only if the reprojected point is within the image
+        if ((click_pos_img[0] > 0) and (click_pos_img[0] <= self.active_camera.img_w)):
+            if (click_pos_img[1] < 0) and (click_pos_img[1] >= self.active_camera.img_h*(-1)):
+                self.img_rubber.removeLastPoint()
+                self.img_rubber.addPoint(QgsPointXY(click_pos_img[0], click_pos_img[1]))
+                self.img_rubber.show()

@@ -28,17 +28,8 @@ import numpy as np
 import pandas as pd
 
 from qgis.PyQt import QtWidgets, QtCore, QtGui
-from qgis.gui import QgsProjectionSelectionWidget
-from qgis.core import (
-    Qgis,
-    QgsProject,
-    QgsVectorLayer,
-    QgsFeature,
-    QgsField,
-    QgsGeometry,
-    QgsPointXY,
-    QgsVectorFileWriter,
-)
+from PyQt5.QtGui import QCursor
+from PyQt5.QtCore import Qt
 
 import operator
 from ..lsq import srs_lm
@@ -53,6 +44,9 @@ class OrientDialog(QtWidgets.QDialog):
     get_camera_signal = QtCore.pyqtSignal()
     camera_estimated_signal = QtCore.pyqtSignal(object)
     save_orientation_signal = QtCore.pyqtSignal()
+    
+    activate_mouse_projection_signal = QtCore.pyqtSignal()
+    deactivate_mouse_projection_signal = QtCore.pyqtSignal()
     
     def __init__(self, parent=None, icon_dir=None, active_iid=None):
         """Constructor."""
@@ -74,6 +68,8 @@ class OrientDialog(QtWidgets.QDialog):
         self.parent.img_list.setEnabled(False)
         self.parent.activate_gcp_picking()
 
+        self.parent.obj_canvas.setCursor(QCursor(Qt.CrossCursor))
+        
         self.icon_dir = icon_dir
 
         self.setWindowTitle("%s - Camera parameter estimation" % (active_iid))
@@ -102,6 +98,13 @@ class OrientDialog(QtWidgets.QDialog):
         self.btn_import_gcps.setIcon(QtGui.QIcon(os.path.join(self.icon_dir, "mActionCapturePoint.png")))
         self.btn_import_gcps.triggered.connect(self.import_gcps_from_csv)
         table_toolbar.addAction(self.btn_import_gcps)
+        
+        self.btn_preview_pos = QtWidgets.QAction("Project current mouse position into the image", self)
+        self.btn_preview_pos.setIcon(QtGui.QIcon(os.path.join(self.icon_dir, "preview_pos.png")))
+        self.btn_preview_pos.triggered.connect(self.project_mouse_position)
+        self.btn_preview_pos.setEnabled(False)
+        self.btn_preview_pos.setCheckable(True)
+        table_toolbar.addAction(self.btn_preview_pos)
     
         self.table_gcps = QtWidgets.QTableWidget()
         
@@ -547,11 +550,25 @@ class OrientDialog(QtWidgets.QDialog):
                 self.btn_save_ori.setEnabled(True)
 
     def save_orientation(self):
+        self.btn_preview_pos.setEnabled(True)
         self.save_orientation_signal.emit()
     
+    def project_mouse_position(self):
+        if self.btn_preview_pos.isChecked():    #activate
+            self.activate_mouse_projection_signal.emit()
+        else:
+            self.deactivate_mouse_projection_signal.emit()
+    
     def closeEvent(self, event):
+        self.btn_preview_pos.setChecked(False)
+        self.btn_preview_pos.setEnabled(False)
+        
         self.parent.img_list.setEnabled(True)
         self.parent.btn_ori_tool.setChecked(False)
-
+        
+        self.parent.untoggle_project_mouse_pos()
         self.parent.deactivate_gcp_picking()
+        
+        self.parent.obj_canvas.setCursor(QCursor(Qt.ArrowCursor))
+        
         self.parent.discard_changes()

@@ -108,10 +108,8 @@ class Camera():
         self.y0_std = ior["y0_std"]
         
         self.ior = [self.x0, self.y0, self.f]
-        self.ior_Std = [self.x0_Std, self.y0_std, self.f_std]
+        self.ior_Std = [self.x0_std, self.y0_std, self.f_std]
 
-        
-        
     # def alpha2azi(self):
     #     pass
     
