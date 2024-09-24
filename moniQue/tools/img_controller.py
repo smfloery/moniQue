@@ -4,7 +4,7 @@ from typing import Tuple
 import numpy as np
 
 class ImageController(Controller):
-       
+
     _default_controls = {
         "wheel": ("position", "push", -0.001),
         "alt+wheel": ("opacity", "push", -0.01),
@@ -12,7 +12,7 @@ class ImageController(Controller):
     
     def set_image(self, image, pnts_dir, prc, distance=1000):
         self.image = image
-        self.distance = 1000
+        self.distance = distance
         self.pnts_dir = pnts_dir
         self.prc = prc
         
@@ -27,7 +27,7 @@ class ImageController(Controller):
         upd_dist = self.distance+delta*1000
         if upd_dist < 10:
             upd_dist = 10
-            
+                
         upd_pnts = self.prc + upd_dist*self.pnts_dir
         self.image.geometry.positions.data[:, :] = upd_pnts
         self.image.geometry.positions.update_range(0, 4)

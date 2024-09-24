@@ -33,7 +33,9 @@ from PyQt5.QtCore import Qt
 
 import operator
 from ..lsq import srs_lm
-from ..helpers import calc_hfov, calc_vfov
+from ..helpers import calc_hfov, calc_vfov, alzeka2rot
+
+import pygfx as gfx
 
 class OrientDialog(QtWidgets.QDialog):
     
@@ -548,6 +550,9 @@ class OrientDialog(QtWidgets.QDialog):
                 self.set_init_params(est_data)
                 self.set_residuals(est_data)
                 self.btn_save_ori.setEnabled(True)
+
+        ########################################################################################################################################
+
 
     def save_orientation(self):
         self.btn_preview_pos.setEnabled(True)

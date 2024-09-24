@@ -43,6 +43,7 @@ from qgis.utils import iface
 
 from qgis.core import QgsFeature, QgsPoint, QgsRasterLayer, QgsProject, QgsJsonUtils, QgsGeometry, QgsCoordinateReferenceSystem, QgsCoordinateTransform, Qgis, QgsPointXY
 from qgis.gui import QgsMapToolPan, QgsMessageBar
+from qgis.PyQt.QtWidgets import QFileDialog
 
 from PyQt5.QtGui import QColor
 
@@ -213,7 +214,7 @@ class MainDialog(QtWidgets.QDialog):
         self.btn_obj_canvas_show_img.setEnabled(False)
         self.btn_obj_canvas_show_img.setCheckable(True)
         self.obj_toolbar.addAction(self.btn_obj_canvas_show_img)
-        
+
         self.obj_renderer = gfx.WgpuRenderer(self.obj_canvas)
         self.obj_scene = gfx.Scene()
         self.obj_stats = gfx.Stats(viewport=self.obj_renderer)
@@ -223,6 +224,12 @@ class MainDialog(QtWidgets.QDialog):
         
         self.img_plane_grp = gfx.Group()
         self.obj_scene.add(self.img_plane_grp)
+
+        self.cam_planes_grp = gfx.Group()
+        self.obj_scene.add(self.cam_planes_grp)
+
+        self.cam_lines_grp = gfx.Group()
+        self.obj_scene.add(self.cam_lines_grp)
         
         self.obj_camera = gfx.PerspectiveCamera(fov=45, depth_range=(1, 1000000))
         
@@ -299,6 +306,9 @@ class MainDialog(QtWidgets.QDialog):
         self.akon_check = False
 
         self.get_settings()
+        self.FPS = self.settings['FPS_counter']
+
+        self.iid_list = []
 
 
     def get_settings(self):
@@ -311,6 +321,7 @@ class MainDialog(QtWidgets.QDialog):
         for i in settings:
             key_value_pair = i.split('=')
             self.settings[key_value_pair[0].strip()] = key_value_pair[1].strip()
+
         
     def set_layers(self, lyr_dict):
         self.reg_lyr = lyr_dict["reg_lyr"]
@@ -415,6 +426,8 @@ class MainDialog(QtWidgets.QDialog):
                 
         if self.btn_obj_canvas_show_img.isChecked():    #activate
             
+            self.img_in_obj_check = True
+
             self.set_obj_canvas_camera(self.temporary_camera)
             
             self.img_list.setEnabled(False)
@@ -463,11 +476,65 @@ class MainDialog(QtWidgets.QDialog):
             
         else:
             # self.img_list.setSelectionMode(QtWidgets.QAbstractItemView.SingleSelection)
+            self.img_in_obj_check = False
             self.img_list.setEnabled(True)
             self.img_controller.enabled = False
             self.obj_controller.enabled = True
             self.img_plane_grp.clear()
             self.obj_canvas.request_draw()
+
+    def show_camera_in_obj_canvas(self):
+
+        for cam_feat in self.cam_lyr.getFeatures():
+
+            if cam_feat['obj_x0'] != None and cam_feat['iid'] not in self.iid_list:
+
+                self.iid_list.append(cam_feat['iid'])
+
+                img_w = int(cam_feat['img_w'])
+                img_h = int(cam_feat['img_h'])
+                        
+                prc = np.array([float(cam_feat["obj_x0"]), float(cam_feat["obj_y0"]), float(cam_feat["obj_z0"])]) - self.min_xyz
+                rmat = alzeka2rot([float(cam_feat["alpha"]), float(cam_feat["zeta"]), float(cam_feat["kappa"])])
+                cmat = np.array([[1, 0, -float(cam_feat["img_x0"])], 
+                                    [0, 1, -float(cam_feat["img_y0"])],
+                                    [0, 0, -float(cam_feat["f"])]])
+                    
+                plane_pnts_img = np.array([[0, 0, 1],
+                                        [img_w, 0, 1],
+                                        [img_w, img_h*(-1), 1],
+                                        [0, img_h*(-1), 1]]).T
+                    
+                plane_pnts_dir = (rmat@cmat@plane_pnts_img).T
+                plane_pnts_dir = plane_pnts_dir / np.linalg.norm(plane_pnts_dir, axis=1).reshape(-1, 1)
+                    
+                plane_pnts_obj = prc + 100 * plane_pnts_dir
+                plane_faces = np.array([[3, 1, 0], [3, 2, 1]]).astype(np.uint32)
+                plane_uv = np.array([[0, 0], [1, 0], [1, 1], [0, 1]]).astype(np.uint32)
+                    
+                plane_geom = gfx.geometries.Geometry(indices=plane_faces, 
+                                                        positions=plane_pnts_obj.astype(np.float32),
+                                                        texcoords=plane_uv.astype(np.float32))
+                    
+                plane_material = gfx.MeshBasicMaterial(color = (1, 0.65, 0, 1), opacity=0.5)
+                plane_mesh = gfx.Mesh(plane_geom, plane_material, visible=True)
+                    
+                self.img_controller.set_image(plane_mesh, plane_pnts_dir, prc, distance=1000)
+                    
+                self.cam_planes_grp.add(plane_mesh)
+
+                lines = []
+                positions = []
+                for i in range(4):
+                    positions.append([list(prc),plane_pnts_obj[i]])
+                    lines.append(gfx.Line(
+                                    gfx.Geometry(positions=positions[i]),
+                                    gfx.LineMaterial(thickness=1.0, color=(1, 0.65, 0.0), opacity=1)))
+                    
+                for i in lines:
+                    self.cam_lines_grp.add(i)
+
+        self.obj_canvas.request_draw()
         
     # def add_mesh_to_obj_canvas(self, o3d_mesh, bounds, uvs=None, ortho_path=None):        
     def add_mesh_to_obj_canvas(self, tiles_data):
@@ -477,6 +544,8 @@ class MainDialog(QtWidgets.QDialog):
         lod_lvls = self.tiles_data["op_lvls"]
         self.terrain = gfx.Group()
         self.min_xyz = np.array(self.tiles_data["min_xyz"])
+
+        self.show_camera_in_obj_canvas()
         
         for tile in self.tiles_data["tiles"]:
             tile["op"] = {}
@@ -549,89 +618,95 @@ class MainDialog(QtWidgets.QDialog):
 
     def animate(self):     
         
-        # with self.obj_stats:
+        with self.obj_stats:
             
-        if self.tiles_data is not None:
-            
-            # start_time = time.time()
-            
-            cam_pos = self.obj_camera.local.position
-            frustum = self.obj_camera.frustum
-            corners_flat = frustum.reshape((-1, 3))
-                    
-            corners_by_plane = np.stack([
-                corners_flat[[0, 3, 7, 4], :],
-                corners_flat[[5, 6, 2, 1], :],
-                corners_flat[[3, 2, 6, 7], :],
-                corners_flat[[4, 5, 1, 0], :],
-                corners_flat[[1, 2, 3, 0], :],
-                corners_flat[[4, 7, 6, 5], :]], axis=0)
-                        
-            # planes in normal form (normals point away from the frustum area)
-            normals = np.cross(
-                corners_by_plane[:, 0, :] - corners_by_plane[:, 3, :],
-                corners_by_plane[:, 2, :] - corners_by_plane[:, 3, :]
-            )
-            
-            normals /= np.linalg.norm(normals, axis=-1)[:, None] # normal normals ^_^
-            # offset = np.sum(normals * corners_by_plane[:, 3, :], axis=-1)  #d=n*r0; r0 some point on the plane            
-            
-            # end_time = time.time()
-            # print("%.6f" % (end_time - start_time))
-            
-            # start_time = time.time()
-            for tile in self.tiles_data["tiles"]:
-                result = "INSIDE"
-                tile_cx = np.array(tile["cx_r"][:3]) - self.min_xyz
+            if self.tiles_data is not None:
                 
-                for nx in range(6):
+                #start_time = time.time()
+                
+                cam_pos = self.obj_camera.local.position
+                frustum = self.obj_camera.frustum
+                corners_flat = frustum.reshape((-1, 3))
+                        
+                corners_by_plane = np.stack([
+                    corners_flat[[0, 3, 7, 4], :],
+                    corners_flat[[5, 6, 2, 1], :],
+                    corners_flat[[3, 2, 6, 7], :],
+                    corners_flat[[4, 5, 1, 0], :],
+                    corners_flat[[1, 2, 3, 0], :],
+                    corners_flat[[4, 7, 6, 5], :]], axis=0)
+                            
+                # planes in normal form (normals point away from the frustum area)
+                normals = np.cross(
+                    corners_by_plane[:, 0, :] - corners_by_plane[:, 3, :],
+                    corners_by_plane[:, 2, :] - corners_by_plane[:, 3, :]
+                )
+                
+                normals /= np.linalg.norm(normals, axis=-1)[:, None] # normal normals ^_^
+                # offset = np.sum(normals * corners_by_plane[:, 3, :], axis=-1)  #d=n*r0; r0 some point on the plane            
+                
+                #end_time = time.time()
+                #print("%.6f" % (end_time - start_time))
+                
+                #start_time = time.time()
+                for tile in self.tiles_data["tiles"]:
+                    result = "INSIDE"
+                    tile_cx = np.array(tile["cx_r"][:3]) - self.min_xyz
                     
-                    #normal distance between any point on the plane and the sphere center                
-                    #https://www.w3schools.blog/distance-of-a-point-from-a-plane
-                    #simplest frustum culling technique; renderes more tiles than actually visible;
-                    cx_c_vec = tile_cx - corners_by_plane[nx, 0, :]                    
-                    cx_dist = np.dot(cx_c_vec, normals[nx, :])
-                                    
-                    if cx_dist > tile["cx_r"][-1]:
-                        result="OUTSIDE"
-                        break
-                                    
-                # #first tile added to group has tid_pygfx = 0; Hence, we can use this id to directly access the 
-                # #respective children within the list; no need for an additional for loop;
-                if result == "INSIDE":
-                    
-                    dist_from_cam = np.linalg.norm(tile_cx-cam_pos)
-                    
-                    if dist_from_cam >= 25000:
-                        lod_lvl = "10"
-                    elif ((dist_from_cam < 25000) & (dist_from_cam >= 15000)):
-                        lod_lvl = "11"
-                    elif ((dist_from_cam < 15000) & (dist_from_cam >= 10000)):
-                        lod_lvl = "12"
-                    elif ((dist_from_cam < 10000) & (dist_from_cam >= 5000)):
-                        lod_lvl = "13"
-                    # elif ((dist_from_cam < 5000) & (dist_from_cam >= 2500)):
-                    #     lod_lvl = "14"
+                    for nx in range(6):
+                        
+                        #normal distance between any point on the plane and the sphere center                
+                        #https://www.w3schools.blog/distance-of-a-point-from-a-plane
+                        #simplest frustum culling technique; renderes more tiles than actually visible;
+                        cx_c_vec = tile_cx - corners_by_plane[nx, 0, :]                    
+                        cx_dist = np.dot(cx_c_vec, normals[nx, :])
+                                        
+                        if cx_dist > tile["cx_r"][-1]:
+                            result="OUTSIDE"
+                            break
+                                        
+                    # #first tile added to group has tid_pygfx = 0; Hence, we can use this id to directly access the 
+                    # #respective children within the list; no need for an additional for loop;
+                    if result == "INSIDE":
+                        
+                        dist_from_cam = np.linalg.norm(tile_cx-cam_pos)
+                        
+                        if dist_from_cam >= 25000:
+                            lod_lvl = "10"
+                        elif ((dist_from_cam < 25000) & (dist_from_cam >= 15000)):
+                            lod_lvl = "12"
+                        elif ((dist_from_cam < 15000) & (dist_from_cam >= 10000)):
+                            lod_lvl = "14"
+                        elif ((dist_from_cam < 10000) & (dist_from_cam >= 5000)):
+                            lod_lvl = "15"
+                        #elif ((dist_from_cam < 5000) & (dist_from_cam >= 2500)):
+                            #lod_lvl = "16"
+                        else:
+                            lod_lvl = "17"
+                        
+                        self.terrain.children[int(tile["tid_int"])].material.map = tile["op"][lod_lvl]
+                        self.terrain.children[int(tile["tid_int"])].visible = True
+                        
                     else:
-                        lod_lvl = "17"
-                    
-                    self.terrain.children[int(tile["tid_int"])].material.map = tile["op"][lod_lvl]
-                    self.terrain.children[int(tile["tid_int"])].visible = True
-                    
-                else:
-                    self.terrain.children[int(tile["tid_int"])].visible = False
+                        self.terrain.children[int(tile["tid_int"])].visible = False
+                
+                #end_time = time.time()
+                #print("%.6f" % (end_time - start_time))
+                #print("========")
             
-            # end_time = time.time()
-            # print("%.6f" % (end_time - start_time))
-            # # print("========")
-        
-        # start_time = time.time()
-        self.obj_renderer.render(self.obj_scene, self.obj_camera)#, flush=False)
-        # end_time = time.time()
-        # print("%.6f" % (end_time - start_time))
-        # print("========")  
-        
-        # self.obj_stats.render()
+            #start_time = time.time()
+            #self.obj_renderer.render(self.obj_scene, self.obj_camera)#, flush=False)
+            #end_time = time.time()
+            #print("%.6f" % (end_time - start_time))
+            #print("========")  
+            
+            if self.FPS == 'True':
+                self.obj_renderer.render(self.obj_scene, self.obj_camera, flush=False)
+                self.obj_stats.render()
+            else:
+                self.obj_renderer.render(self.obj_scene, self.obj_camera)
+            
+            
         
     def import_images(self):
         """Import selected images.
@@ -715,43 +790,7 @@ class MainDialog(QtWidgets.QDialog):
             except:
                 errorMessage = QgsMessageBar()
                 errorMessage.pushMessage('Could not find an image with the AKON_ID', img_name)
-
-        #try:
-            #img_found = False
-            #layer = QgsProject.instance().mapLayersByName('akon_postcards_pd — akon_postcards_public_domain')[0]
-            #features = layer.getFeatures()
-
-            #for feat in features:
-                #attrs = feat.attributes()
-                #if attrs[1] == id :
-                    #img_found = True
-                    #url = attrs[-2]
-                    #img_name = attrs[1]
-
-            #if img_found:
-                #if imp_akon_dlg.ok == True:
-                    #save_path = QtWidgets.QFileDialog.getExistingDirectory(self)
-                #else:
-                    #save_path=''
-
-                #if len(save_path) > 0:
-                    #urllib.request.urlretrieve(url, save_path + '/' + img_name + '.jpeg')
-
-                    #self.akon_img_path = save_path + '/' + img_name + '.jpeg'
-                    #self.akon_check = True
-                    #self.import_images()
-                    #self.akon_check = False
-                #else:
-                    #pass
-
-            #else:
-                #errorMessage = QgsMessageBar()
-                #errorMessage.pushMessage('Could not find an image with this AKON_ID!')
-        
-        #except:
-            #cancelMessage = QgsMessageBar()
-            #cancelMessage.pushMessage('Process has been canceled!')
-              
+         
     def get_gcps_from_gpkg(self):
         gcps = OrderedDict()
         gcp_data = {"obj_x":None, "obj_y":None, "obj_z":None, "img_x":None, "img_y":None, "img_dx":None, "img_dy":None, "active":None}
@@ -939,6 +978,8 @@ class MainDialog(QtWidgets.QDialog):
             self.cam_lyr.changeAttributeValue(curr_cam_fid, curr_cam.fieldNameIndex(attr), float(data[attr]))
         
         self.cam_lyr.triggerRepaint()
+
+        self.show_camera_in_obj_canvas()
     
     def update_gcps(self, data):
         curr_img_gcps = self.img_gcps_lyr.getFeatures(expression = "iid = '%s'" % (self.active_camera.iid))
@@ -1171,6 +1212,9 @@ class MainDialog(QtWidgets.QDialog):
                 self.prev_img_item = item
 
     def untoggle_camera(self, item):
+
+        self.cam_planes_grp.visible = True
+        self.cam_lines_grp.visible = True
         
         item.setCheckState(QtCore.Qt.Unchecked)
         self.img_list.clearSelection()
@@ -1194,6 +1238,9 @@ class MainDialog(QtWidgets.QDialog):
         self.setWindowTitle("%s" % (self.project_name))
         
     def toggle_camera(self, item):
+
+        self.cam_planes_grp.visible = False
+        self.cam_lines_grp.visible = False
         
         #before for the first time an image is loaded
         #into to canvas self.img_lyr is None; Hence, until
@@ -1207,7 +1254,19 @@ class MainDialog(QtWidgets.QDialog):
                     
         iid = item.text()
         iid_path = self.camera_collection[iid].path
-        
+
+        if not os.path.exists(iid_path):
+            iid_path = QFileDialog.getOpenFileName(None, "Image not found! Select new directory to the Image", "", ("JPEG (*.jpeg)"))[0]
+            self.camera_collection[iid].set_path(iid_path)
+
+            field_idx = self.cam_lyr.fields().indexOf('path')
+            for feat in self.cam_lyr.getFeatures():
+                if feat['iid'] == iid:
+                    feature_id = feat.id()
+                    self.cam_lyr.startEditing()
+                    self.cam_lyr.changeAttributeValue(feature_id,field_idx,iid_path)
+                    self.cam_lyr.commitChanges()
+
         self.load_img(iid, iid_path)
         
         expression = "iid = '%s'" % (iid)
@@ -1314,13 +1373,18 @@ class MainDialog(QtWidgets.QDialog):
         self.img_picker_tool.set_layers(img_gcps_lyr=self.img_gcps_lyr, map_gcps_lyr=self.map_gcps_lyr)
         
         self.img_picker_tool.gcpAdded.connect(self.img_gcp_added)
+        self.img_picker_tool.gcpEdit.connect(self.gcp_selected)
         self.img_picker_tool.gcpUpdated.connect(self.img_gcp_updated)
-
+        self.img_picker_tool.gcpUpdated.connect(self.deselect_gcp)
+        
         self.img_canvas.setMapTool(self.img_picker_tool)
         
         #GCP picking ib object space
         for mesh in self.terrain.children:
             mesh.add_event_handler(self.mesh_picking, "click")
+    
+    def gcp_selected(self, data):
+        self.dlg_orient.gcp_selected(data, 1)
 
     def deactivate_gcp_picking(self):
         for mesh in self.terrain.children:
@@ -1375,6 +1439,10 @@ class MainDialog(QtWidgets.QDialog):
                 self.dlg_orient.update_selected_gcp({"obj_x":click_pos_global[0],
                                                      "obj_y":click_pos_global[1],
                                                      "obj_z":click_pos_global[2]}, gcp_type="obj_space")
+                
+                self.img_gcps_lyr.removeSelection()
+                self.deselect_gcp()
+
             else:
                 
                 dlg_meta = GcpMetaDialog()
@@ -1422,7 +1490,23 @@ class MainDialog(QtWidgets.QDialog):
                     (res, afeat) = self.map_gcps_lyr.dataProvider().addFeatures([feat])
                     self.map_gcps_lyr.commitChanges()
                     self.map_gcps_lyr.triggerRepaint()
-    
+
+        if event.button == 1 and "Alt" in event.modifiers:
+            click_pos_local, _ = self.pick_to_world(event)
+            mx = click_pos_local[0] + self.min_xyz[0]
+            my = click_pos_local[1] + self.min_xyz[1]
+            mz = click_pos_local[2] + self.min_xyz[2]
+
+            gcp_dict = {}
+            for feat in self.map_gcps_lyr.getFeatures():
+                gcp_dict[feat['gid']] = (feat['obj_x'], feat['obj_y'], feat['obj_z'])
+
+            dist = [np.sqrt((mx-gcp_dict[i][0])**2 + (my-gcp_dict[i][1])**2 + (mz-gcp_dict[i][2])**2) for i in gcp_dict.keys()]
+            rix = dist.index(min(dist))
+
+            if dist[rix] < 100:
+                self.gcp_selected(rix)
+
     def zoom_to_point(self, event):
         
         #only conduct zoom to point if image is not currently shown in the object canvas

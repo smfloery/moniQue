@@ -1,3 +1,5 @@
+# ITALY
+
 import json
 import os
 from osgeo import gdal, osr
@@ -34,7 +36,7 @@ if __name__ == "__main__":
     zoom_lvls_res = [150, 80, 40, 20, 10, 5, 2.5, 1]
     
     # json_path = "D:\\4_DATASETS\\AKON\\bozen_25km_10m_25832\\tiles.json"
-    json_path = "D:\\4_DATASETS\\AKON\\wolkenstein_25km_10m_25832\\tiles.json"
+    json_path = "C:\\Users\\David\\Documents\\TU-Job\\QGIS\\grossvenediger_25km\\tiles.json"
     
     odir_op = os.path.join(os.path.dirname(json_path), "op")
     if not os.path.exists(odir_op):
