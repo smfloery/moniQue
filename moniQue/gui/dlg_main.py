@@ -678,7 +678,7 @@ class MainDialog(QtWidgets.QDialog):
                         elif ((dist_from_cam < 15000) & (dist_from_cam >= 10000)):
                             lod_lvl = "14"
                         elif ((dist_from_cam < 10000) & (dist_from_cam >= 5000)):
-                            lod_lvl = "15"
+                            lod_lvl = "16"
                         #elif ((dist_from_cam < 5000) & (dist_from_cam >= 2500)):
                             #lod_lvl = "16"
                         else:
@@ -1238,9 +1238,6 @@ class MainDialog(QtWidgets.QDialog):
         self.setWindowTitle("%s" % (self.project_name))
         
     def toggle_camera(self, item):
-
-        self.cam_planes_grp.visible = False
-        self.cam_lines_grp.visible = False
         
         #before for the first time an image is loaded
         #into to canvas self.img_lyr is None; Hence, until
@@ -1256,7 +1253,16 @@ class MainDialog(QtWidgets.QDialog):
         iid_path = self.camera_collection[iid].path
 
         if not os.path.exists(iid_path):
-            iid_path = QFileDialog.getOpenFileName(None, "Image not found! Select new directory to the Image", "", ("JPEG (*.jpeg)"))[0]
+            #iid_path = QFileDialog.getOpenFileName(None, "Image not found! Please, select new directory.", "", ("JPEG (*.jpeg)"))[0]
+            while True:
+                iid_dir = QFileDialog.getExistingDirectory(self, "Image not found! Please, select the directory to the image.")
+                iid_path = iid_dir+'/'+iid+'.jpeg'
+                if os.path.exists(iid_path) or iid_dir == '':
+                    break
+                else:
+                    print('No image with the right name in this directory! (Only JPEG is supported)') 
+                    continue
+
             self.camera_collection[iid].set_path(iid_path)
 
             field_idx = self.cam_lyr.fields().indexOf('path')
