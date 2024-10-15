@@ -27,8 +27,6 @@ import open3d as o3d
 import numpy as np
 import pandas as pd
 
-from IPython.display import display
-
 from qgis.PyQt import QtWidgets, QtCore, QtGui
 from PyQt5.QtGui import QCursor
 from PyQt5.QtCore import Qt
@@ -75,7 +73,6 @@ class OrientDialog(QtWidgets.QDialog):
         self.parent.obj_canvas.setCursor(QCursor(Qt.CrossCursor))
         
         self.icon_dir = icon_dir
-        self.active_iid = active_iid
 
         self.setWindowTitle("%s - Camera parameter estimation" % (active_iid))
         self.resize(800, 400)
@@ -256,7 +253,7 @@ class OrientDialog(QtWidgets.QDialog):
         layout = QtWidgets.QVBoxLayout()
         layout.setSpacing(0)
         layout.setContentsMargins(0, 0, 0, 5)
-        #layout.addWidget(self.main_toolbar)
+        # layout.addWidget(self.main_toolbar)
         layout.addLayout(main_layout)
         self.setLayout(layout)
 
@@ -312,23 +309,6 @@ class OrientDialog(QtWidgets.QDialog):
                 for gcp in gcps:
                     self.add_gcp_to_table(gcp)
                     self.gcp_imported_signal.emit(gcp)
-
-    def export_gcps_from_csv(self):
-        nr_rows = self.table_gcps.rowCount()
-        gcp_dict = {"gid":[], "img_x":[], "img_y":[], "obj_x":[], "obj_y":[], "obj_z":[]}
-
-        for rix in range(nr_rows):
-            gcp_dict["gid"].append(self.table_gcps.item(rix, 1).text())
-            gcp_dict["img_x"].append(self.table_gcps.item(rix, 5).text())
-            gcp_dict["img_y"].append(self.table_gcps.item(rix, 6).text())
-            gcp_dict["obj_x"].append(self.table_gcps.item(rix, 2).text())
-            gcp_dict["obj_y"].append(self.table_gcps.item(rix, 3).text())
-            gcp_dict["obj_z"].append(self.table_gcps.item(rix, 4).text())
-
-        csv_path = QtWidgets.QFileDialog.getExistingDirectory(self)
-
-        df_gcp = pd.DataFrame(data = gcp_dict)
-        df_gcp.to_csv(csv_path+'/'+self.active_iid+'.csv', sep=';', index=False)
         
     def delete_selected_gcp(self):
         self.gcp_delete_signal.emit({"gid":self.sel_gid})

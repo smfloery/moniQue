@@ -308,7 +308,7 @@ class MainDialog(QtWidgets.QDialog):
         self.get_settings()
         self.FPS = self.settings['FPS_counter']
 
-        self.iid_list = []
+        self.cam_dict = {}
 
 
     def get_settings(self):
@@ -487,10 +487,7 @@ class MainDialog(QtWidgets.QDialog):
 
         for cam_feat in self.cam_lyr.getFeatures():
 
-            if cam_feat['obj_x0'] != None and cam_feat['iid'] not in self.iid_list:
-
-                self.iid_list.append(cam_feat['iid'])
-
+            if cam_feat['obj_x0'] != None:
                 img_w = int(cam_feat['img_w'])
                 img_h = int(cam_feat['img_h'])
                         
@@ -520,19 +517,20 @@ class MainDialog(QtWidgets.QDialog):
                 plane_mesh = gfx.Mesh(plane_geom, plane_material, visible=True)
                     
                 self.img_controller.set_image(plane_mesh, plane_pnts_dir, prc, distance=1000)
-                    
-                self.cam_planes_grp.add(plane_mesh)
+                
+                positions = [[list(prc),plane_pnts_obj[i]] for i in range(4)]
+                lines = [gfx.Line(gfx.Geometry(positions=positions[i]), gfx.LineMaterial(thickness=1.0, color=(1, 0.65, 0.0), opacity=1)) for i in range(4)]
 
-                lines = []
-                positions = []
-                for i in range(4):
-                    positions.append([list(prc),plane_pnts_obj[i]])
-                    lines.append(gfx.Line(
-                                    gfx.Geometry(positions=positions[i]),
-                                    gfx.LineMaterial(thickness=1.0, color=(1, 0.65, 0.0), opacity=1)))
-                    
+                if cam_feat['iid'] in self.cam_dict.keys():
+                    self.cam_dict[cam_feat['iid']].clear()
+
+                self.cam_dict[cam_feat['iid']] = gfx.Group()
+                self.obj_scene.add(self.cam_dict[cam_feat['iid']])
+                self.cam_dict[cam_feat['iid']].add(plane_mesh)   
+
                 for i in lines:
-                    self.cam_lines_grp.add(i)
+                    self.cam_dict[cam_feat['iid']].add(i)
+
 
         self.obj_canvas.request_draw()
         
@@ -678,7 +676,7 @@ class MainDialog(QtWidgets.QDialog):
                         elif ((dist_from_cam < 15000) & (dist_from_cam >= 10000)):
                             lod_lvl = "14"
                         elif ((dist_from_cam < 10000) & (dist_from_cam >= 5000)):
-                            lod_lvl = "16"
+                            lod_lvl = "15"
                         #elif ((dist_from_cam < 5000) & (dist_from_cam >= 2500)):
                             #lod_lvl = "16"
                         else:
@@ -1213,11 +1211,12 @@ class MainDialog(QtWidgets.QDialog):
 
     def untoggle_camera(self, item):
 
-        self.cam_planes_grp.visible = True
-        self.cam_lines_grp.visible = True
-        
         item.setCheckState(QtCore.Qt.Unchecked)
         self.img_list.clearSelection()
+
+        iid = item.text()
+        if iid in self.cam_dict.keys():
+            self.cam_dict[iid].visible = True
         
         self.obj_gcps_grp.clear()        
         self.img_plane_grp.clear()
@@ -1252,17 +1251,11 @@ class MainDialog(QtWidgets.QDialog):
         iid = item.text()
         iid_path = self.camera_collection[iid].path
 
-        if not os.path.exists(iid_path):
-            #iid_path = QFileDialog.getOpenFileName(None, "Image not found! Please, select new directory.", "", ("JPEG (*.jpeg)"))[0]
-            while True:
-                iid_dir = QFileDialog.getExistingDirectory(self, "Image not found! Please, select the directory to the image.")
-                iid_path = iid_dir+'/'+iid+'.jpeg'
-                if os.path.exists(iid_path) or iid_dir == '':
-                    break
-                else:
-                    print('No image with the right name in this directory! (Only JPEG is supported)') 
-                    continue
+        if iid in self.cam_dict.keys():
+            self.cam_dict[iid].visible = False
 
+        if not os.path.exists(iid_path):
+            iid_path = QFileDialog.getOpenFileName(None, "Image not found! Select new directory to the Image", "", ("JPEG (*.jpeg)"))[0]
             self.camera_collection[iid].set_path(iid_path)
 
             field_idx = self.cam_lyr.fields().indexOf('path')
