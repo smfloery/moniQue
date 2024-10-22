@@ -1254,11 +1254,21 @@ class MainDialog(QtWidgets.QDialog):
         if iid in self.cam_dict.keys():
             self.cam_dict[iid].visible = False
 
+        
         if not os.path.exists(iid_path):
-            iid_path = QFileDialog.getOpenFileName(None, "Image not found! Select new directory to the Image", "", ("JPEG (*.jpeg)"))[0]
-            self.camera_collection[iid].set_path(iid_path)
+            #iid_path = QFileDialog.getOpenFileName(None, "Image not found! Please, select new directory.", "", ("JPEG (*.jpeg)"))[0]
+            while True:
+                iid_dir = QFileDialog.getExistingDirectory(self, "Image not found! Please, select the directory to the image.")
+                iid_path = iid_dir+'/'+iid+'.jpeg'
+                if os.path.exists(iid_path) or iid_dir == '':
+                    break
+                else:
+                    print('No image with the right name in this directory! (Only JPEG is supported)') 
+                    continue
 
+            self.camera_collection[iid].set_path(iid_path)
             field_idx = self.cam_lyr.fields().indexOf('path')
+            
             for feat in self.cam_lyr.getFeatures():
                 if feat['iid'] == iid:
                     feature_id = feat.id()
