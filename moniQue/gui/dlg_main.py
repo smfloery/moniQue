@@ -100,6 +100,10 @@ class MainDialog(QtWidgets.QDialog):
         self.export_menu = QtWidgets.QMenu("&Export", self)
         self.export_menu.setEnabled(False)
         self.menu.addMenu(self.export_menu)
+
+        self.view_menu = QtWidgets.QMenu("&View", self)
+        self.view_menu.setEnabled(False)
+        self.menu.addMenu(self.view_menu)
         
         self.create_action = QtWidgets.QAction("&New project", self)
         self.create_action.triggered.connect(self.show_dlg_create)
@@ -128,6 +132,10 @@ class MainDialog(QtWidgets.QDialog):
         self.export_action = QtWidgets.QAction("&Export Object View to PNG", self)
         self.export_action.triggered.connect(self.export_obj_canvas)
         self.export_menu.addAction(self.export_action)
+
+        self.showCam_action = QtWidgets.QAction("&Show Camera Position in 3D", self)
+        self.showCam_action.triggered.connect(self.showCam)
+        self.view_menu.addAction(self.showCam_action)
 
         self.main_toolbar = QtWidgets.QToolBar("My main toolbar")
         self.main_toolbar.setIconSize(QtCore.QSize(20, 20))
@@ -309,6 +317,7 @@ class MainDialog(QtWidgets.QDialog):
         self.FPS = self.settings['FPS_counter']
 
         self.cam_dict = {}
+        self.showCam_check = False
 
 
     def get_settings(self):
@@ -524,7 +533,7 @@ class MainDialog(QtWidgets.QDialog):
                 if cam_feat['iid'] in self.cam_dict.keys():
                     self.cam_dict[cam_feat['iid']].clear()
 
-                self.cam_dict[cam_feat['iid']] = gfx.Group()
+                self.cam_dict[cam_feat['iid']] = gfx.Group(visible=False)
                 self.obj_scene.add(self.cam_dict[cam_feat['iid']])
                 self.cam_dict[cam_feat['iid']].add(plane_mesh)   
 
@@ -533,6 +542,17 @@ class MainDialog(QtWidgets.QDialog):
 
 
         self.obj_canvas.request_draw()
+
+    def showCam(self):
+        self.showCam_check = not self.showCam_check
+
+        if self.showCam_check:
+            for key in self.cam_dict.keys():
+                self.cam_dict[key].visible = True
+        else:
+            for key in self.cam_dict.keys():
+                self.cam_dict[key].visible = False
+
         
     # def add_mesh_to_obj_canvas(self, o3d_mesh, bounds, uvs=None, ortho_path=None):        
     def add_mesh_to_obj_canvas(self, tiles_data):
@@ -668,6 +688,8 @@ class MainDialog(QtWidgets.QDialog):
                     if result == "INSIDE":
                         
                         dist_from_cam = np.linalg.norm(tile_cx-cam_pos)
+
+                        #lod_lvl = "17"
                         
                         if dist_from_cam >= 25000:
                             lod_lvl = "10"
@@ -676,11 +698,12 @@ class MainDialog(QtWidgets.QDialog):
                         elif ((dist_from_cam < 15000) & (dist_from_cam >= 10000)):
                             lod_lvl = "14"
                         elif ((dist_from_cam < 10000) & (dist_from_cam >= 5000)):
-                            lod_lvl = "15"
+                            lod_lvl = "16"
                         #elif ((dist_from_cam < 5000) & (dist_from_cam >= 2500)):
                             #lod_lvl = "16"
                         else:
                             lod_lvl = "17"
+                        
                         
                         self.terrain.children[int(tile["tid_int"])].material.map = tile["op"][lod_lvl]
                         self.terrain.children[int(tile["tid_int"])].visible = True
@@ -1214,9 +1237,9 @@ class MainDialog(QtWidgets.QDialog):
         item.setCheckState(QtCore.Qt.Unchecked)
         self.img_list.clearSelection()
 
-        iid = item.text()
-        if iid in self.cam_dict.keys():
-            self.cam_dict[iid].visible = True
+        #iid = item.text()
+        #if iid in self.cam_dict.keys():
+            #self.cam_dict[iid].visible = True
         
         self.obj_gcps_grp.clear()        
         self.img_plane_grp.clear()
@@ -1251,8 +1274,8 @@ class MainDialog(QtWidgets.QDialog):
         iid = item.text()
         iid_path = self.camera_collection[iid].path
 
-        if iid in self.cam_dict.keys():
-            self.cam_dict[iid].visible = False
+        #if iid in self.cam_dict.keys():
+            #self.cam_dict[iid].visible = False
 
         
         if not os.path.exists(iid_path):
@@ -1371,7 +1394,7 @@ class MainDialog(QtWidgets.QDialog):
         self.img_list.setEnabled(True)
         self.img_menu.setEnabled(True)
         self.export_menu.setEnabled(True)
-        #self.btn_fly_mode.setEnabled(True)
+        self.view_menu.setEnabled(True)
         self.project_name = self.windowTitle()
                 
     def activate_gcp_picking(self):

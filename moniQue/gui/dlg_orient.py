@@ -34,6 +34,7 @@ from PyQt5.QtCore import Qt
 import operator
 from ..lsq import srs_lm
 from ..helpers import calc_hfov, calc_vfov, alzeka2rot
+from .dlg_meta_offset import OffsetMetaDialog
 
 import pygfx as gfx
 
@@ -107,6 +108,18 @@ class OrientDialog(QtWidgets.QDialog):
         self.btn_preview_pos.setEnabled(False)
         self.btn_preview_pos.setCheckable(True)
         table_toolbar.addAction(self.btn_preview_pos)
+
+        self.btn_offset = QtWidgets.QAction("Set Offset", self)
+        self.btn_offset.setIcon(QtGui.QIcon(os.path.join(self.icon_dir, "mActionCapturePoint.png")))
+        self.btn_offset.triggered.connect(self.set_offset)
+        table_toolbar.addAction(self.btn_offset)
+        self.offset_x = 0.0
+        self.offset_y = 0.0
+        self.offset_z = 0.0
+        self.offset_al = 0.0
+        self.offset_ka = 0.0
+        self.offset_ze = 0.0
+        self.offset_fov = 0.0
     
         self.table_gcps = QtWidgets.QTableWidget()
         
@@ -258,6 +271,7 @@ class OrientDialog(QtWidgets.QDialog):
         self.setLayout(layout)
 
         self.error_dialog = QtWidgets.QErrorMessage(parent=self)
+
         
     def gcp_selected(self, rix, cix):
         
@@ -488,7 +502,7 @@ class OrientDialog(QtWidgets.QDialog):
                 self.table_gcps.setItem(rix, self.name2ix["dy"], QtWidgets.QTableWidgetItem(""))
              
     def calc_orientation(self):
-        
+
         if not self.init_params:
             self.error_dialog.showMessage('Set initial camera parameters first!')
         else:
@@ -500,7 +514,7 @@ class OrientDialog(QtWidgets.QDialog):
                     curr_gid = self.table_gcps.item(rix, self.name2ix["gid"]).text()
                     curr_obj_x = float(self.table_gcps.item(rix, self.name2ix["X"]).text())
                     curr_obj_y = float(self.table_gcps.item(rix, self.name2ix["Y"]).text())
-                    curr_obj_z = float(self.table_gcps.item(rix, self.name2ix["Z"]).text())
+                    curr_obj_z = float(self.table_gcps.item(rix, self.name2ix["Z"]).text()) 
                     curr_img_x = float(self.table_gcps.item(rix, self.name2ix["x"]).text())
                     curr_img_y = float(self.table_gcps.item(rix, self.name2ix["y"]).text())
                     
@@ -517,7 +531,7 @@ class OrientDialog(QtWidgets.QDialog):
             else:
                 est_obj_x0 = res.params["obj_x0"].value
                 est_obj_y0 = res.params["obj_y0"].value
-                est_obj_z0 = res.params["obj_z0"].value
+                est_obj_z0 = res.params["obj_z0"].value 
                 est_alpha = res.params["alpha"].value
                 est_zeta = res.params["zeta"].value
                 est_kappa = res.params["kappa"].value
@@ -534,15 +548,15 @@ class OrientDialog(QtWidgets.QDialog):
                 
                 gcp_dict = {"residuals": dict(zip(gcp_gids, gcp_residuals.tolist()))}
                 
-                est_data = {"obj_x0":est_obj_x0,
-                            "obj_y0":est_obj_y0,
-                            "obj_z0":est_obj_z0,
-                            "alpha":est_alpha,
-                            "zeta":est_zeta,
-                            "kappa":est_kappa,
+                est_data = {"obj_x0":est_obj_x0 + self.offset_x,
+                            "obj_y0":est_obj_y0 + self.offset_y,
+                            "obj_z0":est_obj_z0 + self.offset_z,
+                            "alpha":est_alpha + self.offset_al,
+                            "zeta":est_zeta + self.offset_ze,
+                            "kappa":est_kappa + self.offset_ka,
                             "img_x0":self.init_params["img_x0"],
                             "img_y0":self.init_params["img_y0"],
-                            "f":est_focal}
+                            "f":est_focal + self.offset_fov}
                 est_data = {**est_data, **cxx_dict}
                 est_data = {**est_data, **gcp_dict}
                 
@@ -577,3 +591,25 @@ class OrientDialog(QtWidgets.QDialog):
         self.parent.obj_canvas.setCursor(QCursor(Qt.ArrowCursor))
         
         self.parent.discard_changes()
+
+    def set_offset(self):
+        offset_dialog = OffsetMetaDialog()
+        offset_dialog.exec_()
+
+        if offset_dialog.offset_x.text() != '':
+            self.offset_x = float(offset_dialog.offset_x.text())
+        if offset_dialog.offset_y.text() != '':
+            self.offset_y = float(offset_dialog.offset_y.text())
+        if offset_dialog.offset_z.text() != '':
+            self.offset_z = float(offset_dialog.offset_z.text())
+        if offset_dialog.offset_al.text() != '':
+            self.offset_al = (float(offset_dialog.offset_al.text())*np.pi)/180
+        if offset_dialog.offset_ka.text() != '':
+            self.offset_ka = (float(offset_dialog.offset_ka.text())*np.pi)/180
+        if offset_dialog.offset_ze.text() != '':
+            self.offset_ze = (float(offset_dialog.offset_ze.text())*np.pi)/180
+        if offset_dialog.offset_fov.text() != '':
+            self.offset_fov = float(offset_dialog.offset_fov.text())
+
+
+
