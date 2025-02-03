@@ -8,10 +8,10 @@ import shapely
 
 if __name__ == "__main__":
 
-    gpkg_path = "P:\\Projects\\23_CS4SEHAG\\07_Work_Data\\AOIs\\lech_25km.gpkg"
-    out_path = "C:\\Users\\sfloery\\Desktop\\lech_25km_a.tif"
+    gpkg_path = "C:\\Users\\David\\Documents\\TU-Job\\DATA\\AOIs\\grossvenediger_25km.gpkg"
+    out_path = "C:\\Users\\David\\Documents\\TU-Job\\DATA\\AOIs\\grossvenediger_25km.tif"
 
-    dgm_path = "P:\\Datapool\\Austria\\Austria\\01_DTM\\21_OGD_10m\\2_DTM\\dhm_at_lamb_10m_2018.tif"
+    dgm_path = "C:\\Users\\David\\Documents\\TU-Job\\DATA\\AUSTRIA\\dhm_at_lamb_10m_2018.tif"
     dgm_data = gdal.Open(dgm_path)
     dgm_proj = osr.SpatialReference(wkt=dgm_data.GetProjection())
     dgm_epsg = dgm_proj.GetAttrValue('AUTHORITY', 1)

@@ -133,4 +133,7 @@ class Camera():
         # if min_dist is not None:
         ray_start = np.ravel(self.prc + self.min_dist * pnts_obj_dir_norm)
         return np.array([[ray_start[0], ray_start[1], ray_start[2], pnts_obj_dir_norm[0], pnts_obj_dir_norm[1], pnts_obj_dir_norm[2]]])
+    
+    def set_path(self, new_path):
+        self.path = new_path
        

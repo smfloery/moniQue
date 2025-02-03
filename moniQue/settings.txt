@@ -1,2 +1,3 @@
 url_base = https://iiif.onb.ac.at/images/AKON/
 url_extent = /full/full/0/native.jpg
+FPS_counter = True

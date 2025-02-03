@@ -1,3 +1,5 @@
+# AUSTRIA
+
 import json
 import os
 import morecantile
@@ -35,7 +37,7 @@ if __name__ == "__main__":
     # json_path = "D:\\4_DATASETS\\AKON\\innsbruck_25km_10m_25832\\tiles.json"
     # json_path = "D:\\4_DATASETS\\AKON\\grossglockner_25km_10m_25833\\tiles.json"
     # json_path = "D:\\4_DATASETS\\AKON\\pizbuin_25km_10m_25832\\tiles.json"
-    json_path = "D:\\4_DATASETS\\AKON\\lech_25km_10m_25832\\tiles.json"
+    json_path = "C:\\Users\\David\\Documents\\TU-Job\\QGIS\\grossvenediger_25km\\tiles.json"
     
     with open(json_path, "r") as f:
             tiles_data = json.load(f)

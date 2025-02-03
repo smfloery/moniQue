@@ -88,10 +88,15 @@ class GcpMetaDialog(QDialog):
     #     self.line_comment.clear()
     
     def accept(self):
-        if self.combo_gid.currentText() not in self.gids_not_allowed:
-            super().accept()
-        else:
+        if self.combo_gid.currentText() in self.gids_not_allowed:
             self.error_dialog.showMessage('GID already in use!')
+
+        elif self.combo_gid.currentText() == '':
+            self.error_dialog.showMessage('GID has to be chosen!')
+            
+        else:
+            super().accept()
+            
             
     def createForm(self):
   

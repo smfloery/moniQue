@@ -23,7 +23,7 @@
 """
 from qgis.PyQt.QtCore import Qt
 from qgis.PyQt.QtGui import QIcon
-from qgis.PyQt.QtWidgets import QAction, QApplication
+from qgis.PyQt.QtWidgets import QAction, QApplication, QFileDialog
 
 from qgis.core import QgsProject, QgsVectorLayer, QgsJsonUtils
 from qgis.gui import QgsMapToolPan, QgsMessageBar
@@ -194,6 +194,13 @@ class MoniQue:
         
         reg_feat = list(self.reg_lyr.getFeatures())[0]
         json_path = reg_feat["json_path"]
+
+        if not os.path.exists(json_path):
+            json_path = QFileDialog.getOpenFileName(None, "Mesh not found! Select new directory to the Mesh", "", ("JSON (*.json)"))[0]
+            field_idx = self.reg_lyr.fields().indexOf('json_path')
+            self.reg_lyr.startEditing()
+            self.reg_lyr.changeAttributeValue(1,field_idx,json_path)
+            self.reg_lyr.commitChanges()
         
         with open(json_path, "r") as f:
             tiles_data = json.load(f)

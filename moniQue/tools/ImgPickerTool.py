@@ -2,12 +2,15 @@ from qgis.gui import QgsMapTool, QgsRubberBand
 from qgis.core import QgsPointXY, QgsFeature, QgsPoint, QgsGeometry, QgsJsonUtils
 from qgis.PyQt.QtCore import Qt
 import json
+import numpy as np
 from PyQt5.QtCore import pyqtSignal
 
 class ImgPickerTool(QgsMapTool):
     
     gcpAdded = pyqtSignal(object)
     gcpUpdated = pyqtSignal(object)
+
+    gcpEdit = pyqtSignal(object)
     
     def __init__(self, canvas, meta_window):
         
@@ -48,6 +51,7 @@ class ImgPickerTool(QgsMapTool):
                         self.img_gcps_lyr.changeAttributeValue(sel_fid, self.img_gcps_lyr_img_x_ix, "%.1f" % (mx))
                         self.img_gcps_lyr.changeAttributeValue(sel_fid, self.img_gcps_lyr_img_y_ix, "%.1f" % (my))
                         self.img_gcps_lyr.commitChanges()
+                        self.img_gcps_lyr.removeSelection()
                         self.gcpUpdated.emit({"img_x":mx, "img_y":my})
                         
                     else:       
@@ -86,6 +90,20 @@ class ImgPickerTool(QgsMapTool):
                         
                     self.img_gcps_lyr.triggerRepaint()
                     self.canvas.refresh()
+        
+        if (e.button() == Qt.LeftButton) & (e.modifiers() == Qt.AltModifier):
+            click_pos = self.toMapCoordinates(e.pos())            
+            mx, my = float(click_pos.x()), float(click_pos.y())
+
+            gcp_dict = {}
+            for feat in self.img_gcps_lyr.getFeatures():
+                gcp_dict[feat['gid']] = (feat['img_x'],feat['img_y'])
+
+            dist = [np.sqrt((mx-gcp_dict[i][0])**2 + (my-gcp_dict[i][1])**2) for i in gcp_dict.keys()]
+            rix = dist.index(min(dist))
+
+            if dist[rix] < 50:
+                self.gcpEdit.emit(rix)      
                     
     def reset(self):
         pass

@@ -1,5 +1,5 @@
 import sys
-sys.path.append(r"H:\Software\moniQue\monique")
+sys.path.append(r"C:\Users\David\AppData\Roaming\QGIS\QGIS3\profiles\default\python\plugins\moniQue")
 
 import argparse
 from terramesh import MeshGrid
@@ -25,8 +25,8 @@ from terramesh import MeshGrid
 # dtm_path = "D:\\4_DATASETS\\AKON\\bozen_25km_10m_25832.tif"
 # out_dir = "D:\\4_DATASETS\\AKON\\bozen_25km_10m_25832"
 
-dtm_path = "D:\\4_DATASETS\\AKON\\wolkenstein_25km_10m_25832.tif"
-out_dir = "D:\\4_DATASETS\\AKON\\wolkenstein_25km_10m_25832"
+dtm_path = "C:\\Users\\David\\Documents\\TU-Job\\DATA\\AOIs\\grossvenediger_25km.tif"
+out_dir = "C:\\Users\\David\\Documents\\TU-Job\\QGIS\\grossvenediger_25km"
 
 tile_grid = MeshGrid(path=dtm_path, tile_size=512, max_error=1)
 tile_grid.snap_boundaries()
