@@ -207,6 +207,13 @@ class MoniQue:
             tiles_data["tile_dir"] = os.path.join(os.path.dirname(json_path), "mesh")
             tiles_data["op_dir"] = os.path.join(os.path.dirname(json_path), "op")
             
+            mesh_lvls = []
+            sd_names = next(os.walk(tiles_data["tile_dir"]))[1]
+            for sd in sd_names:
+                mesh_lvls.append(int(sd))
+            mesh_lvls.sort(reverse=True)
+            tiles_data["mesh_lvls"] = list(map(str, mesh_lvls))
+            
             if os.path.exists(tiles_data["op_dir"]):
     
                 op_lvls = []            
@@ -218,6 +225,8 @@ class MoniQue:
                 tiles_data["op_lvls"] = list(map(str, op_lvls))
             else:
                 tiles_data["op_lvls"] = []
+        
+        print(tiles_data["mesh_lvls"])
         
         ##! WIE IN ZUKUNFT DIE RAYCASTING SCENE SETZEN?
         # self.ray_scene = scene

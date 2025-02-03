@@ -29,16 +29,20 @@ if __name__ == "__main__":
     wms_img_fmt = "image/jpeg"
     wms_style = ""
     wms_version = "1.3.0"
-    
     wms_max_size = 2000
     
-    zoom_lvls = [10, 11, 12, 13, 14, 15, 16, 17]
-    zoom_lvls_res = [150, 80, 40, 20, 10, 5, 2.5, 1]
+    # zoom_lvls = [10, 11, 12, 13, 14, 15, 16, 17]
+    # zoom_lvls_res = [150, 80, 40, 20, 10, 5, 2.5, 1]
+    
+    zoom_lvls = [17]
+    zoom_lvls_res = [1]
     
     # json_path = "D:\\4_DATASETS\\AKON\\bozen_25km_10m_25832\\tiles.json"
-    json_path = "C:\\Users\\David\\Documents\\TU-Job\\QGIS\\grossvenediger_25km\\tiles.json"
+    # json_path = "D:\\4_DATASETS\\AKON\\wolkenstein_25km_10m_25832\\tiles.json"
+    # json_path = "D:\\4_DATASETS\\HABER\\solnhofen_1m_utm32_felix\\tiles.json"
+    json_path = "D:\\1_PROJECTS\\01_SEHAG\\05_STEREO_PAIRS\\mt_stereo\\tiles.json"
     
-    odir_op = os.path.join(os.path.dirname(json_path), "op")
+    odir_op = os.path.join(os.path.dirname(json_path), "op_bozen")
     if not os.path.exists(odir_op):
         os.mkdir(odir_op)
     
@@ -66,10 +70,11 @@ if __name__ == "__main__":
             if img_w < wms_max_size:
                 # pass
                 wms_getmap = "%s&version=%s&crs=%s&layers=%s&styles=%s&format=%s&width=%i&height=%i&bbox=%s" % (wms_url, wms_version, wms_crs, wms_lyr, wms_style, wms_img_fmt, img_w, img_h, bbox_str)
-        
+                print(wms_getmap)
+                
                 r = requests.get(wms_getmap, stream=True)
                 if r.status_code == 200:
-                    
+                    print(r.raw)
                     img = Image.open(r.raw)
                     tile_arr = np.array(img, dtype=np.uint8)
                                     
@@ -97,7 +102,8 @@ if __name__ == "__main__":
                         curr_bbox_str = ",".join(map(str, curr_bbox))
                         
                         wms_getmap = "%s&version=%s&crs=%s&layers=%s&styles=%s&format=%s&width=%i&height=%i&bbox=%s" % (wms_url, wms_version, wms_crs, wms_lyr, wms_style, wms_img_fmt, max_c - min_c, max_r-min_r, curr_bbox_str)
-
+                        print(wms_getmap)
+                                 
                         r = requests.get(wms_getmap, stream=True)
                         if r.status_code == 200:
                             

@@ -567,7 +567,7 @@ class MainDialog(QtWidgets.QDialog):
         
         for tile in self.tiles_data["tiles"]:
             tile["op"] = {}
-            tile_path = os.path.join(self.tiles_data["tile_dir"], "%s.ply" % (tile["tid"]))
+            tile_path = os.path.join(self.tiles_data["tile_dir"], "1", "%s.ply" % (tile["tid"]))
             tile_mesh = o3d.io.read_triangle_mesh(tile_path)
 
             verts = np.asarray(tile_mesh.vertices)
@@ -588,22 +588,23 @@ class MainDialog(QtWidgets.QDialog):
             if len(lod_lvls) > 0:
             
                 for lod in lod_lvls:
-                    lod_path = os.path.join(self.tiles_data["op_dir"], "%s_mesh" % lod, "%s.tif" % (tile["tid"]))
-                                
-                    img_ds = gdal.Open(lod_path)
-                    img_h = img_ds.RasterYSize
-                    img_w = img_ds.RasterXSize
-                    img_arr = np.zeros((img_h, img_w, 3), dtype=np.uint8)
-                                
-                    for bx in range(3):
-                        bx_arr = img_ds.GetRasterBand(bx+1).ReadAsArray()
-                        img_arr[:, :, bx] = bx_arr
+                    if lod == "17":
+                        lod_path = os.path.join(self.tiles_data["op_dir"], "%s_mesh" % lod, "%s.tif" % (tile["tid"]))
                                     
-                    img_arr = np.flipud(img_arr)
-                    tex = gfx.Texture(img_arr, dim=2)
-                    mesh_material = gfx.MeshBasicMaterial(map=tex, side="FRONT", map_interpolation="linear", pick_write=True )
-                    
-                    tile["op"][lod] = tex
+                        img_ds = gdal.Open(lod_path)
+                        img_h = img_ds.RasterYSize
+                        img_w = img_ds.RasterXSize
+                        img_arr = np.zeros((img_h, img_w, 3), dtype=np.uint8)
+                                    
+                        for bx in range(3):
+                            bx_arr = img_ds.GetRasterBand(bx+1).ReadAsArray()
+                            img_arr[:, :, bx] = bx_arr
+                                        
+                        img_arr = np.flipud(img_arr)
+                        tex = gfx.Texture(img_arr, dim=2, generate_mipmaps=True)
+                        mesh_material = gfx.MeshBasicMaterial(map=tex, side="FRONT", map_interpolation="linear", pick_write=True)
+                        
+                        # tile["op"][lod] = tex
                 
             else:
                 mesh_material = gfx.MeshNormalMaterial(side="FRONT", pick_write=True)
@@ -640,7 +641,7 @@ class MainDialog(QtWidgets.QDialog):
             
             if self.tiles_data is not None:
                 
-                #start_time = time.time()
+                # start_time = time.time()
                 
                 cam_pos = self.obj_camera.local.position
                 frustum = self.obj_camera.frustum
@@ -663,10 +664,10 @@ class MainDialog(QtWidgets.QDialog):
                 normals /= np.linalg.norm(normals, axis=-1)[:, None] # normal normals ^_^
                 # offset = np.sum(normals * corners_by_plane[:, 3, :], axis=-1)  #d=n*r0; r0 some point on the plane            
                 
-                #end_time = time.time()
-                #print("%.6f" % (end_time - start_time))
+                # end_time = time.time()
+                # print("%.6f" % (end_time - start_time))
                 
-                #start_time = time.time()
+                # start_time = time.time()
                 for tile in self.tiles_data["tiles"]:
                     result = "INSIDE"
                     tile_cx = np.array(tile["cx_r"][:3]) - self.min_xyz
@@ -687,47 +688,37 @@ class MainDialog(QtWidgets.QDialog):
                     # #respective children within the list; no need for an additional for loop;
                     if result == "INSIDE":
                         
-                        dist_from_cam = np.linalg.norm(tile_cx-cam_pos)
-
-                        #lod_lvl = "17"
+                        # dist_from_cam = np.linalg.norm(tile_cx-cam_pos)
+                        # if dist_from_cam >= 25000:
+                        #     lod_lvl = "10"
+                        # elif ((dist_from_cam < 25000) & (dist_from_cam >= 15000)):
+                        #     lod_lvl = "11"
+                        # elif ((dist_from_cam < 15000) & (dist_from_cam >= 10000)):
+                        #     lod_lvl = "12"
+                        # elif ((dist_from_cam < 10000) & (dist_from_cam >= 5000)):
+                        #     lod_lvl = "13"
+                        # # elif ((dist_from_cam < 5000) & (dist_from_cam >= 2500)):
+                        # #     lod_lvl = "14"
+                        # else:
+                        #     lod_lvl = "17"
                         
-                        if dist_from_cam >= 25000:
-                            lod_lvl = "10"
-                        elif ((dist_from_cam < 25000) & (dist_from_cam >= 15000)):
-                            lod_lvl = "12"
-                        elif ((dist_from_cam < 15000) & (dist_from_cam >= 10000)):
-                            lod_lvl = "14"
-                        elif ((dist_from_cam < 10000) & (dist_from_cam >= 5000)):
-                            lod_lvl = "16"
-                        #elif ((dist_from_cam < 5000) & (dist_from_cam >= 2500)):
-                            #lod_lvl = "16"
-                        else:
-                            lod_lvl = "17"
-                        
-                        
-                        self.terrain.children[int(tile["tid_int"])].material.map = tile["op"][lod_lvl]
+                        # self.terrain.children[int(tile["tid_int"])].material.map = tile["op"][lod_lvl]
                         self.terrain.children[int(tile["tid_int"])].visible = True
                         
                     else:
                         self.terrain.children[int(tile["tid_int"])].visible = False
                 
-                #end_time = time.time()
-                #print("%.6f" % (end_time - start_time))
-                #print("========")
+                # end_time = time.time()
+                # print("%.6f" % (end_time - start_time))
+                # # print("========")
             
-            #start_time = time.time()
-            #self.obj_renderer.render(self.obj_scene, self.obj_camera)#, flush=False)
-            #end_time = time.time()
-            #print("%.6f" % (end_time - start_time))
-            #print("========")  
-            
-            if self.FPS == 'True':
-                self.obj_renderer.render(self.obj_scene, self.obj_camera, flush=False)
-                self.obj_stats.render()
-            else:
-                self.obj_renderer.render(self.obj_scene, self.obj_camera)
-            
-            
+            # start_time = time.time()
+            self.obj_renderer.render(self.obj_scene, self.obj_camera, flush=False) #flash=True if fps not used anymore
+            # end_time = time.time()
+            # print("%.6f" % (end_time - start_time))
+            # print("========")  
+        
+        self.obj_stats.render()
         
     def import_images(self):
         """Import selected images.

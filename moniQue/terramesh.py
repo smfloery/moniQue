@@ -504,7 +504,7 @@ class MeshGrid:
     #     with open(path, 'w') as f:
     #         dump(tile_collection, f)
     
-    def save_tiles(self, odir):
+    def save_tiles(self, odir, olvl="1", save_json=True):
                
         if not os.path.exists(odir):
             os.mkdir(odir)
@@ -526,9 +526,9 @@ class MeshGrid:
         
         tile_meta_list = []
         
-        odir_mesh = os.path.join(odir, "mesh")
+        odir_mesh = os.path.join(odir, "mesh", olvl)
         if not os.path.exists(odir_mesh):
-            os.mkdir(odir_mesh)
+            os.makedirs(odir_mesh)
         
         for r in rows:
             for c in cols:
@@ -595,8 +595,9 @@ class MeshGrid:
         
         meta["tiles"] = tile_meta_list
         
-        with open(os.path.join(odir, "tiles.json"), 'w') as f:
-            dump(meta, f, indent=4)
+        if save_json:
+            with open(os.path.join(odir, "tiles.json"), 'w') as f:
+                dump(meta, f, indent=4)
         
     def merge_tiles(self, opath):
         

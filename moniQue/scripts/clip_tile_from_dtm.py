@@ -8,10 +8,19 @@ import shapely
 
 if __name__ == "__main__":
 
-    gpkg_path = "C:\\Users\\David\\Documents\\TU-Job\\DATA\\AOIs\\grossvenediger_25km.gpkg"
-    out_path = "C:\\Users\\David\\Documents\\TU-Job\\DATA\\AOIs\\grossvenediger_25km.tif"
+    # gpkg_path = "P:\\Projects\\23_CS4SEHAG\\07_Work_Data\\AOIs\\lech_25km.gpkg"
+    # out_path = "C:\\Users\\sfloery\\Desktop\\lech_25km_1m.tif"  
+    # dgm_path = "P:\\Datapool\\Austria\\Austria\\01_DTM\\21_OGD_10m\\2_DTM\\dhm_at_lamb_10m_2018.tif"
+    # dgm_path = "D:\\4_DATASETS\\at_dgm_1m.vrt"
+    
+#     gpkg_path = "D:\\1_PROJECTS\\01_SEHAG\\05_STEREO_PAIRS\\mt_stereo.gpkg"
+#     out_path = "D:\\1_PROJECTS\\01_SEHAG\\05_STEREO_PAIRS\\mt_stereo_10m.tif"  
+#     dgm_path = "P:\\Projects\\23_CS4SEHAG\\07_Work_Data\\DTM\\TINITALY\\tinitaly_10m.vrt"
 
-    dgm_path = "C:\\Users\\David\\Documents\\TU-Job\\DATA\\AUSTRIA\\dhm_at_lamb_10m_2018.tif"
+    gpkg_path = "D:\\4_DATASETS\\monique\\suldental.gpkg"
+    out_path = "D:\\4_DATASETS\\monique\\suldental_10m.tif"  
+    dgm_path = "P:\\Projects\\23_CS4SEHAG\\07_Work_Data\\DTM\\TINITALY\\tinitaly_10m.vrt"
+    
     dgm_data = gdal.Open(dgm_path)
     dgm_proj = osr.SpatialReference(wkt=dgm_data.GetProjection())
     dgm_epsg = dgm_proj.GetAttrValue('AUTHORITY', 1)
