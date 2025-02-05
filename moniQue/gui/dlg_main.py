@@ -37,21 +37,23 @@ from osgeo import gdal
 import json
 import sys
 import urllib.request
+import glob
 
 from collections import OrderedDict
 from qgis.utils import iface
 
 from qgis.core import QgsFeature, QgsPoint, QgsRasterLayer, QgsProject, QgsJsonUtils, QgsGeometry, QgsCoordinateReferenceSystem, QgsCoordinateTransform, Qgis, QgsPointXY
-from qgis.gui import QgsMapToolPan, QgsMessageBar
+from qgis.gui import QgsMapToolPan
 from qgis.PyQt.QtWidgets import QFileDialog
 
-from PyQt5.QtGui import QColor
+from PyQt5.QtGui import QColor, QCursor
+from PyQt5.QtCore import Qt
 
 from .dlg_create import CreateDialog
 from .dlg_orient import OrientDialog
 from .dlg_meta_gcp import GcpMetaDialog
 from .dlg_meta_export import ExportMetaDialog
-from .dlg_import_akon import ImportAkonDialog
+# from .dlg_import_akon import ImportAkonDialog
 from .dlg_meta_mono import MonoMetaDialog
 from ..tools.ImgPickerTool import ImgPickerTool
 from ..tools.MonoMapTool import MonoMapTool
@@ -82,8 +84,10 @@ class MainDialog(QtWidgets.QDialog):
         #will be set from monique.py
         self.camera_collection = None
         self.tiles_data = None
+        self.initial_render = True
         self.project_pos_toggled = False
         self.temporary_camera = None
+        self.orient_dlg_open = False
         
         self.setWindowTitle("moniQue")
         self.setWindowFlag(QtCore.Qt.WindowMaximizeButtonHint, True)
@@ -120,10 +124,6 @@ class MainDialog(QtWidgets.QDialog):
         self.import_action = QtWidgets.QAction("&Import images", self)
         self.import_action.triggered.connect(self.import_images)
         self.img_menu.addAction(self.import_action)
-
-        self.import_akon_action = QtWidgets.QAction("&Import images from AKON", self)
-        self.import_akon_action.triggered.connect(self.import_akon)
-        self.img_menu.addAction(self.import_akon_action)
 
         self.import_json_action = QtWidgets.QAction("&Get initial orientation from *.json", self)
         self.import_json_action.triggered.connect(self.import_json)
@@ -241,7 +241,7 @@ class MainDialog(QtWidgets.QDialog):
         
         self.obj_camera = gfx.PerspectiveCamera(fov=45, depth_range=(1, 1000000))
         
-        self.obj_canvas.request_draw(self.animate)
+        # self.obj_canvas.request_draw()
 
         self.obj_controller = OrbitFlightController(self.obj_camera, speed=2500, register_events=self.obj_renderer, damping=0)
         self.img_controller = ImageController(self.obj_camera, register_events=self.obj_renderer, damping=0)
@@ -311,26 +311,9 @@ class MainDialog(QtWidgets.QDialog):
 
         self.json_check = False
         self.map_check = False
-        self.akon_check = False
-
-        self.get_settings()
-        self.FPS = self.settings['FPS_counter']
 
         self.cam_dict = {}
         self.showCam_check = False
-
-
-    def get_settings(self):
-        settings_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'settings.txt'))
-
-        with open(settings_path, 'r') as file:
-            settings = [s for s in file]
-        
-        self.settings = {}
-        for i in settings:
-            key_value_pair = i.split('=')
-            self.settings[key_value_pair[0].strip()] = key_value_pair[1].strip()
-
         
     def set_layers(self, lyr_dict):
         self.reg_lyr = lyr_dict["reg_lyr"]
@@ -383,7 +366,7 @@ class MainDialog(QtWidgets.QDialog):
                 self.dlg_orient.btn_preview_pos.setEnabled(True)
                 
             self.dlg_orient.show()
-
+                        
     def on_created_signal(self, data):
         self.load_project(gpkg_path=data["gpkg_path"])
     
@@ -435,6 +418,10 @@ class MainDialog(QtWidgets.QDialog):
                 
         if self.btn_obj_canvas_show_img.isChecked():    #activate
             
+            #if GCP picking is not active show this cursor; otherwise leave the cross hair
+            if not self.orient_dlg_open:
+                self.obj_canvas.setCursor(QCursor(Qt.SizeVerCursor))           
+
             self.img_in_obj_check = True
 
             self.set_obj_canvas_camera(self.temporary_camera)
@@ -484,11 +471,18 @@ class MainDialog(QtWidgets.QDialog):
             self.obj_canvas.request_draw()
             
         else:
-            # self.img_list.setSelectionMode(QtWidgets.QAbstractItemView.SingleSelection)
             self.img_in_obj_check = False
-            self.img_list.setEnabled(True)
+            
+            #only if the orient dialog is not open the image list should be made active again; change back to "normal" cursor
+            if not self.orient_dlg_open:
+                self.img_list.setEnabled(True)
+                self.obj_canvas.setCursor(QCursor(Qt.ArrowCursor))
+            else:   #if orient dialog is open change back to cross hair as GCP becomes active again
+                self.obj_canvas.setCursor(QCursor(Qt.CrossCursor))
+
             self.img_controller.enabled = False
             self.obj_controller.enabled = True
+            
             self.img_plane_grp.clear()
             self.obj_canvas.request_draw()
 
@@ -559,67 +553,81 @@ class MainDialog(QtWidgets.QDialog):
         
         self.tiles_data = tiles_data
         
-        lod_lvls = self.tiles_data["op_lvls"]
+        self.msg_box = QtWidgets.QProgressDialog("Loading tiles...", None, 0, len(self.tiles_data["tiles"])+1, self)
+        self.msg_box.setWindowTitle("%s" % (self.parent.project_name))
+        self.msg_box.setWindowModality(QtCore.Qt.WindowModal)
+        self.msg_box.show()
+        self.msg_box.setValue(0)
+        QtWidgets.QApplication.processEvents()  #required otherwise msg_box stays empty and is not updated; found here: https://stackoverflow.com/questions/47879413/pyqt-qprogressdialog-displays-as-an-empty-white-window
+                
         self.terrain = gfx.Group()
         self.min_xyz = np.array(self.tiles_data["min_xyz"])
+        self.max_xyz = np.array(self.tiles_data["max_xyz"])
 
         self.show_camera_in_obj_canvas()
         
-        for tile in self.tiles_data["tiles"]:
-            tile["op"] = {}
-            tile_path = os.path.join(self.tiles_data["tile_dir"], "1", "%s.ply" % (tile["tid"]))
-            tile_mesh = o3d.io.read_triangle_mesh(tile_path)
+        for tx, tile in enumerate(self.tiles_data["tiles"]):
+            
+            self.msg_box.setValue(tx+1)
+            
+            geom_path = os.path.join(self.tiles_data["tile_dir"], "%s.ply" % (tile["tid"]))
+            op_path = glob.glob(os.path.join(self.tiles_data["op_dir"], "%s.jpg" % (tile["tid"])))
+            op_path.extend(glob.glob(os.path.join(self.tiles_data["op_dir"], "%s.jpeg" % (tile["tid"]))))
+            op_path.extend(glob.glob(os.path.join(self.tiles_data["op_dir"], "%s.png" % (tile["tid"]))))
+            op_path.extend(glob.glob(os.path.join(self.tiles_data["op_dir"], "%s.tif" % (tile["tid"]))))
+            
+            if os.path.exists(geom_path):
+                tile_mesh = o3d.io.read_triangle_mesh(geom_path)
 
-            verts = np.asarray(tile_mesh.vertices)
+                verts = np.asarray(tile_mesh.vertices)
+                
+                u = (verts[:, 0] - tile["min_xyz"][0])/(tile["max_xyz"][0] - tile["min_xyz"][0])
+                v = (verts[:, 1] - tile["min_xyz"][1])/(tile["max_xyz"][1] - tile["min_xyz"][1])
+                uv = np.hstack((u.reshape(-1, 1), v.reshape(-1, 1)))
+                
+                verts -= self.min_xyz
+                faces = np.asarray(tile_mesh.triangles).astype(np.uint32)
+                                    
+                # print("Loading mesh...")
+                mesh_geom = gfx.geometries.Geometry(indices=faces, 
+                                                    positions=verts.astype(np.float32),
+                                                    texcoords=uv.astype(np.float32),
+                                                    tid=[int(tile["tid_int"])])
             
-            u = (verts[:, 0] - tile["min_xyz"][0])/(tile["max_xyz"][0] - tile["min_xyz"][0])
-            v = (verts[:, 1] - tile["min_xyz"][1])/(tile["max_xyz"][1] - tile["min_xyz"][1])
-            uv = np.hstack((u.reshape(-1, 1), v.reshape(-1, 1)))
-            
-            verts -= self.min_xyz
-            faces = np.asarray(tile_mesh.triangles).astype(np.uint32)
+                if len(op_path) == 1:                                
+                    img_ds = gdal.Open(op_path[0])
+                    img_h = img_ds.RasterYSize
+                    img_w = img_ds.RasterXSize
+                    img_arr = np.zeros((img_h, img_w, 3), dtype=np.uint8)
                                 
-            # print("Loading mesh...")
-            mesh_geom = gfx.geometries.Geometry(indices=faces, 
-                                                positions=verts.astype(np.float32),
-                                                texcoords=uv.astype(np.float32),
-                                                tid=[int(tile["tid_int"])])
-            
-            if len(lod_lvls) > 0:
-            
-                for lod in lod_lvls:
-                    if lod == "17":
-                        lod_path = os.path.join(self.tiles_data["op_dir"], "%s_mesh" % lod, "%s.tif" % (tile["tid"]))
+                    for bx in range(3):
+                        bx_arr = img_ds.GetRasterBand(bx+1).ReadAsArray()
+                        img_arr[:, :, bx] = bx_arr
                                     
-                        img_ds = gdal.Open(lod_path)
-                        img_h = img_ds.RasterYSize
-                        img_w = img_ds.RasterXSize
-                        img_arr = np.zeros((img_h, img_w, 3), dtype=np.uint8)
-                                    
-                        for bx in range(3):
-                            bx_arr = img_ds.GetRasterBand(bx+1).ReadAsArray()
-                            img_arr[:, :, bx] = bx_arr
-                                        
-                        img_arr = np.flipud(img_arr)
-                        tex = gfx.Texture(img_arr, dim=2, generate_mipmaps=True)
-                        mesh_material = gfx.MeshBasicMaterial(map=tex, side="FRONT", map_interpolation="linear", pick_write=True)
-                        
-                        # tile["op"][lod] = tex
-                
-            else:
-                mesh_material = gfx.MeshNormalMaterial(side="FRONT", pick_write=True)
+                    img_arr = np.flipud(img_arr)
+                    tex = gfx.Texture(img_arr, dim=2, generate_mipmaps=True)
+                    mesh_material = gfx.MeshBasicMaterial(map=tex, side="FRONT", map_interpolation="linear", pick_write=True)
+                else:
+                    mesh_material = gfx.MeshNormalMaterial(side="FRONT", pick_write=True)
             
-            #add lowest resolution material to mesh at startup
-            mesh = gfx.Mesh(mesh_geom, mesh_material, visible=False)
-            mesh.add_event_handler(self.zoom_to_point, "click")
-            self.terrain.add(mesh)
-                
+                #add lowest resolution material to mesh at startup
+                mesh = gfx.Mesh(mesh_geom, mesh_material, visible=False)
+                mesh.add_event_handler(self.zoom_to_point, "click")
+                self.terrain.add(mesh)
+            
         self.obj_scene.add(self.terrain)
-        cx_local = self.tiles_data["cx"] - self.min_xyz
-        self.obj_camera.local.position = cx_local + np.array([0, 0, 2500])
-        self.obj_camera.show_pos(cx_local)
-        self.obj_canvas.request_draw()  #request draw calls animate     
-               
+        local_cx = self.tiles_data["cx"] - self.min_xyz
+        
+        offset_z = local_cx[0] / np.tan(np.deg2rad(self.obj_camera.get_state()["fov"])/2)
+        
+        self.obj_camera.local.position = local_cx + np.array([0, 0, offset_z])
+        self.obj_camera.show_pos(local_cx)
+        
+        #intitial render call
+        self.msg_box.setLabelText("Rendering initial scene...")
+        QtWidgets.QApplication.processEvents()
+        self.obj_canvas.request_draw(self.animate)  #request draw calls animate     
+        
         #group that will hold all the GCPs on object space
         self.obj_gcps_grp = gfx.Group()
         self.obj_scene.add(self.obj_gcps_grp)
@@ -630,104 +638,75 @@ class MainDialog(QtWidgets.QDialog):
         
         self.mono_tool.set_minxyz(self.min_xyz)
         self.mono_vertex_tool.set_minxyz(self.min_xyz)
-        
+                       
         #! TODO How to define and set raycating scene in future?
         # self.mono_tool.set_scene(self.parent.ray_scene)
         # self.mono_vertex_tool.set_scene(self.parent.ray_scene)
 
-    def animate(self):     
         
-        with self.obj_stats:
-            
-            if self.tiles_data is not None:
-                
-                # start_time = time.time()
-                
-                cam_pos = self.obj_camera.local.position
-                frustum = self.obj_camera.frustum
-                corners_flat = frustum.reshape((-1, 3))
+    def animate(self):     
+
+        if self.tiles_data is not None:
                         
-                corners_by_plane = np.stack([
-                    corners_flat[[0, 3, 7, 4], :],
-                    corners_flat[[5, 6, 2, 1], :],
-                    corners_flat[[3, 2, 6, 7], :],
-                    corners_flat[[4, 5, 1, 0], :],
-                    corners_flat[[1, 2, 3, 0], :],
-                    corners_flat[[4, 7, 6, 5], :]], axis=0)
-                            
-                # planes in normal form (normals point away from the frustum area)
-                normals = np.cross(
-                    corners_by_plane[:, 0, :] - corners_by_plane[:, 3, :],
-                    corners_by_plane[:, 2, :] - corners_by_plane[:, 3, :]
-                )
-                
-                normals /= np.linalg.norm(normals, axis=-1)[:, None] # normal normals ^_^
-                # offset = np.sum(normals * corners_by_plane[:, 3, :], axis=-1)  #d=n*r0; r0 some point on the plane            
-                
-                # end_time = time.time()
-                # print("%.6f" % (end_time - start_time))
-                
-                # start_time = time.time()
-                for tile in self.tiles_data["tiles"]:
-                    result = "INSIDE"
-                    tile_cx = np.array(tile["cx_r"][:3]) - self.min_xyz
+            # cam_pos = self.obj_camera.local.position
+            frustum = self.obj_camera.frustum
+            corners_flat = frustum.reshape((-1, 3))
                     
-                    for nx in range(6):
+            corners_by_plane = np.stack([
+                corners_flat[[0, 3, 7, 4], :],
+                corners_flat[[5, 6, 2, 1], :],
+                corners_flat[[3, 2, 6, 7], :],
+                corners_flat[[4, 5, 1, 0], :],
+                corners_flat[[1, 2, 3, 0], :],
+                corners_flat[[4, 7, 6, 5], :]], axis=0)
                         
-                        #normal distance between any point on the plane and the sphere center                
-                        #https://www.w3schools.blog/distance-of-a-point-from-a-plane
-                        #simplest frustum culling technique; renderes more tiles than actually visible;
-                        cx_c_vec = tile_cx - corners_by_plane[nx, 0, :]                    
-                        cx_dist = np.dot(cx_c_vec, normals[nx, :])
-                                        
-                        if cx_dist > tile["cx_r"][-1]:
-                            result="OUTSIDE"
-                            break
-                                        
-                    # #first tile added to group has tid_pygfx = 0; Hence, we can use this id to directly access the 
-                    # #respective children within the list; no need for an additional for loop;
-                    if result == "INSIDE":
-                        
-                        # dist_from_cam = np.linalg.norm(tile_cx-cam_pos)
-                        # if dist_from_cam >= 25000:
-                        #     lod_lvl = "10"
-                        # elif ((dist_from_cam < 25000) & (dist_from_cam >= 15000)):
-                        #     lod_lvl = "11"
-                        # elif ((dist_from_cam < 15000) & (dist_from_cam >= 10000)):
-                        #     lod_lvl = "12"
-                        # elif ((dist_from_cam < 10000) & (dist_from_cam >= 5000)):
-                        #     lod_lvl = "13"
-                        # # elif ((dist_from_cam < 5000) & (dist_from_cam >= 2500)):
-                        # #     lod_lvl = "14"
-                        # else:
-                        #     lod_lvl = "17"
-                        
-                        # self.terrain.children[int(tile["tid_int"])].material.map = tile["op"][lod_lvl]
-                        self.terrain.children[int(tile["tid_int"])].visible = True
-                        
-                    else:
-                        self.terrain.children[int(tile["tid_int"])].visible = False
-                
-                # end_time = time.time()
-                # print("%.6f" % (end_time - start_time))
-                # # print("========")
+            # planes in normal form (normals point away from the frustum area)
+            normals = np.cross(
+                corners_by_plane[:, 0, :] - corners_by_plane[:, 3, :],
+                corners_by_plane[:, 2, :] - corners_by_plane[:, 3, :]
+            )
             
-            # start_time = time.time()
-            self.obj_renderer.render(self.obj_scene, self.obj_camera, flush=False) #flash=True if fps not used anymore
+            normals /= np.linalg.norm(normals, axis=-1)[:, None] # normal normals ^_^
+            # offset = np.sum(normals * corners_by_plane[:, 3, :], axis=-1)  #d=n*r0; r0 some point on the plane            
+            
             # end_time = time.time()
             # print("%.6f" % (end_time - start_time))
-            # print("========")  
-        
-        self.obj_stats.render()
-        
+            
+            # start_time = time.time()
+            for tile in self.tiles_data["tiles"]:
+                result = "INSIDE"
+                tile_cx = np.array(tile["cx_r"][:3]) - self.min_xyz
+                
+                for nx in range(6):
+                    
+                    #normal distance between any point on the plane and the sphere center                
+                    #https://www.w3schools.blog/distance-of-a-point-from-a-plane
+                    #simplest frustum culling technique; renderes more tiles than actually visible;
+                    cx_c_vec = tile_cx - corners_by_plane[nx, 0, :]                    
+                    cx_dist = np.dot(cx_c_vec, normals[nx, :])
+                                    
+                    if cx_dist > tile["cx_r"][-1]:
+                        result="OUTSIDE"
+                        break
+                                    
+                # #first tile added to group has tid_pygfx = 0; Hence, we can use this id to directly access the 
+                # #respective children within the list; no need for an additional for loop;
+                if result == "INSIDE":
+                    self.terrain.children[int(tile["tid_int"])].visible = True
+                else:
+                    self.terrain.children[int(tile["tid_int"])].visible = False
+                    
+            self.obj_renderer.render(self.obj_scene, self.obj_camera, flush=True) #flash=True if fps not used anymore
+            
+            if self.initial_render is True:
+                self.msg_box.setValue(len(self.tiles_data["tiles"])+1)
+                QtWidgets.QApplication.instance().restoreOverrideCursor()
+                self.initial_render = False        
+                
     def import_images(self):
         """Import selected images.
-        """
-        if self.akon_check == False:
-            img_paths = QtWidgets.QFileDialog.getOpenFileNames(None, "Load images", "", ("Image (*.tif *.tiff *.png *.jpg *.jpeg)"))[0]
-        else:
-            img_paths = [self.akon_img_path]
-        
+        """       
+        img_paths = QtWidgets.QFileDialog.getOpenFileNames(None, "Load images", "", ("Image (*.tif *.tiff *.png *.jpg *.jpeg)"))[0]
         loaded_imgs = [self.img_list.item(x).text() for x in range(self.img_list.count())]
         
         for path in img_paths:
@@ -777,32 +756,7 @@ class MainDialog(QtWidgets.QDialog):
             print("Something went wrong while setting the initial camera parameters! \nPlease check if an image has been selected and try again.")
             self.json_check = False
             return   
-        
-    def import_akon(self):
-        imp_akon_dlg = ImportAkonDialog()
-        imp_akon_dlg.exec_()
-
-        url_base = self.settings['url_base']
-        url_extent = self.settings['url_extent']
-
-        ids = imp_akon_dlg.akon_id.toPlainText().split(';')
-        save_path = QtWidgets.QFileDialog.getExistingDirectory(self)
-
-        for id in ids:
-            img_name = id.strip()
-            self.akon_img_path = save_path+'/'+img_name+'.jpeg'
-            
-            try:
-                urllib.request.urlretrieve(url_base+img_name+'/'+img_name[-3:]+url_extent, self.akon_img_path)
-                
-                self.akon_check = True
-                self.import_images()
-                self.akon_check = False
-
-            except:
-                errorMessage = QgsMessageBar()
-                errorMessage.pushMessage('Could not find an image with the AKON_ID', img_name)
-         
+                 
     def get_gcps_from_gpkg(self):
         gcps = OrderedDict()
         gcp_data = {"obj_x":None, "obj_y":None, "obj_z":None, "img_x":None, "img_y":None, "img_dx":None, "img_dy":None, "active":None}
@@ -946,7 +900,6 @@ class MainDialog(QtWidgets.QDialog):
         # cam_state = self.obj_camera.get_state()
         
         cam_pos = self.obj_camera.local.position + self.min_xyz
-        print('Camera Position:',cam_pos)
 
         #the camera appears to be exactly what alzeka needs; hence, we can directly derive alzeka from the rotation matrix
         cam_rmat_pygfx = self.obj_camera.local.rotation_matrix[:3, :3]  #already transposed in contrast to self.obj_camera.view_matrix; otherweise the same
@@ -966,7 +919,7 @@ class MainDialog(QtWidgets.QDialog):
         data["vfov"] = est_vfov
         
         self.set_obj_canvas_camera(data)
-        self.show_img_in_obj_canvas()
+        # self.show_img_in_obj_canvas()
         
         if self.json_check == False:
             self.update_camera(data)
@@ -1153,7 +1106,7 @@ class MainDialog(QtWidgets.QDialog):
             
             self.obj_camera.set_state(obj_camera_target)
             self.obj_camera.show_pos((map_pos_loc[0], map_pos_loc[1], self.min_xyz[2]), up=(0,0,1))
-            self.obj_canvas.request_draw(self.animate)
+            self.obj_canvas.request_draw()#self.animate)
 
         except:
             print('No project seems to be loaded!')
@@ -1224,13 +1177,15 @@ class MainDialog(QtWidgets.QDialog):
                 self.prev_img_item = item
 
     def untoggle_camera(self, item):
-
+        
+        self.btn_ori_tool.setEnabled(False)
+        self.btn_mono_tool.setEnabled(False)
+        self.btn_mono_select.setEnabled(False)
+        self.btn_mono_vertex.setEnabled(False)
+        self.btn_obj_canvas_show_img.setEnabled(False)
+        
         item.setCheckState(QtCore.Qt.Unchecked)
         self.img_list.clearSelection()
-
-        #iid = item.text()
-        #if iid in self.cam_dict.keys():
-            #self.cam_dict[iid].visible = True
         
         self.obj_gcps_grp.clear()        
         self.img_plane_grp.clear()
@@ -1252,11 +1207,7 @@ class MainDialog(QtWidgets.QDialog):
         
     def toggle_camera(self, item):
         
-        #before for the first time an image is loaded
-        #into to canvas self.img_lyr is None; Hence, until
-        #than the button shall be disabled
-        if self.img_lyr is None:
-            self.btn_ori_tool.setEnabled(True)
+        self.btn_ori_tool.setEnabled(True)
         
         # item = self.img_list.selectedItems()[0]
         item.setCheckState(QtCore.Qt.Checked)
@@ -1264,10 +1215,6 @@ class MainDialog(QtWidgets.QDialog):
                     
         iid = item.text()
         iid_path = self.camera_collection[iid].path
-
-        #if iid in self.cam_dict.keys():
-            #self.cam_dict[iid].visible = False
-
         
         if not os.path.exists(iid_path):
             #iid_path = QFileDialog.getOpenFileName(None, "Image not found! Please, select new directory.", "", ("JPEG (*.jpeg)"))[0]
@@ -1320,10 +1267,11 @@ class MainDialog(QtWidgets.QDialog):
                         
             self.mono_tool.set_camera(self.active_camera)
             self.mono_vertex_tool.set_camera(self.active_camera)
-            
         else:
             self.btn_mono_tool.setEnabled(False)
-            # self.btn_obj_canvas_show_img.setEnabled(False)
+            self.btn_mono_select.setEnabled(False)
+            self.btn_mono_vertex.setEnabled(False)
+            self.btn_obj_canvas_show_img.setEnabled(False)
             
         self.obj_canvas.request_draw()
         

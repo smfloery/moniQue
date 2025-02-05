@@ -33,7 +33,7 @@ from PyQt5.QtCore import Qt
 
 import operator
 from ..lsq import srs_lm
-from ..helpers import calc_hfov, calc_vfov, alzeka2rot
+from ..helpers import calc_hfov, calc_vfov, alzeka2rot, alpha2azi, rot2alzeka
 from .dlg_meta_offset import OffsetMetaDialog
 
 import pygfx as gfx
@@ -70,7 +70,7 @@ class OrientDialog(QtWidgets.QDialog):
         self.parent = parent
         self.parent.img_list.setEnabled(False)
         self.parent.activate_gcp_picking()
-
+        self.parent.orient_dlg_open = True
         self.parent.obj_canvas.setCursor(QCursor(Qt.CrossCursor))
         
         self.icon_dir = icon_dir
@@ -502,7 +502,7 @@ class OrientDialog(QtWidgets.QDialog):
                 self.table_gcps.setItem(rix, self.name2ix["dy"], QtWidgets.QTableWidgetItem(""))
              
     def calc_orientation(self):
-
+               
         if not self.init_params:
             self.error_dialog.showMessage('Set initial camera parameters first!')
         else:
@@ -536,7 +536,22 @@ class OrientDialog(QtWidgets.QDialog):
                 est_zeta = res.params["zeta"].value
                 est_kappa = res.params["kappa"].value
                 est_focal = res.params["f"].value
-
+                
+                alzekas = rot2alzeka(alzeka2rot([est_alpha, est_zeta, est_kappa]))
+                                                
+                est_azi = alpha2azi(alzekas[0, 0])
+                est_azi_inv = alpha2azi(alzekas[1, 0])
+                
+                #for north clockwise: atan2(x,y); for east-counterclockwise: atan2(y,x)
+                prc2gcp_azi = np.arctan2(np.array(ori_data["obj"])[:, 0] - est_obj_x0, 
+                                         np.array(ori_data["obj"])[:, 1] - est_obj_y0)
+                prc2gcp_azi = (prc2gcp_azi + 2*np.pi) % (2*np.pi) #map atan2 to 0-360
+                                
+                if np.abs(prc2gcp_azi[0] - est_azi_inv) < np.abs(prc2gcp_azi[0] - est_azi):
+                    est_alpha = alzekas[1, 0]
+                    est_zeta = alzekas[1, 1]
+                    est_kappa = alzekas[1, 2]
+                    
                 cxx = res.covar
                 
                 cxx_std = np.sqrt(np.diag(cxx))
@@ -591,7 +606,8 @@ class OrientDialog(QtWidgets.QDialog):
         self.parent.obj_canvas.setCursor(QCursor(Qt.ArrowCursor))
         
         self.parent.discard_changes()
-
+        self.parent.orient_dlg_open = False
+        
     def set_offset(self):
         offset_dialog = OffsetMetaDialog()
         offset_dialog.exec_()

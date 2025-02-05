@@ -7,11 +7,13 @@ from pyproj.transformer import Transformer
 import shapely
 import json
 from tqdm import tqdm 
+
 if __name__ == "__main__":
     
     # op_path = "C:\\Users\\sfloery\\Downloads\\felix\\op_solnhofen_20cm_utm32.vrt"
-    op_path = "D:\\1_PROJECTS\\01_SEHAG\\05_STEREO_PAIRS\\mt_stereo\\op_stereo_25832_1m.vrt"
-    op_path = "C:\\Users\\sfloery\\Downloads\\gp_sued_sulden_10000\\suldental_1m_25832.vrt"
+    # op_path = "D:\\1_PROJECTS\\01_SEHAG\\05_STEREO_PAIRS\\mt_stereo\\op_stereo_25832_1m.vrt"
+    # op_path = "C:\\Users\\sfloery\\Downloads\\gp_sued_sulden_10000\\suldental_1m_25832.vrt"
+    op_path = "C:\\Users\\sfloery\\Downloads\\gp_sued_sulden_10000\\suldental_025m_25832.vrt"
     
     op_data = gdal.Open(op_path)
     op_proj = osr.SpatialReference(wkt=op_data.GetProjection())
@@ -31,13 +33,13 @@ if __name__ == "__main__":
     
     # assert op_epsg == tiles_epsg
     
-    op_dir = os.path.join(os.path.dirname(json_path), "op", "17_mesh")
+    op_dir = os.path.join(os.path.dirname(json_path), "op_025m")
     if not os.path.exists(op_dir):
         os.makedirs(op_dir)    
     
     for tile in tqdm(tiles_data["tiles"]):
         tid = tile["tid"]
-        out_path = os.path.join(op_dir, "%s.tif" % (tid))
+        out_path = os.path.join(op_dir, "%s.jpg" % (tid))
         
         min_xyz = tile["min_xyz"]
         max_xyz = tile["max_xyz"]
@@ -50,14 +52,14 @@ if __name__ == "__main__":
         inp_srs = osr.SpatialReference()
         inp_srs.ImportFromEPSG(int(op_epsg))
         
-        kwargs = {'format': 'GTiff', 
+        kwargs = {'format': 'JPEG', 
                 'outputBounds':bbox,
                 'outputBoundsSRS':out_srs,
                 'srcSRS':inp_srs,
                 'dstSRS':out_srs,
                 'xRes':op_gt[1], 
                 'yRes':op_gt[5],
-                'resampleAlg':'cubic'}
+                'resampleAlg':'bilinear'}
         ds = gdal.Warp(out_path, op_path, **kwargs)
         del ds    
         

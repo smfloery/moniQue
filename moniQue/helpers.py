@@ -62,3 +62,6 @@ def calc_hfov(img_w, focal):
 
 def calc_vfov(img_h, focal):
     return 2*np.arctan(img_h/(2*focal))
+
+def alpha2azi(alpha):
+    return np.deg2rad((450 - np.rad2deg(alpha)) % 360)

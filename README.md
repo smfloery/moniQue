@@ -1,6 +1,7 @@
-# moniQue - Monoplotting oblique images in QGIS
+<!-- # moniQue - Monoplotting oblique images in QGIS-->
+<!-- ![moniQue - Main dialog](./moniQue/doc/main_dialog.jpg)-->
 
-![moniQue - Main dialog](./moniQue/doc/main_dialog.jpg)
+![moniQue - Header](./moniQue/doc/monique_header_hr.jpg)
 
 ## Installation
 ### Additional Python packages

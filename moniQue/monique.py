@@ -23,7 +23,7 @@
 """
 from qgis.PyQt.QtCore import Qt
 from qgis.PyQt.QtGui import QIcon
-from qgis.PyQt.QtWidgets import QAction, QApplication, QFileDialog
+from qgis.PyQt.QtWidgets import QAction, QApplication, QFileDialog, QProgressDialog
 
 from qgis.core import QgsProject, QgsVectorLayer, QgsJsonUtils
 from qgis.gui import QgsMapToolPan, QgsMessageBar
@@ -39,6 +39,7 @@ import open3d as o3d
 import numpy as np
 import requests 
 import xml.etree.ElementTree as ET
+import glob
 
 from .camera import Camera
 
@@ -173,11 +174,11 @@ class MoniQue:
         self.dlg_main.set_layers(self.layer_collection)
         self.dlg_main.activate_gui_elements()
         
-        self.load_mesh()        #commented to switch loading single mesh to tiles
         self.load_cameras_from_gpkg()
+        QApplication.processEvents()
         
-        QApplication.instance().restoreOverrideCursor()
-    
+        self.load_mesh()        #commented to switch loading single mesh to tiles
+                    
     def load_cameras_from_gpkg(self):
         
         cam_feats = self.cam_lyr.getFeatures() 
@@ -196,7 +197,7 @@ class MoniQue:
         json_path = reg_feat["json_path"]
 
         if not os.path.exists(json_path):
-            json_path = QFileDialog.getOpenFileName(None, "Mesh not found! Select new directory to the Mesh", "", ("JSON (*.json)"))[0]
+            json_path = QFileDialog.getOpenFileName(None, "Project not found! Select new directory to the Mesh", "", ("JSON (*.json)"))[0]
             field_idx = self.reg_lyr.fields().indexOf('json_path')
             self.reg_lyr.startEditing()
             self.reg_lyr.changeAttributeValue(1,field_idx,json_path)
@@ -206,30 +207,10 @@ class MoniQue:
             tiles_data = json.load(f)
             tiles_data["tile_dir"] = os.path.join(os.path.dirname(json_path), "mesh")
             tiles_data["op_dir"] = os.path.join(os.path.dirname(json_path), "op")
-            
-            mesh_lvls = []
-            sd_names = next(os.walk(tiles_data["tile_dir"]))[1]
-            for sd in sd_names:
-                mesh_lvls.append(int(sd))
-            mesh_lvls.sort(reverse=True)
-            tiles_data["mesh_lvls"] = list(map(str, mesh_lvls))
-            
-            if os.path.exists(tiles_data["op_dir"]):
-    
-                op_lvls = []            
-                sd_names = next(os.walk(tiles_data["op_dir"]))[1]
-                for sd in sd_names:
-                    if "mesh" in sd:
-                        op_lvls.append(int(sd.split("_")[0]))
-                op_lvls.sort(reverse=True)
-                tiles_data["op_lvls"] = list(map(str, op_lvls))
-            else:
-                tiles_data["op_lvls"] = []
-        
-        print(tiles_data["mesh_lvls"])
         
         ##! WIE IN ZUKUNFT DIE RAYCASTING SCENE SETZEN?
         # self.ray_scene = scene
+               
         self.dlg_main.add_mesh_to_obj_canvas(tiles_data)
         
     def reset_plugin(self):
