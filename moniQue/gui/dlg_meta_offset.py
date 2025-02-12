@@ -1,11 +1,15 @@
-from PyQt5.QtWidgets import QDialog, QGroupBox, QLineEdit, QDialogButtonBox, QVBoxLayout, QFormLayout, QLabel, QComboBox, QErrorMessage, QFileDialog
-from PyQt5.QtGui import QIntValidator
+import numpy as np
+from PyQt5 import QtCore
+from PyQt5.QtWidgets import QDialog, QGroupBox, QLineEdit, QDialogButtonBox, QVBoxLayout, QFormLayout, QLabel, QErrorMessage, QPushButton
+
 
 class OffsetMetaDialog(QDialog):
+
+    preview_offset_signal = QtCore.pyqtSignal(object, bool)
   
     def __init__(self):
         super(OffsetMetaDialog, self).__init__()
-        
+
         # setting window title
         self.setWindowTitle("Set offset for camera position")
   
@@ -15,49 +19,32 @@ class OffsetMetaDialog(QDialog):
         # creating a group box
         self.formGroupBox = QGroupBox()
 
-        self.offset_x = QLineEdit()
-        self.offset_x.setReadOnly(False)
-        self.offset_x.setEnabled(True)
-        self.offset_x.setPlaceholderText('0')
+        self.forward = QLineEdit()
+        self.forward.setReadOnly(False)
+        self.forward.setEnabled(True)
+        self.forward.setPlaceholderText('0')
 
-        self.offset_y = QLineEdit()
-        self.offset_y.setReadOnly(False)
-        self.offset_y.setEnabled(True)
-        self.offset_y.setPlaceholderText('0')
+        self.right = QLineEdit()
+        self.right.setReadOnly(False)
+        self.right.setEnabled(True)
+        self.right.setPlaceholderText('0')
 
-        self.offset_z = QLineEdit()
-        self.offset_z.setReadOnly(False)
-        self.offset_z.setEnabled(True)
-        self.offset_z.setPlaceholderText('0')
-
-        self.offset_al = QLineEdit()
-        self.offset_al.setReadOnly(False)
-        self.offset_al.setEnabled(True)
-        self.offset_al.setPlaceholderText('0')
-
-        self.offset_ka = QLineEdit()
-        self.offset_ka.setReadOnly(False)
-        self.offset_ka.setEnabled(True)
-        self.offset_ka.setPlaceholderText('0')
-
-        self.offset_ze = QLineEdit()
-        self.offset_ze.setReadOnly(False)
-        self.offset_ze.setEnabled(True)
-        self.offset_ze.setPlaceholderText('0')
-
-        self.offset_fov = QLineEdit()
-        self.offset_fov.setReadOnly(False)
-        self.offset_fov.setEnabled(True)
-        self.offset_fov.setPlaceholderText('0')
+        self.up = QLineEdit()
+        self.up.setReadOnly(False)
+        self.up.setEnabled(True)
+        self.up.setPlaceholderText('0')
         
-        # calling the method that create the form
         self.createForm()
-        
+
         # creating a dialog button for ok and cancel
-        self.buttonBox = QDialogButtonBox(QDialogButtonBox.Ok)# | QDialogButtonBox.Cancel)
-  
+        self.buttonBox = QDialogButtonBox(QDialogButtonBox.Ok)
+
+        self.previewButton = QPushButton(self.tr("&Preview"))
+        self.buttonBox.addButton(self.previewButton, QDialogButtonBox.ActionRole)
+
         # adding action when form is accepted
         self.buttonBox.accepted.connect(self.accept)
+        self.previewButton.clicked.connect(self.preview)
   
         # creating a vertical layout
         mainLayout = QVBoxLayout()
@@ -74,9 +61,17 @@ class OffsetMetaDialog(QDialog):
         self.error_dialog = QErrorMessage(parent=self)
         self.gids_not_allowed = None
 
+        self.accepted = False
+
     
     def accept(self):
+        self.accepted = True
+        self.preview()
         super().accept()
+
+    def preview(self):
+        self.preview_offset = [self.forward.text(), self.right.text(), self.up.text()]
+        self.preview_offset_signal.emit(self.preview_offset, self.accepted)
         
     def createForm(self):
   
@@ -85,14 +80,11 @@ class OffsetMetaDialog(QDialog):
   
         # adding rows
         # for name and adding input text
-        layout.addRow(QLabel("Offset_X"), self.offset_x)
-        layout.addRow(QLabel("Offset_Y"), self.offset_y)
-        layout.addRow(QLabel("Offset_Z"), self.offset_z)
-        layout.addRow(QLabel("Offset_Alpha"), self.offset_al)
-        layout.addRow(QLabel("Offset_Kappa"), self.offset_ka)
-        layout.addRow(QLabel("Offset_Zeta"), self.offset_ze)
-        layout.addRow(QLabel("Offset_FOV"), self.offset_fov)
+        layout.addRow(QLabel("Forward"), self.forward)
+        layout.addRow(QLabel("Right"), self.right)
+        layout.addRow(QLabel("Up"), self.up)
 
-  
         # setting layout
         self.formGroupBox.setLayout(layout)
+
+
