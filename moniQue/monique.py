@@ -31,13 +31,12 @@ from qgis.gui import QgsMapToolPan, QgsMessageBar
 # # Initialize Qt resources from file resources.py
 # from .resources import *
 from .gui.dlg_main import MainDialog
-from .gui.dlg_convert import ConvertDialog
+# from .gui.dlg_convert import ConvertDialog
 
 import os.path
 import json
 import open3d as o3d
-import numpy as np
-import requests 
+import numpy as np 
 import xml.etree.ElementTree as ET
 import glob
 
@@ -91,18 +90,18 @@ class MoniQue:
         launch_action.triggered.connect(self.open_main_dlg)
         launch_action.setEnabled(True)
         
-        convert_icon = QIcon(os.path.join(self.icon_dir, "mActionAddMeshLayer.png"))
-        convert_action = QAction(convert_icon, "Convert DTM to mesh...", self.iface.mainWindow())
-        convert_action.triggered.connect(self.open_convert_dlg)
-        convert_action.setEnabled(True)
+        # convert_icon = QIcon(os.path.join(self.icon_dir, "mActionAddMeshLayer.png"))
+        # convert_action = QAction(convert_icon, "Convert DTM to mesh...", self.iface.mainWindow())
+        # convert_action.triggered.connect(self.open_convert_dlg)
+        # convert_action.setEnabled(True)
         
         self.iface.addPluginToMenu("moniQue", launch_action)
-        self.iface.addPluginToMenu("moniQue", convert_action)
+        # self.iface.addPluginToMenu("moniQue", convert_action)
         
         self.iface.addToolBarIcon(launch_action)
         
         self.actions.append(launch_action)
-        self.actions.append(convert_action)
+        # self.actions.append(convert_action)
 
     def unload(self):
         """Removes the plugin menu item and icon from QGIS GUI."""
@@ -231,9 +230,9 @@ class MoniQue:
             
             self.dlg_main.setWindowTitle("moniQue")
     
-    def open_convert_dlg(self):
-        self.dlg_convert = ConvertDialog(icon_dir=self.icon_dir, parent=self)
-        self.dlg_convert.show()
+    # def open_convert_dlg(self):
+    #     self.dlg_convert = ConvertDialog(icon_dir=self.icon_dir, parent=self)
+    #     self.dlg_convert.show()
     
     def open_main_dlg(self):
                 

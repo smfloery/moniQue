@@ -4,3 +4,5 @@ monique/doc/svg/
 monique/doc/raw/
 *.zip
 monique/__pycache__/
+monique/web/js/libs/
+monique/web/data/

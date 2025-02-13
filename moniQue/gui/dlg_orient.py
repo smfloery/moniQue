@@ -86,7 +86,7 @@ class OrientDialog(QtWidgets.QDialog):
         table_toolbar = QtWidgets.QToolBar("")
         table_toolbar.setIconSize(QtCore.QSize(20, 20))
         
-        self.btn_init_ori = QtWidgets.QAction("Set initial orientation from camera view.", self)
+        self.btn_init_ori = QtWidgets.QAction("Set initial camera parameters from camera view.", self)
         self.btn_init_ori.setIcon(QtGui.QIcon(os.path.join(self.icon_dir, "mActionMeasureBearing.png")))
         self.btn_init_ori.triggered.connect(self.get_camera_signal.emit)
         params_toolbar.addAction(self.btn_init_ori)
@@ -97,19 +97,19 @@ class OrientDialog(QtWidgets.QDialog):
         self.btn_delete_gcp.setEnabled(False)
         table_toolbar.addAction(self.btn_delete_gcp)
         
-        self.btn_import_gcps = QtWidgets.QAction("Import GCPs from *.csv.", self)
-        self.btn_import_gcps.setIcon(QtGui.QIcon(os.path.join(self.icon_dir, "mActionCapturePoint.png")))
+        self.btn_import_gcps = QtWidgets.QAction("Import GCPs from *.csv", self)
+        self.btn_import_gcps.setIcon(QtGui.QIcon(os.path.join(self.icon_dir, "import_gcp_from_file.png")))
         self.btn_import_gcps.triggered.connect(self.import_gcps_from_csv)
         table_toolbar.addAction(self.btn_import_gcps)
         
-        self.btn_preview_pos = QtWidgets.QAction("Project current mouse position into the image", self)
+        self.btn_preview_pos = QtWidgets.QAction("Project 3D mouse position into the image.", self)
         self.btn_preview_pos.setIcon(QtGui.QIcon(os.path.join(self.icon_dir, "preview_pos.png")))
         self.btn_preview_pos.triggered.connect(self.project_mouse_position)
         self.btn_preview_pos.setEnabled(False)
         self.btn_preview_pos.setCheckable(True)
         table_toolbar.addAction(self.btn_preview_pos)
 
-        self.btn_offset = QtWidgets.QAction("Set Offset", self)
+        self.btn_offset = QtWidgets.QAction("Set Offset.", self)
         self.btn_offset.setIcon(QtGui.QIcon(os.path.join(self.icon_dir, "mActionCapturePoint.png")))
         self.btn_offset.triggered.connect(self.set_offset)
         table_toolbar.addAction(self.btn_offset)
@@ -581,7 +581,6 @@ class OrientDialog(QtWidgets.QDialog):
                 self.btn_save_ori.setEnabled(True)
 
         ########################################################################################################################################
-
 
     def save_orientation(self):
         self.btn_preview_pos.setEnabled(True)

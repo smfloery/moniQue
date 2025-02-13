@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- <meta http-equiv="X-UA-Compatible" content="ie=edge"> -->
+    <!-- <title>My Website</title> -->
+    <link href="./css/main.css" rel="stylesheet" type="text/css">
+    <!-- <link rel="icon" href="./favicon.ico" type="image/x-icon"> -->
+  </head>
+
+  <body>
+    <div id="scene-container"></div>
+    
+    <!-- recommened way of importing threejs according to https://threejs.org/manual/#en/fundamentals -->
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "./js/libs/three_js_r173/build/three.module.js",
+          "three/addons/": "./js/libs/three_js_r173/examples/jsm/"
+        }
+      }
+    </script>
+    <script type="module" src="./js/main.js"></script>
+
+       
+    <!-- <script type="module">
+      import * as THREE from 'three';
+      import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
+    </script> -->
+
+  </body>
+</html>

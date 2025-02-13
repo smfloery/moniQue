@@ -137,11 +137,11 @@ class MainDialog(QtWidgets.QDialog):
         self.showCam_action.triggered.connect(self.showCam)
         self.view_menu.addAction(self.showCam_action)
 
-        self.main_toolbar = QtWidgets.QToolBar("My main toolbar")
-        self.main_toolbar.setIconSize(QtCore.QSize(20, 20))
+        self.main_toolbar = QtWidgets.QToolBar("Main toolbar")
+        self.main_toolbar.setIconSize(QtCore.QSize(24, 24))
 
         self.btn_ori_tool = QtWidgets.QAction("Open orientation dialog", self)
-        self.btn_ori_tool.setIcon(QtGui.QIcon(os.path.join(self.icon_dir, "camera.png")))
+        self.btn_ori_tool.setIcon(QtGui.QIcon(os.path.join(self.icon_dir, "open_orientation_dialog.png")))
         self.btn_ori_tool.triggered.connect(self.show_dlg_orient)
         self.btn_ori_tool.setCheckable(True)
         self.btn_ori_tool.setEnabled(False)
@@ -171,7 +171,7 @@ class MainDialog(QtWidgets.QDialog):
         self.main_toolbar.addAction(self.btn_mono_vertex)
         
         self.img_toolbar = QtWidgets.QToolBar()
-        self.img_toolbar.setIconSize(QtCore.QSize(20, 20))
+        self.img_toolbar.setIconSize(QtCore.QSize(24, 24))
         
         self.img_canvas = QgsMapCanvas(parent=self)
         self.img_canvas.setMinimumSize(QtCore.QSize(300, 16777215))
@@ -192,32 +192,32 @@ class MainDialog(QtWidgets.QDialog):
         self.img_toolbar.addAction(btn_img_extent)
         
         self.obj_toolbar = QtWidgets.QToolBar()
-        self.obj_toolbar.setIconSize(QtCore.QSize(20, 20))
+        self.obj_toolbar.setIconSize(QtCore.QSize(24, 24))
         self.obj_canvas = WgpuCanvas(parent=self)
         self.obj_canvas.setMinimumSize(QtCore.QSize(300, 16777215))
 
         btn_reset_obj_canvas_camera = QtWidgets.QAction("Reset to default camera position", self)
-        btn_reset_obj_canvas_camera.setIcon(QtGui.QIcon(os.path.join(self.icon_dir, "mActionZoomFullExtent.png")))
+        btn_reset_obj_canvas_camera.setIcon(QtGui.QIcon(os.path.join(self.icon_dir, "zoom_to_extent.png")))
         btn_reset_obj_canvas_camera.triggered.connect(self.reset_obj_canvas_camera)
         self.obj_toolbar.addAction(btn_reset_obj_canvas_camera)
 
         btn_save_obj_canvas_camera = QtWidgets.QAction("Save camera position.", self)
-        btn_save_obj_canvas_camera.setIcon(QtGui.QIcon(os.path.join(self.icon_dir, "saveView.png")))
+        btn_save_obj_canvas_camera.setIcon(QtGui.QIcon(os.path.join(self.icon_dir, "save_temporary_camera_position.png")))
         btn_save_obj_canvas_camera.triggered.connect(self.save_obj_canvas_camera)
         self.obj_toolbar.addAction(btn_save_obj_canvas_camera)
 
         btn_load_obj_canvas_camera = QtWidgets.QAction("Zoom to saved camera position.", self)
-        btn_load_obj_canvas_camera.setIcon(QtGui.QIcon(os.path.join(self.icon_dir, "loadView.png")))
+        btn_load_obj_canvas_camera.setIcon(QtGui.QIcon(os.path.join(self.icon_dir, "set_temporary_camera_position.png")))
         btn_load_obj_canvas_camera.triggered.connect(self.load_obj_canvas_camera)
         self.obj_toolbar.addAction(btn_load_obj_canvas_camera)
 
         btn_obj_canvas_camera_from_map = QtWidgets.QAction("Set camera position from current QGIS map canvas", self)
-        btn_obj_canvas_camera_from_map.setIcon(QtGui.QIcon(os.path.join(self.icon_dir, "mLayoutItemMap.png")))
+        btn_obj_canvas_camera_from_map.setIcon(QtGui.QIcon(os.path.join(self.icon_dir, "sync_views.png")))
         btn_obj_canvas_camera_from_map.triggered.connect(self.obj_canvas_camera_from_map)
         self.obj_toolbar.addAction(btn_obj_canvas_camera_from_map)
         
         self.btn_obj_canvas_show_img = QtWidgets.QAction("Render image in 3D canvas", self)
-        self.btn_obj_canvas_show_img.setIcon(QtGui.QIcon(os.path.join(self.icon_dir, "show_img_3D.png")))
+        self.btn_obj_canvas_show_img.setIcon(QtGui.QIcon(os.path.join(self.icon_dir, "add_image_to_3d_canvas.png")))
         self.btn_obj_canvas_show_img.triggered.connect(self.show_img_in_obj_canvas)
         self.btn_obj_canvas_show_img.setEnabled(False)
         self.btn_obj_canvas_show_img.setCheckable(True)
@@ -239,9 +239,9 @@ class MainDialog(QtWidgets.QDialog):
         self.cam_lines_grp = gfx.Group()
         self.obj_scene.add(self.cam_lines_grp)
         
-        self.obj_camera = gfx.PerspectiveCamera(fov=45, depth_range=(1, 1000000))
+        self.obj_camera = gfx.PerspectiveCamera(fov=45, depth_range=(1, 100000))
         
-        # self.obj_canvas.request_draw()
+        self.obj_canvas.request_draw()
 
         self.obj_controller = OrbitFlightController(self.obj_camera, speed=2500, register_events=self.obj_renderer, damping=0)
         self.img_controller = ImageController(self.obj_camera, register_events=self.obj_renderer, damping=0)
@@ -251,9 +251,11 @@ class MainDialog(QtWidgets.QDialog):
         self.list_toolbar.setIconSize(QtCore.QSize(20, 20))
         
         self.img_list = QtWidgets.QListWidget()
+        self.img_list.setContextMenuPolicy(3)   #call customContextMenu
         self.img_list.setAlternatingRowColors(True)
         self.img_list.setSelectionMode(QtWidgets.QAbstractItemView.SingleSelection)
         self.img_list.itemClicked.connect(self.camera_clicked)
+        self.img_list.customContextMenuRequested.connect(self.show_image_menu)
         
         self.prev_img_item = None
         
@@ -314,6 +316,12 @@ class MainDialog(QtWidgets.QDialog):
 
         self.cam_dict = {}
         self.showCam_check = False
+        
+        self.img_context_menu = QtWidgets.QMenu(self)
+        action1 = QtGui.QAction('Action 1', self)
+        action2 = QtGui.QAction('Action 2', self)
+        self.img_context_menu.addAction(action1)
+        self.img_context_menu.addAction(action2)
         
     def set_layers(self, lyr_dict):
         self.reg_lyr = lyr_dict["reg_lyr"]
@@ -460,7 +468,11 @@ class MainDialog(QtWidgets.QDialog):
             img_array = np.asarray(img)
             tex = gfx.Texture(img_array, dim=2)
             
-            plane_material = gfx.MeshBasicMaterial(map=tex, side="FRONT", map_interpolation="linear")
+            if gfx.__version__ != '0.7.0':
+                plane_material = gfx.MeshBasicMaterial(map=tex, side="FRONT", map_interpolation="linear")
+            else:
+                plane_material = gfx.MeshBasicMaterial(map=tex, side="FRONT")
+                
             plane_mesh = gfx.Mesh(plane_geom, plane_material, visible=True)
             
             self.img_controller.set_image(plane_mesh, plane_pnts_dir, prc, distance=1000)
@@ -547,8 +559,6 @@ class MainDialog(QtWidgets.QDialog):
             for key in self.cam_dict.keys():
                 self.cam_dict[key].visible = False
 
-        
-    # def add_mesh_to_obj_canvas(self, o3d_mesh, bounds, uvs=None, ortho_path=None):        
     def add_mesh_to_obj_canvas(self, tiles_data):
         
         self.tiles_data = tiles_data
@@ -566,6 +576,8 @@ class MainDialog(QtWidgets.QDialog):
 
         self.show_camera_in_obj_canvas()
         
+        self.o3d_scene = o3d.t.geometry.RaycastingScene()
+        
         for tx, tile in enumerate(self.tiles_data["tiles"]):
             
             self.msg_box.setValue(tx+1)
@@ -578,8 +590,9 @@ class MainDialog(QtWidgets.QDialog):
             
             if os.path.exists(geom_path):
                 tile_mesh = o3d.io.read_triangle_mesh(geom_path)
-
-                verts = np.asarray(tile_mesh.vertices)
+                
+                
+                verts = np.asarray(tile_mesh.vertices).astype(np.float32)
                 
                 u = (verts[:, 0] - tile["min_xyz"][0])/(tile["max_xyz"][0] - tile["min_xyz"][0])
                 v = (verts[:, 1] - tile["min_xyz"][1])/(tile["max_xyz"][1] - tile["min_xyz"][1])
@@ -587,10 +600,12 @@ class MainDialog(QtWidgets.QDialog):
                 
                 verts -= self.min_xyz
                 faces = np.asarray(tile_mesh.triangles).astype(np.uint32)
+                
+                self.o3d_scene.add_triangles(verts, faces)
                                     
                 # print("Loading mesh...")
                 mesh_geom = gfx.geometries.Geometry(indices=faces, 
-                                                    positions=verts.astype(np.float32),
+                                                    positions=verts,
                                                     texcoords=uv.astype(np.float32),
                                                     tid=[int(tile["tid_int"])])
             
@@ -606,7 +621,12 @@ class MainDialog(QtWidgets.QDialog):
                                     
                     img_arr = np.flipud(img_arr)
                     tex = gfx.Texture(img_arr, dim=2, generate_mipmaps=True)
-                    mesh_material = gfx.MeshBasicMaterial(map=tex, side="FRONT", map_interpolation="linear", pick_write=True)
+                    
+                    #prior to 0.7.0 it was possible to defined the texture interpolation for meshes; appaers to be removed with 0.7.0
+                    if gfx.__version__ != '0.7.0':
+                        mesh_material = gfx.MeshBasicMaterial(map=tex, side="FRONT", map_interpolation="linear", pick_write=True)  
+                    else:
+                        mesh_material = gfx.MeshBasicMaterial(map=tex, side="FRONT", pick_write=True)
                 else:
                     mesh_material = gfx.MeshNormalMaterial(side="FRONT", pick_write=True)
             
@@ -639,10 +659,8 @@ class MainDialog(QtWidgets.QDialog):
         self.mono_tool.set_minxyz(self.min_xyz)
         self.mono_vertex_tool.set_minxyz(self.min_xyz)
                        
-        #! TODO How to define and set raycating scene in future?
-        # self.mono_tool.set_scene(self.parent.ray_scene)
-        # self.mono_vertex_tool.set_scene(self.parent.ray_scene)
-
+        self.mono_tool.set_scene(self.o3d_scene)
+        self.mono_vertex_tool.set_scene(self.o3d_scene)
         
     def animate(self):     
 
@@ -974,9 +992,15 @@ class MainDialog(QtWidgets.QDialog):
             gcp_fid = gcp.id()
             
             if gcp_gid in used_gids:
-                self.map_gcps_lyr.changeAttributeValue(gcp_fid, gcp.fieldNameIndex("active"), "1")
+                self.map_gcps_lyr.changeAttributeValue(gcp_fid, gcp.fieldNameIndex("active"), "1")        
+                for pnts in self.obj_gcps_grp.children:
+                    if int(gcp_fid) == int(pnts.geometry.gid.data[0]):
+                        pnts.material = gfx.PointsMaterial(color=(0.76, 0, 0, 1), size=10)        
             else:
                 self.map_gcps_lyr.changeAttributeValue(gcp_fid, gcp.fieldNameIndex("active"), "0")
+                for pnts in self.obj_gcps_grp.children:
+                    if int(gcp_fid) == int(pnts.geometry.gid.data[0]):
+                        pnts.material = gfx.PointsMaterial(color=(0.87, 0.87, 0.87, 1), size=10)       
     
     def save_gcp_to_lyr(self, data):
         img_feat_geom = QgsPoint(data["img_x"], data["img_y"])
@@ -1166,8 +1190,13 @@ class MainDialog(QtWidgets.QDialog):
         
         else:
             pass
-
+        
+    def show_image_menu(self, point):
+        clicked_img = self.img_list.itemAt(point.x(), point.y())
+        self.img_context_menu.exec(self.img_list.mapToGlobal(point))
+        
     def camera_clicked(self, item):
+        
         if item.isSelected():
             if item == self.prev_img_item:
                 self.untoggle_camera(item)
@@ -1250,12 +1279,18 @@ class MainDialog(QtWidgets.QDialog):
         #remove all children from the group --> removes all prevously loaded GCPs
         self.obj_gcps_grp.clear()
         
-        for feat in self.map_gcps_lyr.getFeatures():
-            feat_pos = [feat["obj_x"]-self.min_xyz[0], 
-                        feat["obj_y"]-self.min_xyz[1], 
-                        feat["obj_z"]-self.min_xyz[2]]
-            feat_gfx = create_point_3d(feat_pos, feat["gid"])
-            self.obj_gcps_grp.add(feat_gfx)
+        for gcp in self.map_gcps_lyr.getFeatures():
+            gcp_pos = [gcp["obj_x"]-self.min_xyz[0], 
+                        gcp["obj_y"]-self.min_xyz[1], 
+                        gcp["obj_z"]-self.min_xyz[2]]
+            
+            if gcp["active"] == '1':
+                gcp_clr = (0.78, 0, 0, 1)
+            else:
+                gcp_clr = (0.86, 0.86, 0.86, 1)
+            
+            gcp_gfx = create_point_3d(gcp_pos, gcp["gid"], gcp_clr)
+            self.obj_gcps_grp.add(gcp_gfx)
 
         if self.active_camera.is_oriented == 1:
             self.set_obj_canvas_camera(self.active_camera.asdict())
@@ -1282,12 +1317,13 @@ class MainDialog(QtWidgets.QDialog):
             self.btn_mono_vertex.setEnabled(False)
             #during monoplotting user cant adjust image orientation            
             self.img_canvas.setMapTool(self.mono_tool)
+            self.img_list.setEnabled(False)
             self.mono_tool.reset()
         else:                                               #deactivate
             self.btn_ori_tool.setEnabled(True)
             self.btn_mono_select.setEnabled(True)
             self.btn_mono_vertex.setEnabled(True)
-            
+            self.img_list.setEnabled(True)
             self.img_canvas.unsetMapTool(self.mono_tool)
             self.img_canvas.setMapTool(self.img_pan_tool)
     
@@ -1297,6 +1333,7 @@ class MainDialog(QtWidgets.QDialog):
             self.btn_ori_tool.setEnabled(False)
             self.btn_mono_tool.setEnabled(False)
             self.btn_mono_vertex.setEnabled(False)
+            self.img_list.setEnabled(False)
             
             #during monoplotting user cant adjust image orientation
             self.img_canvas.setMapTool(self.mono_select_tool)
@@ -1306,7 +1343,7 @@ class MainDialog(QtWidgets.QDialog):
             self.btn_mono_tool.setEnabled(True)#deactivate tool
             self.btn_mono_select.setEnabled(True)
             self.btn_mono_vertex.setEnabled(True)
-            
+            self.img_list.setEnabled(True)
             self.img_canvas.unsetMapTool(self.mono_select_tool)
             self.img_canvas.setMapTool(self.img_pan_tool)    
     
@@ -1316,7 +1353,8 @@ class MainDialog(QtWidgets.QDialog):
             self.btn_ori_tool.setEnabled(False)
             self.btn_mono_tool.setEnabled(False)
             self.btn_mono_select.setEnabled(False)
-            
+            self.img_list.setEnabled(False)
+            self.img_list.setEnabled(True)
             #during monoplotting user cant adjust image orientation
             self.img_canvas.setMapTool(self.mono_vertex_tool)
             self.mono_vertex_tool.reset()

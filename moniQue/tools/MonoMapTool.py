@@ -103,7 +103,7 @@ class MonoMapTool(QgsMapTool):
         
         elif e.button() == Qt.RightButton:
             
-            if self.rubberMap.numberOfVertices() > 3:
+            if self.rubberMap.numberOfVertices() >= 2:
                 
                 map_line_geom = self.rubberMap.asGeometry()
                 map_line_pnts_h = []

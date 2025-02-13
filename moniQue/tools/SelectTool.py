@@ -98,5 +98,7 @@ class SelectTool(QgsMapTool):
         return QgsRectangle(self.startPoint, self.endPoint)
 
     def deactivate(self):
+        self.map_lyr.removeSelection()
+        self.img_lyr.removeSelection()
         QgsMapTool.deactivate(self)
         self.deactivated.emit()
