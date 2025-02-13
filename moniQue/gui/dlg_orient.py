@@ -50,6 +50,8 @@ class OrientDialog(QtWidgets.QDialog):
     
     activate_mouse_projection_signal = QtCore.pyqtSignal()
     deactivate_mouse_projection_signal = QtCore.pyqtSignal()
+
+    offset_signal = QtCore.pyqtSignal(object)
     
     def __init__(self, parent=None, icon_dir=None, active_iid=None):
         """Constructor."""
@@ -109,17 +111,12 @@ class OrientDialog(QtWidgets.QDialog):
         self.btn_preview_pos.setCheckable(True)
         table_toolbar.addAction(self.btn_preview_pos)
 
-        self.btn_offset = QtWidgets.QAction("Set Offset.", self)
-        self.btn_offset.setIcon(QtGui.QIcon(os.path.join(self.icon_dir, "mActionCapturePoint.png")))
+        self.btn_offset = QtWidgets.QAction("Manually adjust orientation parameters", self)
+        self.btn_offset.setIcon(QtGui.QIcon(os.path.join(self.icon_dir, "mActionMoveFeaturePoint.png")))
         self.btn_offset.triggered.connect(self.set_offset)
         table_toolbar.addAction(self.btn_offset)
-        self.offset_x = 0.0
-        self.offset_y = 0.0
-        self.offset_z = 0.0
-        self.offset_al = 0.0
-        self.offset_ka = 0.0
-        self.offset_ze = 0.0
-        self.offset_fov = 0.0
+
+        self.offset = {'offset_x': 0.0, 'offset_y': 0.0, 'offset_z': 0.0}
     
         self.table_gcps = QtWidgets.QTableWidget()
         
@@ -271,6 +268,8 @@ class OrientDialog(QtWidgets.QDialog):
         self.setLayout(layout)
 
         self.error_dialog = QtWidgets.QErrorMessage(parent=self)
+
+        self.offset = None
 
         
     def gcp_selected(self, rix, cix):
@@ -524,7 +523,8 @@ class OrientDialog(QtWidgets.QDialog):
                     
             
             ori_data["init_params"] = self.init_params
-            res = srs_lm(ori_data)
+            res = srs_lm(ori_data, self.offset)
+            self.offset = None
                         
             if res.success == False:
                 self.error_dialog.showMessage('LSQ did not converge: %s' % (res.message))
@@ -563,15 +563,15 @@ class OrientDialog(QtWidgets.QDialog):
                 
                 gcp_dict = {"residuals": dict(zip(gcp_gids, gcp_residuals.tolist()))}
                 
-                est_data = {"obj_x0":est_obj_x0 + self.offset_x,
-                            "obj_y0":est_obj_y0 + self.offset_y,
-                            "obj_z0":est_obj_z0 + self.offset_z,
-                            "alpha":est_alpha + self.offset_al,
-                            "zeta":est_zeta + self.offset_ze,
-                            "kappa":est_kappa + self.offset_ka,
+                est_data = {"obj_x0":est_obj_x0,
+                            "obj_y0":est_obj_y0,
+                            "obj_z0":est_obj_z0,
+                            "alpha":est_alpha,
+                            "zeta":est_zeta,
+                            "kappa":est_kappa,
                             "img_x0":self.init_params["img_x0"],
                             "img_y0":self.init_params["img_y0"],
-                            "f":est_focal + self.offset_fov}
+                            "f":est_focal}
                 est_data = {**est_data, **cxx_dict}
                 est_data = {**est_data, **gcp_dict}
                 
@@ -608,23 +608,35 @@ class OrientDialog(QtWidgets.QDialog):
         self.parent.orient_dlg_open = False
         
     def set_offset(self):
+        self.offset = None
+        self.first_time = True
         offset_dialog = OffsetMetaDialog()
+        offset_dialog.preview_offset_signal.connect(self.show_offset)
         offset_dialog.exec_()
 
-        if offset_dialog.offset_x.text() != '':
-            self.offset_x = float(offset_dialog.offset_x.text())
-        if offset_dialog.offset_y.text() != '':
-            self.offset_y = float(offset_dialog.offset_y.text())
-        if offset_dialog.offset_z.text() != '':
-            self.offset_z = float(offset_dialog.offset_z.text())
-        if offset_dialog.offset_al.text() != '':
-            self.offset_al = (float(offset_dialog.offset_al.text())*np.pi)/180
-        if offset_dialog.offset_ka.text() != '':
-            self.offset_ka = (float(offset_dialog.offset_ka.text())*np.pi)/180
-        if offset_dialog.offset_ze.text() != '':
-            self.offset_ze = (float(offset_dialog.offset_ze.text())*np.pi)/180
-        if offset_dialog.offset_fov.text() != '':
-            self.offset_fov = float(offset_dialog.offset_fov.text())
+    def show_offset(self, preview_offset, accepted):
+        forward, right, up, alpha = self.calc_offset(preview_offset)
+
+        self.preview_offset = {'offset_x': forward * np.cos(alpha) + right * np.cos(alpha - (np.pi/2)), 
+                                'offset_y': forward * np.sin(alpha) + right * np.sin(alpha - (np.pi/2)), 
+                                'offset_z': up}
+        
+        self.offset_signal.emit(self.preview_offset)
+        self.first_time = False
+
+        if accepted:
+            self.offset = self.preview_offset
+
+    def calc_offset(self, offset):
+        forward = -float(offset[0]) if offset[0] != '' else 0.0
+        right = -float(offset[1]) if offset[1] != '' else 0.0
+        up = float(offset[2]) if offset[2] != '' else 0.0
+        alpha = self.init_params['alpha']
+
+        return forward, right, up, alpha
+
+        
+
 
 
 

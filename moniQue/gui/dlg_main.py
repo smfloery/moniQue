@@ -133,7 +133,7 @@ class MainDialog(QtWidgets.QDialog):
         self.export_action.triggered.connect(self.export_obj_canvas)
         self.export_menu.addAction(self.export_action)
 
-        self.showCam_action = QtWidgets.QAction("&Show Camera Position in 3D", self)
+        self.showCam_action = QtWidgets.QAction("&Show Camera Position in 3D Canvas", self)
         self.showCam_action.triggered.connect(self.showCam)
         self.view_menu.addAction(self.showCam_action)
 
@@ -212,7 +212,11 @@ class MainDialog(QtWidgets.QDialog):
         self.obj_toolbar.addAction(btn_load_obj_canvas_camera)
 
         btn_obj_canvas_camera_from_map = QtWidgets.QAction("Set camera position from current QGIS map canvas", self)
+<<<<<<< HEAD
         btn_obj_canvas_camera_from_map.setIcon(QtGui.QIcon(os.path.join(self.icon_dir, "sync_views.png")))
+=======
+        btn_obj_canvas_camera_from_map.setIcon(QtGui.QIcon(os.path.join(self.icon_dir, "mExtentFromMap.png")))
+>>>>>>> cda944cf965121027863f57867e8c523f2565226
         btn_obj_canvas_camera_from_map.triggered.connect(self.obj_canvas_camera_from_map)
         self.obj_toolbar.addAction(btn_obj_canvas_camera_from_map)
         
@@ -367,6 +371,8 @@ class MainDialog(QtWidgets.QDialog):
             self.dlg_orient.save_orientation_signal.connect(self.save_orientation_to_lyr)
             self.dlg_orient.activate_mouse_projection_signal.connect(self.toggle_project_mouse_pos)
             self.dlg_orient.deactivate_mouse_projection_signal.connect(self.untoggle_project_mouse_pos)
+            self.dlg_orient.offset_signal.connect(self.show_offset_in_obj_canvas)
+
             self.dlg_orient.add_gcps_from_lyr(self.get_gcps_from_gpkg())
 
             if self.active_camera.is_oriented == 1:
@@ -498,7 +504,7 @@ class MainDialog(QtWidgets.QDialog):
             self.img_plane_grp.clear()
             self.obj_canvas.request_draw()
 
-    def show_camera_in_obj_canvas(self):
+    def show_camera_in_obj_canvas(self, current_iid):
 
         for cam_feat in self.cam_lyr.getFeatures():
 
@@ -530,21 +536,35 @@ class MainDialog(QtWidgets.QDialog):
                     
                 plane_material = gfx.MeshBasicMaterial(color = (1, 0.65, 0, 1), opacity=0.5)
                 plane_mesh = gfx.Mesh(plane_geom, plane_material, visible=True)
+                
+                selected_plane_material = gfx.MeshBasicMaterial(color = (1, 0, 0, 1), opacity=0.5)
+                selected_plane_mesh = gfx.Mesh(plane_geom, selected_plane_material, visible=True)
+
+                #TODO: plane_mesh rot färben wenn entsprechendes Bild ausgewählt ist!
                     
                 self.img_controller.set_image(plane_mesh, plane_pnts_dir, prc, distance=1000)
                 
                 positions = [[list(prc),plane_pnts_obj[i]] for i in range(4)]
                 lines = [gfx.Line(gfx.Geometry(positions=positions[i]), gfx.LineMaterial(thickness=1.0, color=(1, 0.65, 0.0), opacity=1)) for i in range(4)]
+                selected_lines = [gfx.Line(gfx.Geometry(positions=positions[i]), gfx.LineMaterial(thickness=1.0, color=(1, 0.0, 0.0), opacity=1)) for i in range(4)]
 
                 if cam_feat['iid'] in self.cam_dict.keys():
                     self.cam_dict[cam_feat['iid']].clear()
 
-                self.cam_dict[cam_feat['iid']] = gfx.Group(visible=False)
+                self.cam_dict[cam_feat['iid']] = gfx.Group(visible=self.showCam_check)
                 self.obj_scene.add(self.cam_dict[cam_feat['iid']])
-                self.cam_dict[cam_feat['iid']].add(plane_mesh)   
 
-                for i in lines:
-                    self.cam_dict[cam_feat['iid']].add(i)
+                if cam_feat['iid'] == current_iid:
+                    self.cam_dict[cam_feat['iid']].add(selected_plane_mesh)
+                else:
+                    self.cam_dict[cam_feat['iid']].add(plane_mesh)
+
+                if cam_feat['iid'] == current_iid:
+                    for i in selected_lines:
+                        self.cam_dict[cam_feat['iid']].add(i)
+                else:
+                    for i in lines:
+                        self.cam_dict[cam_feat['iid']].add(i)
 
 
         self.obj_canvas.request_draw()
@@ -574,7 +594,7 @@ class MainDialog(QtWidgets.QDialog):
         self.min_xyz = np.array(self.tiles_data["min_xyz"])
         self.max_xyz = np.array(self.tiles_data["max_xyz"])
 
-        self.show_camera_in_obj_canvas()
+        self.show_camera_in_obj_canvas(0)
         
         self.o3d_scene = o3d.t.geometry.RaycastingScene()
         
@@ -962,7 +982,7 @@ class MainDialog(QtWidgets.QDialog):
         
         self.cam_lyr.triggerRepaint()
 
-        self.show_camera_in_obj_canvas()
+        self.show_camera_in_obj_canvas(self.active_camera.iid)
     
     def update_gcps(self, data):
         curr_img_gcps = self.img_gcps_lyr.getFeatures(expression = "iid = '%s'" % (self.active_camera.iid))
@@ -1233,6 +1253,8 @@ class MainDialog(QtWidgets.QDialog):
         
         self.active_camera = None
         self.setWindowTitle("%s" % (self.project_name))
+
+        self.show_camera_in_obj_canvas(0)
         
     def toggle_camera(self, item):
         
@@ -1304,9 +1326,15 @@ class MainDialog(QtWidgets.QDialog):
             self.mono_vertex_tool.set_camera(self.active_camera)
         else:
             self.btn_mono_tool.setEnabled(False)
+<<<<<<< HEAD
             self.btn_mono_select.setEnabled(False)
             self.btn_mono_vertex.setEnabled(False)
             self.btn_obj_canvas_show_img.setEnabled(False)
+=======
+            # self.btn_obj_canvas_show_img.setEnabled(False)
+
+        self.show_camera_in_obj_canvas(iid)
+>>>>>>> cda944cf965121027863f57867e8c523f2565226
             
         self.obj_canvas.request_draw()
         
@@ -1567,8 +1595,7 @@ class MainDialog(QtWidgets.QDialog):
         for mesh in self.terrain.children:
             mesh.add_event_handler(self.reproject_pos, "pointer_move")
     
-    def untoggle_project_mouse_pos(self):
-                
+    def untoggle_project_mouse_pos(self):       
         if self.project_pos_toggled:
             for mesh in self.terrain.children:
                 mesh.remove_event_handler(self.reproject_pos, "pointer_move")
@@ -1587,3 +1614,26 @@ class MainDialog(QtWidgets.QDialog):
                 self.img_rubber.removeLastPoint()
                 self.img_rubber.addPoint(QgsPointXY(click_pos_img[0], click_pos_img[1]))
                 self.img_rubber.show()
+
+    def show_offset_in_obj_canvas(self, offset):
+        if self.dlg_orient.first_time == True:
+            self.obj_cam_state = self.obj_camera.get_state()
+
+        position = [self.obj_cam_state['position'][0] + offset['offset_x'], 
+                    self.obj_cam_state['position'][1] + offset['offset_y'], 
+                    self.obj_cam_state['position'][2] + offset['offset_z']]
+
+        obj_camera_target = {'position':np.array([position[0], position[1], position[2]]),
+                                    'rotation':self.obj_cam_state['rotation'], 
+                                    'scale':self.obj_cam_state['scale'],
+                                    'reference_up':self.obj_cam_state['reference_up'], 
+                                    'fov':self.obj_cam_state['fov'], 
+                                    'width':self.obj_cam_state['width'], 
+                                    'height':self.obj_cam_state['height'], 
+                                    'zoom':self.obj_cam_state['zoom'], 
+                                    'maintain_aspect':self.obj_cam_state['maintain_aspect'],
+                                    'depth_range':self.obj_cam_state['depth_range']}
+        
+        self.obj_camera.set_state(obj_camera_target)
+        self.obj_canvas.request_draw()
+

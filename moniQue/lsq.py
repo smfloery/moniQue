@@ -2,33 +2,39 @@ from lmfit import Parameters, minimize
 import numpy as np
 from .helpers import alzeka2rot
 
-def srs_lm(data):
-    
+def srs_lm(data, offset):
     gcp_obj = np.array(data["obj"])
     gcp_img = np.array(data["img"])
-    
+        
     assert np.shape(gcp_obj)[1] == 3
     assert np.shape(gcp_img)[1] == 2
     assert np.shape(gcp_obj)[0] == np.shape(gcp_img)[0]
-    
+        
     init_params = data["init_params"]
-    
     params = Parameters()
-    params.add("obj_x0", value=init_params["obj_x0"], vary=True)
-    params.add("obj_y0", value=init_params["obj_y0"], vary=True)
-    params.add("obj_z0", value=init_params["obj_z0"], vary=True)
-    
+
+    if offset is None:
+        params.add("obj_x0", value=init_params["obj_x0"], vary=True)
+        params.add("obj_y0", value=init_params["obj_y0"], vary=True)
+        params.add("obj_z0", value=init_params["obj_z0"], vary=True)
+        
+    else:
+        params.add("obj_x0", value=init_params["obj_x0"] + offset['offset_x'], vary=False)
+        params.add("obj_y0", value=init_params["obj_y0"] + offset['offset_y'], vary=False)
+        params.add("obj_z0", value=init_params["obj_z0"] + offset['offset_z'], vary=False)
+
     params.add("alpha", value=init_params["alpha"], vary=True)
     params.add("zeta", value=init_params["zeta"], vary=True)
     params.add("kappa", value=init_params["kappa"], vary=True)
-    
+        
     params.add("f", value=init_params["f"], vary=True)
-    
+        
     params.add("img_x0", value=init_params["img_x0"], vary=False)
     params.add("img_y0", value=init_params["img_y0"], vary=False)
 
     r = minimize(residual, params, args=(gcp_img, gcp_obj), method="leastsq")
     return r
+
 
 def world2img(gcp_obj, p):
 
