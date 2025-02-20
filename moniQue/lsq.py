@@ -12,6 +12,7 @@ def srs_lm(data, offset):
         
     init_params = data["init_params"]
     params = Parameters()
+    offset_check = False
 
     if offset is None:
         params.add("obj_x0", value=init_params["obj_x0"], vary=True)
@@ -22,6 +23,7 @@ def srs_lm(data, offset):
         params.add("obj_x0", value=init_params["obj_x0"] + offset['offset_x'], vary=False)
         params.add("obj_y0", value=init_params["obj_y0"] + offset['offset_y'], vary=False)
         params.add("obj_z0", value=init_params["obj_z0"] + offset['offset_z'], vary=False)
+        offset_check = True
 
     params.add("alpha", value=init_params["alpha"], vary=True)
     params.add("zeta", value=init_params["zeta"], vary=True)
@@ -33,7 +35,8 @@ def srs_lm(data, offset):
     params.add("img_y0", value=init_params["img_y0"], vary=False)
 
     r = minimize(residual, params, args=(gcp_img, gcp_obj), method="leastsq")
-    return r
+
+    return r, offset_check
 
 
 def world2img(gcp_obj, p):
