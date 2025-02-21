@@ -270,6 +270,7 @@ class OrientDialog(QtWidgets.QDialog):
         self.error_dialog = QtWidgets.QErrorMessage(parent=self)
 
         self.offset = None
+        self.offset_check = False
 
         
     def gcp_selected(self, rix, cix):
@@ -520,11 +521,17 @@ class OrientDialog(QtWidgets.QDialog):
                     ori_data["gid"].append(curr_gid)
                     ori_data["img"].append([curr_img_x, curr_img_y])
                     ori_data["obj"].append([curr_obj_x, curr_obj_y, curr_obj_z])
+
+            if self.offset_check:
+                ori_data["init_params"] = self.est_data
+                res, offset_check = srs_lm(ori_data, None)
+                self.offset = None
+                self.offset_check = False
                     
-            
-            ori_data["init_params"] = self.init_params
-            res = srs_lm(ori_data, self.offset)
-            self.offset = None
+            else:
+                ori_data["init_params"] = self.init_params
+                res, offset_check = srs_lm(ori_data, self.offset)
+                self.offset = None
                         
             if res.success == False:
                 self.error_dialog.showMessage('LSQ did not converge: %s' % (res.message))
@@ -574,11 +581,17 @@ class OrientDialog(QtWidgets.QDialog):
                             "f":est_focal}
                 est_data = {**est_data, **cxx_dict}
                 est_data = {**est_data, **gcp_dict}
+
+                if offset_check:
+                    self.offset_check = True
+                    self.est_data = est_data
+                    self.calc_orientation()
                 
-                self.camera_estimated_signal.emit(est_data)
-                self.set_init_params(est_data)
-                self.set_residuals(est_data)
-                self.btn_save_ori.setEnabled(True)
+                else:
+                    self.camera_estimated_signal.emit(est_data)
+                    self.set_init_params(est_data)
+                    self.set_residuals(est_data)
+                    self.btn_save_ori.setEnabled(True)
 
         ########################################################################################################################################
 
@@ -628,8 +641,8 @@ class OrientDialog(QtWidgets.QDialog):
             self.offset = self.preview_offset
 
     def calc_offset(self, offset):
-        forward = -float(offset[0]) if offset[0] != '' else 0.0
-        right = -float(offset[1]) if offset[1] != '' else 0.0
+        forward = float(offset[0]) if offset[0] != '' else 0.0
+        right = float(offset[1]) if offset[1] != '' else 0.0
         up = float(offset[2]) if offset[2] != '' else 0.0
         alpha = self.init_params['alpha']
 
