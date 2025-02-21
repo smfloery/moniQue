@@ -212,11 +212,7 @@ class MainDialog(QtWidgets.QDialog):
         self.obj_toolbar.addAction(btn_load_obj_canvas_camera)
 
         btn_obj_canvas_camera_from_map = QtWidgets.QAction("Set camera position from current QGIS map canvas", self)
-<<<<<<< HEAD
-        btn_obj_canvas_camera_from_map.setIcon(QtGui.QIcon(os.path.join(self.icon_dir, "sync_views.png")))
-=======
         btn_obj_canvas_camera_from_map.setIcon(QtGui.QIcon(os.path.join(self.icon_dir, "mExtentFromMap.png")))
->>>>>>> cda944cf965121027863f57867e8c523f2565226
         btn_obj_canvas_camera_from_map.triggered.connect(self.obj_canvas_camera_from_map)
         self.obj_toolbar.addAction(btn_obj_canvas_camera_from_map)
         
@@ -1326,15 +1322,12 @@ class MainDialog(QtWidgets.QDialog):
             self.mono_vertex_tool.set_camera(self.active_camera)
         else:
             self.btn_mono_tool.setEnabled(False)
-<<<<<<< HEAD
             self.btn_mono_select.setEnabled(False)
             self.btn_mono_vertex.setEnabled(False)
             self.btn_obj_canvas_show_img.setEnabled(False)
-=======
             # self.btn_obj_canvas_show_img.setEnabled(False)
 
         self.show_camera_in_obj_canvas(iid)
->>>>>>> cda944cf965121027863f57867e8c523f2565226
             
         self.obj_canvas.request_draw()
         
