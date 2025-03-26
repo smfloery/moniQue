@@ -42,14 +42,27 @@ import glob
 from collections import OrderedDict
 from qgis.utils import iface
 
-from qgis.core import QgsFeature, QgsPoint, QgsRasterLayer, QgsProject, QgsJsonUtils, QgsGeometry, QgsCoordinateReferenceSystem, QgsCoordinateTransform, Qgis, QgsPointXY
+from qgis.core import (QgsFeature,
+                       QgsField,
+                       QgsVectorLayer, 
+                       QgsVectorFileWriter,
+                       QgsPoint, 
+                       QgsRasterLayer, 
+                       QgsProject, 
+                       QgsJsonUtils, 
+                       QgsGeometry, 
+                       QgsCoordinateReferenceSystem, 
+                       QgsCoordinateTransform, 
+                       Qgis, 
+                       QgsPointXY)
+
 from qgis.gui import QgsMapToolPan
 from qgis.PyQt.QtWidgets import QFileDialog
 
 from PyQt5.QtGui import QColor, QCursor
 from PyQt5.QtCore import Qt
 
-from .dlg_create import CreateDialog
+# from .dlg_create import CreateDialog
 from .dlg_orient import OrientDialog
 from .dlg_meta_gcp import GcpMetaDialog
 from .dlg_meta_export import ExportMetaDialog
@@ -105,22 +118,18 @@ class MainDialog(QtWidgets.QDialog):
         self.export_menu.setEnabled(False)
         self.menu.addMenu(self.export_menu)
 
-        self.view_menu = QtWidgets.QMenu("&View", self)
-        self.view_menu.setEnabled(False)
-        self.menu.addMenu(self.view_menu)
+        # self.view_menu = QtWidgets.QMenu("&View", self)
+        # self.view_menu.setEnabled(False)
+        # self.menu.addMenu(self.view_menu)
         
-        self.create_action = QtWidgets.QAction("&New project", self)
+        self.create_action = QtWidgets.QAction("&Create from *.json", self)
         self.create_action.triggered.connect(self.show_dlg_create)
         self.file_menu.addAction(self.create_action)
         
         self.load_action = QtWidgets.QAction("&Load project", self)
         self.load_action.triggered.connect(self.load_project)
         self.file_menu.addAction(self.load_action)
-        
-        self.save_as_action = QtWidgets.QAction("&Save project as", self)
-        self.save_as_action.triggered.connect(self.save_project_as)
-        self.file_menu.addAction(self.save_as_action)
-        
+                
         self.import_action = QtWidgets.QAction("&Import images", self)
         self.import_action.triggered.connect(self.import_images)
         self.img_menu.addAction(self.import_action)
@@ -133,9 +142,9 @@ class MainDialog(QtWidgets.QDialog):
         self.export_action.triggered.connect(self.export_obj_canvas)
         self.export_menu.addAction(self.export_action)
 
-        self.showCam_action = QtWidgets.QAction("&Show Camera Position in 3D Canvas", self)
-        self.showCam_action.triggered.connect(self.showCam)
-        self.view_menu.addAction(self.showCam_action)
+        # self.showCam_action = QtWidgets.QAction("&Show Camera Position in 3D Canvas", self)
+        # self.showCam_action.triggered.connect(self.showCam)
+        # self.view_menu.addAction(self.showCam_action)
 
         self.main_toolbar = QtWidgets.QToolBar("Main toolbar")
         self.main_toolbar.setIconSize(QtCore.QSize(24, 24))
@@ -196,33 +205,27 @@ class MainDialog(QtWidgets.QDialog):
         self.obj_canvas = WgpuCanvas(parent=self)
         self.obj_canvas.setMinimumSize(QtCore.QSize(300, 16777215))
 
-        btn_reset_obj_canvas_camera = QtWidgets.QAction("Reset to default camera position", self)
-        btn_reset_obj_canvas_camera.setIcon(QtGui.QIcon(os.path.join(self.icon_dir, "zoom_to_extent.png")))
-        btn_reset_obj_canvas_camera.triggered.connect(self.reset_obj_canvas_camera)
-        self.obj_toolbar.addAction(btn_reset_obj_canvas_camera)
+        self.btn_reset_obj_canvas_camera = QtWidgets.QAction("Reset to default camera position.", self)
+        self.btn_reset_obj_canvas_camera.setIcon(QtGui.QIcon(os.path.join(self.icon_dir, "zoom_to_extent.png")))
+        self.btn_reset_obj_canvas_camera.triggered.connect(self.reset_obj_canvas_camera)
+        self.obj_toolbar.addAction(self.btn_reset_obj_canvas_camera)
 
-        btn_save_obj_canvas_camera = QtWidgets.QAction("Save camera position.", self)
-        btn_save_obj_canvas_camera.setIcon(QtGui.QIcon(os.path.join(self.icon_dir, "save_temporary_camera_position.png")))
-        btn_save_obj_canvas_camera.triggered.connect(self.save_obj_canvas_camera)
-        self.obj_toolbar.addAction(btn_save_obj_canvas_camera)
+        # btn_save_obj_canvas_camera = QtWidgets.QAction("Save camera position.", self)
+        # btn_save_obj_canvas_camera.setIcon(QtGui.QIcon(os.path.join(self.icon_dir, "save_temporary_camera_position.png")))
+        # btn_save_obj_canvas_camera.triggered.connect(self.save_obj_canvas_camera)
+        # self.obj_toolbar.addAction(btn_save_obj_canvas_camera)
 
-        btn_load_obj_canvas_camera = QtWidgets.QAction("Zoom to saved camera position.", self)
-        btn_load_obj_canvas_camera.setIcon(QtGui.QIcon(os.path.join(self.icon_dir, "set_temporary_camera_position.png")))
-        btn_load_obj_canvas_camera.triggered.connect(self.load_obj_canvas_camera)
-        self.obj_toolbar.addAction(btn_load_obj_canvas_camera)
+        # btn_load_obj_canvas_camera = QtWidgets.QAction("Zoom to saved camera position.", self)
+        # btn_load_obj_canvas_camera.setIcon(QtGui.QIcon(os.path.join(self.icon_dir, "set_temporary_camera_position.png")))
+        # btn_load_obj_canvas_camera.triggered.connect(self.load_obj_canvas_camera)
+        # self.obj_toolbar.addAction(btn_load_obj_canvas_camera)
 
-        btn_obj_canvas_camera_from_map = QtWidgets.QAction("Set camera position from current QGIS map canvas", self)
-<<<<<<< HEAD
-        btn_obj_canvas_camera_from_map.setIcon(QtGui.QIcon(os.path.join(self.icon_dir, "mExtentFromMap.png")))
-=======
-        btn_obj_canvas_camera_from_map.setIcon(QtGui.QIcon(os.path.join(self.icon_dir, "sync_views.png")))
-        btn_obj_canvas_camera_from_map.setIcon(QtGui.QIcon(os.path.join(self.icon_dir, "mExtentFromMap.png")))
-
->>>>>>> d2666e00b3c6d7d5d4bb614c36f0f90d2d6640f3
-        btn_obj_canvas_camera_from_map.triggered.connect(self.obj_canvas_camera_from_map)
-        self.obj_toolbar.addAction(btn_obj_canvas_camera_from_map)
+        self.btn_obj_canvas_camera_from_map = QtWidgets.QAction("Set camera to current QGIS canvas extent.", self)
+        self.btn_obj_canvas_camera_from_map.setIcon(QtGui.QIcon(os.path.join(self.icon_dir, "mExtentFromMap.png")))
+        self.btn_obj_canvas_camera_from_map.triggered.connect(self.obj_canvas_camera_from_map)
+        self.obj_toolbar.addAction(self.btn_obj_canvas_camera_from_map)
         
-        self.btn_obj_canvas_show_img = QtWidgets.QAction("Render image in 3D canvas", self)
+        self.btn_obj_canvas_show_img = QtWidgets.QAction("Show image in 3D canvas.", self)
         self.btn_obj_canvas_show_img.setIcon(QtGui.QIcon(os.path.join(self.icon_dir, "add_image_to_3d_canvas.png")))
         self.btn_obj_canvas_show_img.triggered.connect(self.show_img_in_obj_canvas)
         self.btn_obj_canvas_show_img.setEnabled(False)
@@ -230,6 +233,7 @@ class MainDialog(QtWidgets.QDialog):
         self.obj_toolbar.addAction(self.btn_obj_canvas_show_img)
 
         self.obj_renderer = gfx.WgpuRenderer(self.obj_canvas)
+        self.obj_renderer.add_event_handler(self.save_camera_view, "key_down")
         self.obj_scene = gfx.Scene()
         self.obj_stats = gfx.Stats(viewport=self.obj_renderer)
 
@@ -245,6 +249,7 @@ class MainDialog(QtWidgets.QDialog):
         self.cam_lines_grp = gfx.Group()
         self.obj_scene.add(self.cam_lines_grp)
         
+        #fov of the camera appaars to represent the vertical FOV!
         self.obj_camera = gfx.PerspectiveCamera(fov=45, depth_range=(1, 100000))
         
         self.obj_canvas.request_draw()
@@ -321,14 +326,44 @@ class MainDialog(QtWidgets.QDialog):
         self.map_check = False
 
         self.cam_dict = {}
-        self.showCam_check = False
+        # self.showCam_check = False
         
         self.img_context_menu = QtWidgets.QMenu(self)
-        action1 = QtGui.QAction('Action 1', self)
-        action2 = QtGui.QAction('Action 2', self)
-        self.img_context_menu.addAction(action1)
-        self.img_context_menu.addAction(action2)
+        self.img_context_menu_align = QtGui.QAction('Align 3D view with camera view', self)
+        self.img_context_menu_align.triggered.connect(self.align_view)
+        self.img_context_menu.addAction(self.img_context_menu_align)
         
+        # self.img_context_menu_ortho = QtGui.QAction('Generate orthophoto', self)
+        # self.img_context_menu_ortho.triggered.connect(self.show_orthophoto_dlg)
+        # self.img_context_menu.addAction(self.img_context_menu_ortho)
+    
+    def save_camera_view(self, event):
+        if event.key == "F1":
+            curr_cam = self.obj_camera.get_state()
+            
+            cam_pos = self.obj_camera.local.position + self.min_xyz
+            cam_rmat_pygfx = self.obj_camera.local.rotation_matrix[:3, :3]  #already transposed in contrast to self.obj_camera.view_matrix; otherweise the same
+            alzekas = rot2alzeka(cam_rmat_pygfx)
+            
+            # canvas_w, canvas_h = self.obj_canvas.get_physical_size()
+            # f = (canvas_h/2.) / np.tan(curr_cam["fov"]/2.)
+            
+            cam_dict = {"project":self.gpkg_path,
+                        "X0":cam_pos[0],
+                        "Y0":cam_pos[1],
+                        "Z0":cam_pos[2],
+                        "alpha":alzekas[0, 0],
+                        "zeta":alzekas[0, 1],
+                        "kappa":alzekas[0, 2],
+                        "vfov":np.deg2rad(curr_cam["fov"])}
+                        # "hfov":np.deg2rad(curr_cam["fov"])*(canvas_w/canvas_h)}
+                        
+            json_path = QtWidgets.QFileDialog.getSaveFileName(None, "JSON path", "", ("Json (*.json)"))[0]
+            if json_path:
+                json_cam = json.dumps(cam_dict, indent=4, ensure_ascii=False).encode("utf-8")
+                with open(json_path, "w", encoding="utf-8") as json_file:
+                    json_file.write(json_cam.decode(encoding="utf-8"))
+    
     def set_layers(self, lyr_dict):
         self.reg_lyr = lyr_dict["reg_lyr"]
         self.cam_lyr = lyr_dict["cam_lyr"]        
@@ -356,9 +391,170 @@ class MainDialog(QtWidgets.QDialog):
         self.mono_vertex_tool.set_layers(self.img_line_lyr, self.map_line_lyr)
         
     def show_dlg_create(self):
-        self.dlg_create = CreateDialog(parent=self, icon_dir=self.icon_dir)
-        self.dlg_create.created_signal.connect(self.on_created_signal)
-        self.dlg_create.show()
+        json_path = QtWidgets.QFileDialog.getOpenFileName(None, "Open project", "", ("Geopackage (*.json)"))[0]
+        if json_path:
+            self.create_gpkg_from_json(json_path)
+    
+    def create_gpkg_from_json(self, json_path):
+        gpkg_path = json_path.replace(".json", ".gpkg")
+                
+        QtWidgets.QApplication.instance().setOverrideCursor(QtCore.Qt.WaitCursor)
+        transform_context = QgsProject.instance().transformContext() #necessary for writing
+                
+        with open(json_path, "r") as f:
+            tiles_data = json.load(f)
+            minx, miny, minz = tiles_data["min_xyz"]
+            maxx, maxy, maxz = tiles_data["max_xyz"]
+            crs = "EPSG:%s" % (tiles_data["epsg"])
+            
+        mesh_bbox = [QgsPointXY(minx, maxy),
+                     QgsPointXY(maxx, maxy),
+                     QgsPointXY(maxx, miny),
+                     QgsPointXY(minx, miny),
+                     QgsPointXY(minx, maxy)]
+            
+        reg_lyr = QgsVectorLayer("Polygon?crs=%s" % (crs), "region", "memory")
+        pr = reg_lyr.dataProvider()
+        pr.addAttributes([QgsField("name", QtCore.QVariant.String), 
+                          QgsField("json_path", QtCore.QVariant.String),
+                          QgsField("minx", QtCore.QVariant.Double, "double", 10, 3), 
+                          QgsField("miny", QtCore.QVariant.Double, "double", 10, 3),
+                          QgsField("minz", QtCore.QVariant.Double, "double", 10, 3),
+                          QgsField("maxx", QtCore.QVariant.Double, "double", 10, 3), 
+                          QgsField("maxy", QtCore.QVariant.Double, "double", 10, 3),
+                          QgsField("maxz", QtCore.QVariant.Double, "double", 10, 3)])
+        reg_lyr.updateFields() 
+            
+        # add a feature
+        feat = QgsFeature()
+        feat.setGeometry(QgsGeometry.fromPolygonXY([mesh_bbox]))
+        feat.setAttributes([os.path.basename(gpkg_path).split(".")[0], 
+                            json_path,
+                            float(minx), 
+                            float(miny), 
+                            float(minz), 
+                            float(maxx),
+                            float(maxy),
+                            float(maxz)])
+        pr.addFeatures([feat])
+
+        # update layer's extent when new features have been added
+        # because change of extent in provider is not propagated to the layer
+        reg_lyr.updateExtents()
+        
+        #write region layer to geopackage
+        lyr_options = QgsVectorFileWriter.SaveVectorOptions()
+        lyr_options.layerName = reg_lyr.name()
+        lyr_options.driverName = "GPKG"
+        
+        if hasattr(QgsVectorFileWriter, 'writeAsVectorFormatV3'): #for QGIS Version >3.20
+            use_v3 = True
+            _writer = QgsVectorFileWriter.writeAsVectorFormatV3(reg_lyr, gpkg_path, transform_context, lyr_options)
+        elif hasattr(QgsVectorFileWriter, 'writeAsVectorFormatV2'): #for QGIS Version <3.20
+            use_v3 = False
+            _writer = QgsVectorFileWriter.writeAsVectorFormatV2(reg_lyr, gpkg_path, transform_context, lyr_options)
+            
+        if _writer[0] == QgsVectorFileWriter.NoError:
+            pass
+        else:
+            self.msg_bar.pushMessage("Error", "Could not create project.", level=Qgis.Critical, duration=3)
+            raise ValueError("Could not create project!")
+                            
+        #create additionally needed layers and add them to the geopackage as well
+        cam_lyr = QgsVectorLayer("Point?crs=%s" % (crs), "cameras", "memory")
+        cam_pr = cam_lyr.dataProvider()
+        cam_pr.addAttributes([QgsField("iid", QtCore.QVariant.String),
+                              QgsField("path", QtCore.QVariant.String),
+                              QgsField("ext", QtCore.QVariant.String),
+                              QgsField("is_oriented", QtCore.QVariant.Int),
+                              QgsField("obj_x0", QtCore.QVariant.Double, "double", 10, 3),
+                              QgsField("obj_y0", QtCore.QVariant.Double, "double", 10, 3),
+                              QgsField("obj_z0", QtCore.QVariant.Double, "double", 10, 3),
+                              QgsField("obj_x0_std", QtCore.QVariant.Double, "double", 10, 3),
+                              QgsField("obj_y0_std", QtCore.QVariant.Double, "double", 10, 3),
+                              QgsField("obj_z0_std", QtCore.QVariant.Double, "double", 10, 3),
+                              QgsField("alpha", QtCore.QVariant.Double, "double", 10, 5),
+                              QgsField("zeta", QtCore.QVariant.Double, "double", 10, 3),
+                              QgsField("kappa", QtCore.QVariant.Double, "double", 10, 5),
+                              QgsField("alpha_std", QtCore.QVariant.Double, "double", 10, 3),
+                              QgsField("zeta_std", QtCore.QVariant.Double, "double", 10, 5),
+                              QgsField("kappa_std", QtCore.QVariant.Double, "double", 10, 3),
+                              QgsField("s0", QtCore.QVariant.Double, "double", 10, 1),
+                              QgsField("img_x0", QtCore.QVariant.Double, "double", 10, 1),
+                              QgsField("img_y0", QtCore.QVariant.Double, "double", 10, 1),
+                              QgsField("f", QtCore.QVariant.Double, "double", 10, 1),
+                              QgsField("f_std", QtCore.QVariant.Double, "double", 10, 1),
+                              QgsField("img_w", QtCore.QVariant.Int),
+                              QgsField("img_h", QtCore.QVariant.Int),
+                              QgsField("hfov", QtCore.QVariant.Double, "double", 6, 3),
+                              QgsField("vfov", QtCore.QVariant.Double, "double", 6, 3)])
+        cam_lyr.updateFields() 
+                
+        gcps_lyr = QgsVectorLayer("Point?crs=%s" % (crs), "gcps", "memory")
+        gcps_pr = gcps_lyr.dataProvider()
+        gcps_pr.addAttributes([QgsField("iid", QtCore.QVariant.String),
+                              QgsField("gid", QtCore.QVariant.String),
+                              QgsField("desc", QtCore.QVariant.String),
+                              QgsField("obj_x", QtCore.QVariant.Double, "double", 10, 3),
+                              QgsField("obj_y", QtCore.QVariant.Double, "double", 10, 3),
+                              QgsField("obj_z", QtCore.QVariant.Double, "double", 10, 3),
+                              QgsField("obj_x_std", QtCore.QVariant.Double, "double", 10, 3),
+                              QgsField("obj_y_std", QtCore.QVariant.Double, "double", 10, 3),
+                              QgsField("obj_z_std", QtCore.QVariant.Double, "double", 10, 3),
+                              QgsField("active", QtCore.QVariant.String)])
+        gcps_lyr.updateFields() 
+        
+        gcps_img_lyr = QgsVectorLayer("Point?crs=%s" % (crs), "gcps_img", "memory")
+        gcps_img_pr = gcps_img_lyr.dataProvider()
+        gcps_img_pr.addAttributes([QgsField("iid", QtCore.QVariant.String),
+                              QgsField("gid", QtCore.QVariant.String),
+                              QgsField("desc", QtCore.QVariant.String),
+                              QgsField("img_x", QtCore.QVariant.Double, "double", 10, 1),
+                              QgsField("img_y", QtCore.QVariant.Double, "double", 10, 1),
+                              QgsField("img_dx", QtCore.QVariant.Double, "double", 10, 1),
+                              QgsField("img_dy", QtCore.QVariant.Double, "double", 10, 1),
+                              QgsField("active", QtCore.QVariant.String)])
+        gcps_img_lyr.updateFields()
+                
+        map_line_lyr = QgsVectorLayer("LineString?crs=%s" % (crs), "lines", "memory")
+        map_line_pr = map_line_lyr.dataProvider()
+        map_line_pr.addAttributes([QgsField("iid", QtCore.QVariant.String), 
+                                   QgsField("type", QtCore.QVariant.String), 
+                                   QgsField("comment", QtCore.QVariant.String)]);
+        map_line_lyr.updateFields() 
+        
+        map_line_pnts_lyr = QgsVectorLayer("Point?crs=%s" % (crs), "lines_vx", "memory")
+        
+        img_line_lyr = QgsVectorLayer("LineString", "lines_img", "memory")
+        img_line_pr = img_line_lyr.dataProvider()
+        img_line_pr.addAttributes([QgsField("iid", QtCore.QVariant.String), 
+                                   QgsField("type", QtCore.QVariant.String), 
+                                   QgsField("comment", QtCore.QVariant.String)]);
+        img_line_lyr.updateFields() 
+        
+        img_line_pnts_lyr = QgsVectorLayer("Point", "lines_img_vx", "memory")
+        
+        lyrs = [map_line_lyr, cam_lyr, map_line_pnts_lyr, img_line_lyr, img_line_pnts_lyr, gcps_lyr, gcps_img_lyr]              
+        
+        for lyr in lyrs:
+            options = QgsVectorFileWriter.SaveVectorOptions()
+            options.actionOnExistingFile = QgsVectorFileWriter.CreateOrOverwriteLayer    
+            options.layerName = lyr.name()
+            options.driverName = "GPKG"
+            
+            if use_v3: #QGIS < 3.20
+                _writer = QgsVectorFileWriter.writeAsVectorFormatV3(lyr, gpkg_path, transform_context, options)
+            else:
+                _writer = QgsVectorFileWriter.writeAsVectorFormatV2(lyr, gpkg_path, transform_context, options)
+            
+            if _writer[0] == QgsVectorFileWriter.NoError:
+                pass
+            else:
+                pass
+        
+        QtWidgets.QApplication.instance().restoreOverrideCursor()
+
+        self.load_project(gpkg_path=gpkg_path)
     
     def show_dlg_orient(self):
         if self.btn_ori_tool.isChecked() or self.json_check == True:
@@ -373,7 +569,6 @@ class MainDialog(QtWidgets.QDialog):
             self.dlg_orient.save_orientation_signal.connect(self.save_orientation_to_lyr)
             self.dlg_orient.activate_mouse_projection_signal.connect(self.toggle_project_mouse_pos)
             self.dlg_orient.deactivate_mouse_projection_signal.connect(self.untoggle_project_mouse_pos)
-            self.dlg_orient.offset_signal.connect(self.show_offset_in_obj_canvas)
 
             self.dlg_orient.add_gcps_from_lyr(self.get_gcps_from_gpkg())
 
@@ -382,9 +577,11 @@ class MainDialog(QtWidgets.QDialog):
                 self.dlg_orient.btn_preview_pos.setEnabled(True)
                 
             self.dlg_orient.show()
-                        
-    def on_created_signal(self, data):
-        self.load_project(gpkg_path=data["gpkg_path"])
+            
+            self.btn_mono_select.setEnabled(False)
+            self.btn_mono_tool.setEnabled(False)
+            self.btn_mono_vertex.setEnabled(False)
+            
     
     def load_project(self, gpkg_path=None):
         if not gpkg_path:
@@ -393,7 +590,8 @@ class MainDialog(QtWidgets.QDialog):
         #load dialog could be cancled; hence, gkpk_path must not always be defined
         if gpkg_path:
             self.load_project_signal.emit({"gpkg_path":gpkg_path})
-    
+            self.gpkg_path = gpkg_path
+            
     def save_project_as(self):
         pass
     
@@ -446,6 +644,13 @@ class MainDialog(QtWidgets.QDialog):
             self.img_controller.enabled = True
             self.obj_controller.enabled = False
             
+            self.btn_mono_tool.setEnabled(False)
+            self.btn_mono_select.setEnabled(False)
+            self.btn_mono_vertex.setEnabled(False)
+            self.btn_ori_tool.setEnabled(False)
+            self.btn_obj_canvas_camera_from_map.setEnabled(False)
+            self.btn_reset_obj_canvas_camera.setEnabled(False)
+            
             img_w = self.active_camera.img_w
             img_h = self.active_camera.img_h
                     
@@ -488,6 +693,10 @@ class MainDialog(QtWidgets.QDialog):
             self.img_plane_grp.clear()
             self.img_plane_grp.add(plane_mesh)
 
+            #hide camera objects in 3D as those intervene with rendering
+            for iid, iid_grp in self.cam_dict.items():
+                iid_grp.visible = False
+            
             self.obj_canvas.request_draw()
             
         else:
@@ -503,11 +712,22 @@ class MainDialog(QtWidgets.QDialog):
             self.img_controller.enabled = False
             self.obj_controller.enabled = True
             
+            self.btn_mono_tool.setEnabled(True)
+            self.btn_mono_select.setEnabled(True)
+            self.btn_mono_vertex.setEnabled(True)
+            self.btn_ori_tool.setEnabled(True)
+            self.btn_obj_canvas_camera_from_map.setEnabled(True)
+            self.btn_reset_obj_canvas_camera.setEnabled(True)
+            
             self.img_plane_grp.clear()
+            
+            for iid, iid_grp in self.cam_dict.items():
+                iid_grp.visible = True
+            
             self.obj_canvas.request_draw()
 
-    def show_camera_in_obj_canvas(self, current_iid):
-
+    def add_camera_in_obj_canvas(self, current_iid = -1):
+        #TODO: currently the camera geometry is created all over again; This can be implemented more efficiently;
         for cam_feat in self.cam_lyr.getFeatures():
 
             if cam_feat['obj_x0'] != None:
@@ -528,7 +748,7 @@ class MainDialog(QtWidgets.QDialog):
                 plane_pnts_dir = (rmat@cmat@plane_pnts_img).T
                 plane_pnts_dir = plane_pnts_dir / np.linalg.norm(plane_pnts_dir, axis=1).reshape(-1, 1)
                     
-                plane_pnts_obj = prc + 100 * plane_pnts_dir
+                plane_pnts_obj = prc + 500 * plane_pnts_dir
                 plane_faces = np.array([[3, 1, 0], [3, 2, 1]]).astype(np.uint32)
                 plane_uv = np.array([[0, 0], [1, 0], [1, 1], [0, 1]]).astype(np.uint32)
                     
@@ -542,8 +762,7 @@ class MainDialog(QtWidgets.QDialog):
                 selected_plane_material = gfx.MeshBasicMaterial(color = (1, 0, 0, 1), opacity=0.5)
                 selected_plane_mesh = gfx.Mesh(plane_geom, selected_plane_material, visible=True)
 
-                #TODO: plane_mesh rot färben wenn entsprechendes Bild ausgewählt ist!
-                    
+                   
                 self.img_controller.set_image(plane_mesh, plane_pnts_dir, prc, distance=1000)
                 
                 positions = [[list(prc),plane_pnts_obj[i]] for i in range(4)]
@@ -553,8 +772,7 @@ class MainDialog(QtWidgets.QDialog):
                 if cam_feat['iid'] in self.cam_dict.keys():
                     self.cam_dict[cam_feat['iid']].clear()
 
-                self.cam_dict[cam_feat['iid']] = gfx.Group(visible=self.showCam_check)
-                self.obj_scene.add(self.cam_dict[cam_feat['iid']])
+                self.cam_dict[cam_feat['iid']] = gfx.Group(visible=True)
 
                 if cam_feat['iid'] == current_iid:
                     self.cam_dict[cam_feat['iid']].add(selected_plane_mesh)
@@ -568,18 +786,10 @@ class MainDialog(QtWidgets.QDialog):
                     for i in lines:
                         self.cam_dict[cam_feat['iid']].add(i)
 
+                self.obj_scene.add(self.cam_dict[cam_feat['iid']])
+
 
         self.obj_canvas.request_draw()
-
-    def showCam(self):
-        self.showCam_check = not self.showCam_check
-
-        if self.showCam_check:
-            for key in self.cam_dict.keys():
-                self.cam_dict[key].visible = True
-        else:
-            for key in self.cam_dict.keys():
-                self.cam_dict[key].visible = False
 
     def add_mesh_to_obj_canvas(self, tiles_data):
         
@@ -596,7 +806,7 @@ class MainDialog(QtWidgets.QDialog):
         self.min_xyz = np.array(self.tiles_data["min_xyz"])
         self.max_xyz = np.array(self.tiles_data["max_xyz"])
 
-        self.show_camera_in_obj_canvas(0)
+        self.add_camera_in_obj_canvas()
         
         self.o3d_scene = o3d.t.geometry.RaycastingScene()
         
@@ -604,16 +814,12 @@ class MainDialog(QtWidgets.QDialog):
             
             self.msg_box.setValue(tx+1)
             
-            geom_path = os.path.join(self.tiles_data["tile_dir"], "%s.ply" % (tile["tid"]))
-            op_path = glob.glob(os.path.join(self.tiles_data["op_dir"], "%s.jpg" % (tile["tid"])))
-            op_path.extend(glob.glob(os.path.join(self.tiles_data["op_dir"], "%s.jpeg" % (tile["tid"]))))
-            op_path.extend(glob.glob(os.path.join(self.tiles_data["op_dir"], "%s.png" % (tile["tid"]))))
-            op_path.extend(glob.glob(os.path.join(self.tiles_data["op_dir"], "%s.tif" % (tile["tid"]))))
-            
+            geom_path = os.path.normpath(os.path.join(self.tiles_data["tile_dir"], "%s.ply" % (tile["tid"])))
+            op_path = os.path.normpath(os.path.join(self.tiles_data["op_dir"], "%s.jpg" % (tile["tid"])))
+                        
             if os.path.exists(geom_path):
+                
                 tile_mesh = o3d.io.read_triangle_mesh(geom_path)
-                
-                
                 verts = np.asarray(tile_mesh.vertices).astype(np.float32)
                 
                 u = (verts[:, 0] - tile["min_xyz"][0])/(tile["max_xyz"][0] - tile["min_xyz"][0])
@@ -631,8 +837,8 @@ class MainDialog(QtWidgets.QDialog):
                                                     texcoords=uv.astype(np.float32),
                                                     tid=[int(tile["tid_int"])])
             
-                if len(op_path) == 1:                                
-                    img_ds = gdal.Open(op_path[0])
+                if os.path.exists(op_path):
+                    img_ds = gdal.Open(op_path)
                     img_h = img_ds.RasterYSize
                     img_w = img_ds.RasterXSize
                     img_arr = np.zeros((img_h, img_w, 3), dtype=np.uint8)
@@ -644,7 +850,7 @@ class MainDialog(QtWidgets.QDialog):
                     img_arr = np.flipud(img_arr)
                     tex = gfx.Texture(img_arr, dim=2, generate_mipmaps=True)
                     
-                    #prior to 0.7.0 it was possible to defined the texture interpolation for meshes; appaers to be removed with 0.7.0
+                    #prior to 0.7.0 it was possible to define the texture interpolation for meshes; appaers to be removed with 0.7.0
                     if gfx.__version__ != '0.7.0':
                         mesh_material = gfx.MeshBasicMaterial(map=tex, side="FRONT", map_interpolation="linear", pick_write=True)  
                     else:
@@ -959,8 +1165,8 @@ class MainDialog(QtWidgets.QDialog):
         data["vfov"] = est_vfov
         
         self.set_obj_canvas_camera(data)
-        # self.show_img_in_obj_canvas()
-        
+        self.btn_obj_canvas_show_img.setEnabled(True)
+                
         if self.json_check == False:
             self.update_camera(data)
             self.update_gcps(data)
@@ -974,17 +1180,17 @@ class MainDialog(QtWidgets.QDialog):
         self.cam_lyr.changeGeometry(curr_cam_fid, QgsGeometry.fromPoint(QgsPoint(data["obj_x0"], data["obj_y0"])))
         self.cam_lyr.changeAttributeValue(curr_cam_fid, curr_cam.fieldNameIndex("is_oriented"), 1)
         
-        attrs = ["obj_x0", "obj_y0", "obj_z0", "alpha", "zeta", "kappa", "img_x0", "img_y0", "f", "hfov","vfov"]
+        attrs = ["obj_x0", "obj_y0", "obj_z0", "alpha", "zeta", "kappa", "img_x0", "img_y0", "f", "hfov", "vfov"]
         for attr in attrs:
             self.cam_lyr.changeAttributeValue(curr_cam_fid, curr_cam.fieldNameIndex(attr), float(data[attr]))
         
         attrs = ["obj_x0_std", "obj_y0_std", "obj_z0_std", "alpha_std", "zeta_std", "kappa_std", "f_std"]
         for attr in attrs:
-            self.cam_lyr.changeAttributeValue(curr_cam_fid, curr_cam.fieldNameIndex(attr), float(data[attr]))
+            self.cam_lyr.changeAttributeValue(curr_cam_fid, curr_cam.fieldNameIndex(attr), float(data[attr]) if attr in list(data.keys()) else None)
         
         self.cam_lyr.triggerRepaint()
 
-        self.show_camera_in_obj_canvas(self.active_camera.iid)
+        self.add_camera_in_obj_canvas(self.active_camera.iid)
     
     def update_gcps(self, data):
         curr_img_gcps = self.img_gcps_lyr.getFeatures(expression = "iid = '%s'" % (self.active_camera.iid))
@@ -1068,6 +1274,7 @@ class MainDialog(QtWidgets.QDialog):
 
         self.camera_collection[cam.iid] = cam
         self.active_camera = self.camera_collection[cam.iid]
+        self.add_camera_in_obj_canvas(cam.iid)
         
     def discard_changes(self):
         self.img_gcps_lyr.rollBack()
@@ -1214,9 +1421,26 @@ class MainDialog(QtWidgets.QDialog):
             pass
         
     def show_image_menu(self, point):
-        clicked_img = self.img_list.itemAt(point.x(), point.y())
-        self.img_context_menu.exec(self.img_list.mapToGlobal(point))
+        clicked_list_item = self.img_list.itemAt(point.x(), point.y())
         
+        self.img_context_menu.setTitle(clicked_list_item.text())
+        
+        
+        for action in self.img_context_menu.actions():
+            if self.camera_collection[clicked_list_item.text()].is_oriented == 1:
+                action.setEnabled(True)
+            else:
+                action.setEnabled(False)
+        
+        
+        self.img_context_menu.exec(self.img_list.mapToGlobal(point))
+    
+    def align_view(self):
+        self.set_obj_canvas_camera(self.camera_collection[self.img_context_menu.title()].asdict())
+    
+    def show_orthophoto_dlg(self):
+        pass
+    
     def camera_clicked(self, item):
         
         if item.isSelected():
@@ -1256,7 +1480,7 @@ class MainDialog(QtWidgets.QDialog):
         self.active_camera = None
         self.setWindowTitle("%s" % (self.project_name))
 
-        self.show_camera_in_obj_canvas(0)
+        self.add_camera_in_obj_canvas()
         
     def toggle_camera(self, item):
         
@@ -1268,7 +1492,7 @@ class MainDialog(QtWidgets.QDialog):
                     
         iid = item.text()
         iid_path = self.camera_collection[iid].path
-        
+                
         if not os.path.exists(iid_path):
             #iid_path = QFileDialog.getOpenFileName(None, "Image not found! Please, select new directory.", "", ("JPEG (*.jpeg)"))[0]
             while True:
@@ -1317,13 +1541,13 @@ class MainDialog(QtWidgets.QDialog):
             self.obj_gcps_grp.add(gcp_gfx)
 
         if self.active_camera.is_oriented == 1:
-            self.set_obj_canvas_camera(self.active_camera.asdict())
-            
+                        
             self.btn_mono_tool.setEnabled(True)
             self.btn_mono_select.setEnabled(True)
             self.btn_mono_vertex.setEnabled(True)
             self.btn_obj_canvas_show_img.setEnabled(True)
-                        
+            self.temporary_camera = self.camera_collection[iid].asdict()
+                            
             self.mono_tool.set_camera(self.active_camera)
             self.mono_vertex_tool.set_camera(self.active_camera)
         else:
@@ -1333,12 +1557,7 @@ class MainDialog(QtWidgets.QDialog):
             self.btn_obj_canvas_show_img.setEnabled(False)
             # self.btn_obj_canvas_show_img.setEnabled(False)
 
-<<<<<<< HEAD
-        self.show_camera_in_obj_canvas(iid)
-            
-=======
-        self.show_camera_in_obj_canvas(iid)      
->>>>>>> d2666e00b3c6d7d5d4bb614c36f0f90d2d6640f3
+        self.add_camera_in_obj_canvas(iid)      
         self.obj_canvas.request_draw()
         
     def toggle_mono_tool(self):
@@ -1402,7 +1621,7 @@ class MainDialog(QtWidgets.QDialog):
         self.img_list.setEnabled(True)
         self.img_menu.setEnabled(True)
         self.export_menu.setEnabled(True)
-        self.view_menu.setEnabled(True)
+        # self.view_menu.setEnabled(True)
         self.project_name = self.windowTitle()
                 
     def activate_gcp_picking(self):
@@ -1506,8 +1725,9 @@ class MainDialog(QtWidgets.QDialog):
                 if result:
                     
                     curr_gid = dlg_meta.combo_gid.currentText() 
+                    gcp_clr = (0.78, 0, 0, 1)
                     
-                    click_obj = create_point_3d(click_pos_local, curr_gid)
+                    click_obj = create_point_3d(click_pos_local, curr_gid, gcp_clr)
                     self.obj_gcps_grp.add(click_obj)
                     self.obj_canvas.request_draw()
                     
@@ -1618,25 +1838,25 @@ class MainDialog(QtWidgets.QDialog):
                 self.img_rubber.addPoint(QgsPointXY(click_pos_img[0], click_pos_img[1]))
                 self.img_rubber.show()
 
-    def show_offset_in_obj_canvas(self, offset):
-        if self.dlg_orient.first_time == True:
-            self.obj_cam_state = self.obj_camera.get_state()
+    # def show_offset_in_obj_canvas(self, offset):
+    #     if self.dlg_orient.first_time == True:
+    #         self.obj_cam_state = self.obj_camera.get_state()
 
-        position = [self.obj_cam_state['position'][0] + offset['offset_x'], 
-                    self.obj_cam_state['position'][1] + offset['offset_y'], 
-                    self.obj_cam_state['position'][2] + offset['offset_z']]
+    #     position = [self.obj_cam_state['position'][0] + offset['offset_x'], 
+    #                 self.obj_cam_state['position'][1] + offset['offset_y'], 
+    #                 self.obj_cam_state['position'][2] + offset['offset_z']]
 
-        obj_camera_target = {'position':np.array([position[0], position[1], position[2]]),
-                                    'rotation':self.obj_cam_state['rotation'], 
-                                    'scale':self.obj_cam_state['scale'],
-                                    'reference_up':self.obj_cam_state['reference_up'], 
-                                    'fov':self.obj_cam_state['fov'], 
-                                    'width':self.obj_cam_state['width'], 
-                                    'height':self.obj_cam_state['height'], 
-                                    'zoom':self.obj_cam_state['zoom'], 
-                                    'maintain_aspect':self.obj_cam_state['maintain_aspect'],
-                                    'depth_range':self.obj_cam_state['depth_range']}
+    #     obj_camera_target = {'position':np.array([position[0], position[1], position[2]]),
+    #                                 'rotation':self.obj_cam_state['rotation'], 
+    #                                 'scale':self.obj_cam_state['scale'],
+    #                                 'reference_up':self.obj_cam_state['reference_up'], 
+    #                                 'fov':self.obj_cam_state['fov'], 
+    #                                 'width':self.obj_cam_state['width'], 
+    #                                 'height':self.obj_cam_state['height'], 
+    #                                 'zoom':self.obj_cam_state['zoom'], 
+    #                                 'maintain_aspect':self.obj_cam_state['maintain_aspect'],
+    #                                 'depth_range':self.obj_cam_state['depth_range']}
         
-        self.obj_camera.set_state(obj_camera_target)
-        self.obj_canvas.request_draw()
+    #     self.obj_camera.set_state(obj_camera_target)
+    #     self.obj_canvas.request_draw()
 

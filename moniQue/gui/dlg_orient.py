@@ -51,7 +51,7 @@ class OrientDialog(QtWidgets.QDialog):
     activate_mouse_projection_signal = QtCore.pyqtSignal()
     deactivate_mouse_projection_signal = QtCore.pyqtSignal()
 
-    offset_signal = QtCore.pyqtSignal(object)
+    # offset_signal = QtCore.pyqtSignal(object)
     
     def __init__(self, parent=None, icon_dir=None, active_iid=None):
         """Constructor."""
@@ -111,12 +111,14 @@ class OrientDialog(QtWidgets.QDialog):
         self.btn_preview_pos.setCheckable(True)
         table_toolbar.addAction(self.btn_preview_pos)
 
-        self.btn_offset = QtWidgets.QAction("Manually adjust orientation parameters", self)
-        self.btn_offset.setIcon(QtGui.QIcon(os.path.join(self.icon_dir, "mActionMoveFeaturePoint.png")))
-        self.btn_offset.triggered.connect(self.set_offset)
-        table_toolbar.addAction(self.btn_offset)
+        self.btn_offset_dlg = QtWidgets.QAction("Displace camera along viewing direction.", self)
+        self.btn_offset_dlg.setIcon(QtGui.QIcon(os.path.join(self.icon_dir, "mActionElevationProfile.png")))
+        self.btn_offset_dlg.triggered.connect(self.show_offset_dlg)
+        table_toolbar.addAction(self.btn_offset_dlg)
 
-        self.offset = {'offset_x': 0.0, 'offset_y': 0.0, 'offset_z': 0.0}
+        # self.offset = {'offset_x': 0.0, 
+        #                'offset_y': 0.0, 
+        #                'offset_z': 0.0}
     
         self.table_gcps = QtWidgets.QTableWidget()
         
@@ -237,7 +239,7 @@ class OrientDialog(QtWidgets.QDialog):
         
         self.btn_calc_ori = QtWidgets.QPushButton("Calculate")
         self.btn_calc_ori.setEnabled(False)
-        self.btn_calc_ori.clicked.connect(self.calc_orientation)
+        self.btn_calc_ori.clicked.connect(lambda: self.calc_orientation(self.offset))
         
         self.btn_save_ori = QtWidgets.QPushButton("Save")
         self.btn_save_ori.setEnabled(False)
@@ -270,8 +272,6 @@ class OrientDialog(QtWidgets.QDialog):
         self.error_dialog = QtWidgets.QErrorMessage(parent=self)
 
         self.offset = None
-        self.offset_check = False
-
         
     def gcp_selected(self, rix, cix):
         
@@ -470,17 +470,62 @@ class OrientDialog(QtWidgets.QDialog):
         self.img_x0_line.setText("%.1f" % (data["img_x0"]))
         self.img_y0_line.setText("%.1f" % (data["img_y0"]))
         self.focal_line.setText("%.1f" % (data["f"]))
-        
+                
         if "obj_x0_std" in list(data.keys()):
-            self.obj_x0_std_line.setText("%.1f" % (data["obj_x0_std"]))
-            self.obj_y0_std_line.setText("%.1f" % (data["obj_y0_std"]))
-            self.obj_z0_std_line.setText("%.1f" % (data["obj_z0_std"]))
-            
-            self.alpha_std_line.setText("%.3f" % (np.rad2deg(data["alpha_std"])))
-            self.zeta_std_line.setText("%.3f" % (np.rad2deg(data["zeta_std"])))
-            self.kappa_std_line.setText("%.3f" % (np.rad2deg(data["kappa_std"])))
-            
-            self.focal_std_line.setText("%.1f" % (data["f_std"]))
+            if data["obj_x0_std"] is not None:
+                self.obj_x0_std_line.setText("%.1f" % (data["obj_x0_std"]))
+            else:
+                self.obj_x0_std_line.setText("")    
+        else:
+            self.obj_x0_std_line.setText("")
+        
+        if "obj_y0_std" in list(data.keys()):
+            if data["obj_y0_std"] is not None:
+                self.obj_y0_std_line.setText("%.1f" % (data["obj_y0_std"]))
+            else:
+                self.obj_y0_std_line.setText("")    
+        else:
+            self.obj_y0_std_line.setText("")
+        
+        if "obj_z0_std" in list(data.keys()):
+            if data["obj_z0_std"] is not None:
+                self.obj_z0_std_line.setText("%.1f" % (data["obj_z0_std"]))
+            else:
+                self.obj_z0_std_line.setText("")    
+        else:
+            self.obj_z0_std_line.setText("")
+        
+        if "alpha_std" in list(data.keys()):
+            if data["alpha_std"] is not None:
+                self.alpha_std_line.setText("%.3f" % (np.rad2deg(data["alpha_std"])))
+            else:
+                self.alpha_std_line.setText("")    
+        else:
+            self.alpha_std_line.setText("")
+        
+        if "zeta_std" in list(data.keys()):
+            if data["zeta_std"] is not None:
+                self.zeta_std_line.setText("%.3f" % (np.rad2deg(data["zeta_std"])))
+            else:
+                self.zeta_std_line.setText("")    
+        else:
+            self.zeta_std_line.setText("")
+        
+        if "kappa_std" in list(data.keys()):
+            if data["kappa_std"] is not None:
+                self.kappa_std_line.setText("%.3f" % (np.rad2deg(data["kappa_std"])))
+            else:
+                self.kappa_std_line.setText("")    
+        else:
+            self.kappa_std_line.setText("")
+        
+        if "f_std" in list(data.keys()):
+            if data["f_std"] is not None:
+                self.focal_std_line.setText("%.1f" % (data["f_std"]))
+            else:
+                self.focal_std_line.setText("")    
+        else:
+            self.focal_std_line.setText("")
                 
         self.init_params = data.copy()
     
@@ -501,7 +546,7 @@ class OrientDialog(QtWidgets.QDialog):
                 self.table_gcps.setItem(rix, self.name2ix["dx"], QtWidgets.QTableWidgetItem(""))
                 self.table_gcps.setItem(rix, self.name2ix["dy"], QtWidgets.QTableWidgetItem(""))
              
-    def calc_orientation(self):
+    def calc_orientation(self, curr_offset):
                
         if not self.init_params:
             self.error_dialog.showMessage('Set initial camera parameters first!')
@@ -522,16 +567,9 @@ class OrientDialog(QtWidgets.QDialog):
                     ori_data["img"].append([curr_img_x, curr_img_y])
                     ori_data["obj"].append([curr_obj_x, curr_obj_y, curr_obj_z])
 
-            if self.offset_check:
-                ori_data["init_params"] = self.est_data
-                res, offset_check = srs_lm(ori_data, None)
-                self.offset = None
-                self.offset_check = False
-                    
-            else:
-                ori_data["init_params"] = self.init_params
-                res, offset_check = srs_lm(ori_data, self.offset)
-                self.offset = None
+            ori_data["init_params"] = self.init_params
+ 
+            res = srs_lm(ori_data, offset=curr_offset)
                         
             if res.success == False:
                 self.error_dialog.showMessage('LSQ did not converge: %s' % (res.message))
@@ -582,18 +620,10 @@ class OrientDialog(QtWidgets.QDialog):
                 est_data = {**est_data, **cxx_dict}
                 est_data = {**est_data, **gcp_dict}
 
-                if offset_check:
-                    self.offset_check = True
-                    self.est_data = est_data
-                    self.calc_orientation()
-                
-                else:
-                    self.camera_estimated_signal.emit(est_data)
-                    self.set_init_params(est_data)
-                    self.set_residuals(est_data)
-                    self.btn_save_ori.setEnabled(True)
-
-        ########################################################################################################################################
+                self.camera_estimated_signal.emit(est_data)
+                self.set_init_params(est_data)
+                self.set_residuals(est_data)
+                self.btn_save_ori.setEnabled(True)
 
     def save_orientation(self):
         self.btn_preview_pos.setEnabled(True)
@@ -609,7 +639,10 @@ class OrientDialog(QtWidgets.QDialog):
         self.btn_preview_pos.setChecked(False)
         self.btn_preview_pos.setEnabled(False)
         
-        self.parent.img_list.setEnabled(True)
+        #only activate image list if image is not rendered in 3D
+        if not self.parent.btn_obj_canvas_show_img.isChecked():
+            self.parent.img_list.setEnabled(True)
+            
         self.parent.btn_ori_tool.setChecked(False)
         
         self.parent.untoggle_project_mouse_pos()
@@ -620,33 +653,66 @@ class OrientDialog(QtWidgets.QDialog):
         self.parent.discard_changes()
         self.parent.orient_dlg_open = False
         
-    def set_offset(self):
-        self.offset = None
-        self.first_time = True
-        offset_dialog = OffsetMetaDialog()
-        offset_dialog.preview_offset_signal.connect(self.show_offset)
-        offset_dialog.exec_()
-
-    def show_offset(self, preview_offset, accepted):
-        forward, right, up, alpha = self.calc_offset(preview_offset)
-
-        self.preview_offset = {'offset_x': forward * np.cos(alpha) + right * np.cos(alpha - (np.pi/2)), 
-                                'offset_y': forward * np.sin(alpha) + right * np.sin(alpha - (np.pi/2)), 
-                                'offset_z': up}
+        if self.parent.active_camera.is_oriented == 1:
+            self.parent.btn_mono_tool.setEnabled(True)
+            self.parent.btn_mono_select.setEnabled(True)
+            self.parent.btn_mono_vertex.setEnabled(True)
         
-        self.offset_signal.emit(self.preview_offset)
-        self.first_time = False
+    def show_offset_dlg(self):
+        # self.offset = None
+        # self.first_time = True
+        
+        temp_cam = self.parent.temporary_camera
+        
+        if temp_cam is not None:
+        
+            prc = np.array([float(temp_cam["obj_x0"]), float(temp_cam["obj_y0"]), float(temp_cam["obj_z0"])]) - self.parent.min_xyz
+            rmat = alzeka2rot([float(temp_cam["alpha"]), float(temp_cam["zeta"]), float(temp_cam["kappa"])])
+            cmat = np.array([[1, 0, -float(temp_cam["img_x0"])], 
+                                [0, 1, -float(temp_cam["img_y0"])],
+                                [0, 0, -float(temp_cam["f"])]])
+                
+            plane_pnts_img = np.array([[temp_cam["img_x0"], temp_cam["img_y0"], 1]]).T
+            plane_pnts_dir = (rmat@cmat@plane_pnts_img).T
+            plane_pnts_dir = plane_pnts_dir / np.linalg.norm(plane_pnts_dir, axis=1).reshape(-1, 1)
 
-        if accepted:
-            self.offset = self.preview_offset
+            ray_offset = np.arange(250, -250, -1).reshape(-1, 1)
+            pnts_along_ray = prc + ray_offset*plane_pnts_dir
+            pnts_along_ray_o3d = o3d.core.Tensor(pnts_along_ray, dtype=o3d.core.Dtype.Float32)
+            dist2mesh = self.parent.o3d_scene.compute_signed_distance(pnts_along_ray_o3d)
+            pnts_profile = pnts_along_ray[:, 2] - dist2mesh.numpy()
+            
+            offset_dlg = OffsetMetaDialog()
+            offset_dlg.plot_data({"offset":ray_offset.ravel(), "profile":pnts_profile, "prc":prc, "ray_dir":plane_pnts_dir})
+            offset_dlg.offset_selected_signal.connect(self.re_estimate_camera)
+            offset_dlg.exec_()
 
-    def calc_offset(self, offset):
-        forward = float(offset[0]) if offset[0] != '' else 0.0
-        right = float(offset[1]) if offset[1] != '' else 0.0
-        up = float(offset[2]) if offset[2] != '' else 0.0
-        alpha = self.init_params['alpha']
+    def re_estimate_camera(self, offset_dict):
+        offset_dict["offset_prc"] += self.parent.min_xyz
+        self.calc_orientation(curr_offset=offset_dict)
+        
+    
+    # def show_offset(self, preview_offset, accepted):
+    #     forward, right, up, alpha = self.calc_offset(preview_offset)
 
-        return forward, right, up, alpha
+    #     #this assumes that the camera is exactly horizontal?! Better: use the direction vectors
+    #     self.preview_offset = {'offset_x': forward * np.cos(alpha) + right * np.cos(alpha - (np.pi/2)), 
+    #                            'offset_y': forward * np.sin(alpha) + right * np.sin(alpha - (np.pi/2)), 
+    #                            'offset_z': up}
+        
+    #     self.offset_signal.emit(self.preview_offset)
+    #     self.first_time = False
+
+    #     if accepted:
+    #         self.offset = self.preview_offset
+
+    # def calc_offset(self, offset):
+    #     forward = float(offset[0]) if offset[0] != '' else 0.0
+    #     right = float(offset[1]) if offset[1] != '' else 0.0
+    #     up = float(offset[2]) if offset[2] != '' else 0.0
+    #     alpha = self.init_params['alpha']
+
+    #     return forward, right, up, alpha
 
         
 

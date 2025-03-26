@@ -12,18 +12,20 @@ def srs_lm(data, offset):
         
     init_params = data["init_params"]
     params = Parameters()
-    offset_check = False
-
+    
     if offset is None:
         params.add("obj_x0", value=init_params["obj_x0"], vary=True)
         params.add("obj_y0", value=init_params["obj_y0"], vary=True)
         params.add("obj_z0", value=init_params["obj_z0"], vary=True)
-        
+                
     else:
-        params.add("obj_x0", value=init_params["obj_x0"] + offset['offset_x'], vary=False)
-        params.add("obj_y0", value=init_params["obj_y0"] + offset['offset_y'], vary=False)
-        params.add("obj_z0", value=init_params["obj_z0"] + offset['offset_z'], vary=False)
-        offset_check = True
+        init_x0 = offset["offset_prc"][0]
+        init_y0 = offset["offset_prc"][1]
+        init_z0 = offset["offset_prc"][2]
+        
+        params.add("obj_x0", value=init_x0, min=init_x0 - 0.25, max=init_x0 + 0.25, vary=True)
+        params.add("obj_y0", value=init_y0, min=init_y0 - 0.25, max=init_y0 + 0.25, vary=True)
+        params.add("obj_z0", value=init_z0, min=init_z0 - 0.25, max=init_z0 + 0.25, vary=True)
 
     params.add("alpha", value=init_params["alpha"], vary=True)
     params.add("zeta", value=init_params["zeta"], vary=True)
@@ -33,10 +35,10 @@ def srs_lm(data, offset):
         
     params.add("img_x0", value=init_params["img_x0"], vary=False)
     params.add("img_y0", value=init_params["img_y0"], vary=False)
+    
+    r = minimize(residual, params, args=(gcp_img, gcp_obj), method="least_squares")
 
-    r = minimize(residual, params, args=(gcp_img, gcp_obj), method="leastsq")
-
-    return r, offset_check
+    return r
 
 
 def world2img(gcp_obj, p):

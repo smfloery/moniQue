@@ -70,8 +70,6 @@ class MonoMapTool(QgsMapTool):
             click_pos = self.toMapCoordinates(e.pos())
             mx, my = float(click_pos.x()), float(click_pos.y())
             
-            print(mx, my)
-            
             if (mx >= 0) and (mx <= self.camera.img_w):
                 if (my <= 0) and (my >= self.camera.img_h*(-1)):
                     
@@ -158,7 +156,6 @@ class MonoMapTool(QgsMapTool):
                 
     def canvasMoveEvent(self, e):
         pos = self.toMapCoordinates(e.pos())
-        print(pos)
         mx, my = float(pos.x()), float(pos.y())
         
         if (mx >= 0) and (mx <= self.camera.img_w):

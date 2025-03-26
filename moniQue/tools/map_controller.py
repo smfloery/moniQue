@@ -44,10 +44,11 @@ class OrbitFlightController(PanZoomController):
         "mouse2": ("pan", "drag", (1, 1)),
         "mouse4": ("quickzoom", "peek", 2),
         "wheel": ("zoom", "push", -0.001),
-        "alt+wheel": ("fov", "push", -0.01),
-        "control+wheel": ("speed", "push", -0.001),
+        "control+wheel":("zoom_new", "push", 0.001),
+        # "alt+wheel": ("fov", "push", -0.01),
+        # "control+wheel": ("speed", "push", -0.001),
         "control+mouse1": ("rotate", "drag", (0.005, 0)),
-        "alt+mouse1": ("rotate", "drag", (0, 0.005)),
+        # "alt+mouse1": ("rotate", "drag", (0, 0.005)),
         "q": ("roll", "repeat", -2),
         "e": ("roll", "repeat", +2),
         "w": ("move", "repeat", (0, 0, -1)),
@@ -70,16 +71,16 @@ class OrbitFlightController(PanZoomController):
             speed = approx_scene_size / scene_fly_thru_time
         self.speed = speed
 
-    @property
-    def speed(self):
-        """The (maximum) speed that the camera will move, in units per second.
-        By default it's based off the width and height of the camera.
-        """
-        return self._speed
+    # @property
+    # def speed(self):
+    #     """The (maximum) speed that the camera will move, in units per second.
+    #     By default it's based off the width and height of the camera.
+    #     """
+    #     return self._speed
 
-    @speed.setter
-    def speed(self, value):
-        self._speed = float(value)
+    # @speed.setter
+    # def speed(self, value):
+    #     self._speed = float(value)
 
 
     def rotate(self, delta: Tuple, rect: Tuple, *, animate=False):
@@ -258,10 +259,50 @@ class OrbitFlightController(PanZoomController):
         self._set_camera_state({"position": new_position})
 
 
-    def _update_speed(self, delta):
-        assert isinstance(delta, float)
-        speed = self.speed * 2**delta
-        self.speed = max(0.001, speed)
+    # def _update_speed(self, delta):
+    #     assert isinstance(delta, float)
+    #     speed = self.speed * 2**delta
+    #     self.speed = max(0.001, speed)
 
-    def get_speed(self):
-        return self.speed
+    # def get_speed(self):
+    #     return self.speed
+    
+    def zoom_new(self, delta: Tuple, rect: Tuple, *, animate=False):
+        """Zoom the view with the given amount.
+
+        The delta can be either a scalar or 2-element tuple. The zoom
+        multiplier is calculated using ``2**delta``. If the camera has
+        maintain_aspect set to True, only the second value is used.
+
+        Note that the camera's distance, width, and height are adjusted,
+        not its zoom property.
+
+        If animate is True, the motion is damped. This requires the
+        controller to receive events from the renderer/viewport.
+        """
+
+        if animate:
+            action_tuple = ("zoom_new", "push", (1.0, 1.0))
+            action = self._create_action(None, action_tuple, (0.0, 0.0), None, rect)
+            action.set_target(delta)
+            action.done = True
+        elif self._cameras:
+            self._update_zoom_new(delta)
+            return self._update_cameras()
+
+    def _update_zoom_new(self, delta):
+        
+        if isinstance(delta, (int, float)):
+            delta = (delta, delta)
+        assert isinstance(delta, tuple) and len(delta) == 2
+                
+        camera_state = self._get_camera_state()
+        upd_fov = camera_state["fov"]+delta[0]
+        
+        #limit possible range of fov
+        if upd_fov > 170:
+            upd_fov = 170
+        if upd_fov < 10:
+            upd_fov = 10
+        
+        self._set_camera_state({"fov":upd_fov})

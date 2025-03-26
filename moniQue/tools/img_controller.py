@@ -40,7 +40,4 @@ class ImageController(Controller):
         else:
             self._update_opacity(delta)
             return self._update_cameras()
-    
-    def _update_opacity(self, delta):
-        print("ARGHH", delta)
         

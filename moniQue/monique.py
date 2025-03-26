@@ -121,10 +121,14 @@ class MoniQue:
         #load layers from geopackage
         gpkg_reg_lyr = self.gpkg_path + "|layername=region"
         self.reg_lyr = QgsVectorLayer(gpkg_reg_lyr, "region", "ogr")
+        self.reg_lyr.setProviderEncoding(u'UTF-8')
+        self.reg_lyr.dataProvider().setEncoding(u'UTF-8')
         self.reg_lyr.loadNamedStyle(self.map_region_qml_path)
                 
         gpkg_cam_lyr = self.gpkg_path + "|layername=cameras"
         self.cam_lyr = QgsVectorLayer(gpkg_cam_lyr, "cameras", "ogr")           
+        self.cam_lyr.setProviderEncoding(u'UTF-8')
+        self.cam_lyr.dataProvider().setEncoding(u'UTF-8')
         self.cam_lyr.loadNamedStyle(self.cam_qml_path)
                         
         gpkg_map_lines_lyr = self.gpkg_path + "|layername=lines"
@@ -196,20 +200,17 @@ class MoniQue:
         json_path = reg_feat["json_path"]
 
         if not os.path.exists(json_path):
-            json_path = QFileDialog.getOpenFileName(None, "Project not found! Select new directory to the Mesh", "", ("JSON (*.json)"))[0]
+            json_path = QFileDialog.getOpenFileName(None, "Project not found! Please specify the new path.", "", ("JSON (*.json)"))[0]
             field_idx = self.reg_lyr.fields().indexOf('json_path')
             self.reg_lyr.startEditing()
             self.reg_lyr.changeAttributeValue(1,field_idx,json_path)
             self.reg_lyr.commitChanges()
         
-        with open(json_path, "r") as f:
+        with open(json_path, "r", encoding="utf-8") as f:
             tiles_data = json.load(f)
-            tiles_data["tile_dir"] = os.path.join(os.path.dirname(json_path), "mesh")
-            tiles_data["op_dir"] = os.path.join(os.path.dirname(json_path), "op")
+            tiles_data["tile_dir"] = os.path.normpath(os.path.join(os.path.dirname(json_path), "mesh"))
+            tiles_data["op_dir"] = os.path.normpath(os.path.join(os.path.dirname(json_path), "op"))
         
-        ##! WIE IN ZUKUNFT DIE RAYCASTING SCENE SETZEN?
-        # self.ray_scene = scene
-               
         self.dlg_main.add_mesh_to_obj_canvas(tiles_data)
         
     def reset_plugin(self):
