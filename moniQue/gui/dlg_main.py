@@ -65,7 +65,7 @@ from PyQt5.QtCore import Qt
 # from .dlg_create import CreateDialog
 from .dlg_orient import OrientDialog
 from .dlg_meta_gcp import GcpMetaDialog
-from .dlg_meta_export import ExportMetaDialog
+# from .dlg_meta_export import ExportMetaDialog
 # from .dlg_import_akon import ImportAkonDialog
 from .dlg_meta_mono import MonoMetaDialog
 from ..tools.ImgPickerTool import ImgPickerTool
@@ -114,9 +114,9 @@ class MainDialog(QtWidgets.QDialog):
         self.img_menu.setEnabled(False)
         self.menu.addMenu(self.img_menu)
 
-        self.export_menu = QtWidgets.QMenu("&Export", self)
-        self.export_menu.setEnabled(False)
-        self.menu.addMenu(self.export_menu)
+        # self.export_menu = QtWidgets.QMenu("&Export", self)
+        # self.export_menu.setEnabled(False)
+        # self.menu.addMenu(self.export_menu)
 
         # self.view_menu = QtWidgets.QMenu("&View", self)
         # self.view_menu.setEnabled(False)
@@ -134,13 +134,13 @@ class MainDialog(QtWidgets.QDialog):
         self.import_action.triggered.connect(self.import_images)
         self.img_menu.addAction(self.import_action)
 
-        self.import_json_action = QtWidgets.QAction("&Get initial orientation from *.json", self)
+        self.import_json_action = QtWidgets.QAction("&Import initial orientation from *.json", self)
         self.import_json_action.triggered.connect(self.import_json)
         self.img_menu.addAction(self.import_json_action)
 
-        self.export_action = QtWidgets.QAction("&Export Object View to PNG", self)
-        self.export_action.triggered.connect(self.export_obj_canvas)
-        self.export_menu.addAction(self.export_action)
+        # self.export_action = QtWidgets.QAction("&Export Object View to PNG", self)
+        # self.export_action.triggered.connect(self.export_obj_canvas)
+        # self.export_menu.addAction(self.export_action)
 
         # self.showCam_action = QtWidgets.QAction("&Show Camera Position in 3D Canvas", self)
         # self.showCam_action.triggered.connect(self.showCam)
@@ -1364,61 +1364,61 @@ class MainDialog(QtWidgets.QDialog):
         except:
             print('No project seems to be loaded!')
 
-    def export_obj_canvas(self):
-        try:
-            def_res = [str(self.active_camera.img_w), str(self.active_camera.img_h)]
-        except:
-            def_res = ['1920','1080']
+    # def export_obj_canvas(self):
+    #     try:
+    #         def_res = [str(self.active_camera.img_w), str(self.active_camera.img_h)]
+    #     except:
+    #         def_res = ['1920','1080']
 
-        def_name = self.parent.project_name
+    #     def_name = self.parent.project_name
 
-        export_dialog = ExportMetaDialog(def_res, def_name)
-        export_dialog.exec_()
-        depth_set = False
+    #     export_dialog = ExportMetaDialog(def_res, def_name)
+    #     export_dialog.exec_()
+    #     depth_set = False
 
-        if export_dialog.ok == True:
-            export_path = QtWidgets.QFileDialog.getExistingDirectory(self)
-        else:
-            export_path=''
+    #     if export_dialog.ok == True:
+    #         export_path = QtWidgets.QFileDialog.getExistingDirectory(self)
+    #     else:
+    #         export_path=''
 
-        if len(export_path) > 0:
-            resolution = [int(export_dialog.res_width.text()), int(export_dialog.res_height.text())]
+    #     if len(export_path) > 0:
+    #         resolution = [int(export_dialog.res_width.text()), int(export_dialog.res_height.text())]
             
-            offscreen_canvas = offscreenCanvas(size=(resolution[0], resolution[1]), pixel_ratio=1)
-            offscreen_renderer = gfx.WgpuRenderer(offscreen_canvas)
+    #         offscreen_canvas = offscreenCanvas(size=(resolution[0], resolution[1]), pixel_ratio=1)
+    #         offscreen_renderer = gfx.WgpuRenderer(offscreen_canvas)
 
-            if export_dialog.depth_offset.text() == '':
-                pass
-            else:
-                if int(export_dialog.depth_offset.text()) > 0:
-                    depth_set = True  
-                    curr_depth = self.obj_camera.depth_range
-                    self.obj_camera.depth_range = (int(export_dialog.depth_offset.text()), curr_depth[1])
-                else:
-                    pass
+    #         if export_dialog.depth_offset.text() == '':
+    #             pass
+    #         else:
+    #             if int(export_dialog.depth_offset.text()) > 0:
+    #                 depth_set = True  
+    #                 curr_depth = self.obj_camera.depth_range
+    #                 self.obj_camera.depth_range = (int(export_dialog.depth_offset.text()), curr_depth[1])
+    #             else:
+    #                 pass
 
-            for pnts in self.obj_gcps_grp.children:
-                pnts.visible = False
+    #         for pnts in self.obj_gcps_grp.children:
+    #             pnts.visible = False
 
-            bg = gfx.Background(None, gfx.BackgroundMaterial([0.086, 0.475, 0.671, 1]))
-            self.obj_scene.remove(self.background)
-            self.obj_scene.add(bg)
+    #         bg = gfx.Background(None, gfx.BackgroundMaterial([0.086, 0.475, 0.671, 1]))
+    #         self.obj_scene.remove(self.background)
+    #         self.obj_scene.add(bg)
 
-            offscreen_canvas.request_draw(offscreen_renderer.render(self.obj_scene, self.obj_camera))
-            img = Image.fromarray(np.asarray(offscreen_canvas.draw()))
-            img.save(os.path.join(export_path, export_dialog.file_name.text() + "_render.png"))
+    #         offscreen_canvas.request_draw(offscreen_renderer.render(self.obj_scene, self.obj_camera))
+    #         img = Image.fromarray(np.asarray(offscreen_canvas.draw()))
+    #         img.save(os.path.join(export_path, export_dialog.file_name.text() + "_render.png"))
 
-            self.obj_scene.remove(bg)
-            self.obj_scene.add(self.background)
+    #         self.obj_scene.remove(bg)
+    #         self.obj_scene.add(self.background)
 
-            for pnts in self.obj_gcps_grp.children:
-                pnts.visible = True
+    #         for pnts in self.obj_gcps_grp.children:
+    #             pnts.visible = True
 
-            if depth_set:
-                self.obj_camera.depth_range = (curr_depth[0], curr_depth[1])
+    #         if depth_set:
+    #             self.obj_camera.depth_range = (curr_depth[0], curr_depth[1])
         
-        else:
-            pass
+    #     else:
+    #         pass
         
     def show_image_menu(self, point):
         clicked_list_item = self.img_list.itemAt(point.x(), point.y())
@@ -1486,7 +1486,6 @@ class MainDialog(QtWidgets.QDialog):
         
         self.btn_ori_tool.setEnabled(True)
         
-        # item = self.img_list.selectedItems()[0]
         item.setCheckState(QtCore.Qt.Checked)
         self.uncheck_list_items(item)
                     
@@ -1494,26 +1493,32 @@ class MainDialog(QtWidgets.QDialog):
         iid_path = self.camera_collection[iid].path
                 
         if not os.path.exists(iid_path):
-            #iid_path = QFileDialog.getOpenFileName(None, "Image not found! Please, select new directory.", "", ("JPEG (*.jpeg)"))[0]
-            while True:
-                iid_dir = QFileDialog.getExistingDirectory(self, "Image not found! Please, select the directory to the image.")
-                iid_path = iid_dir+'/'+iid+'.jpeg'
-                if os.path.exists(iid_path) or iid_dir == '':
-                    break
-                else:
-                    print('No image with the right name in this directory! (Only JPEG is supported)') 
-                    continue
-
-            self.camera_collection[iid].set_path(iid_path)
-            field_idx = self.cam_lyr.fields().indexOf('path')
             
-            for feat in self.cam_lyr.getFeatures():
-                if feat['iid'] == iid:
-                    feature_id = feat.id()
-                    self.cam_lyr.startEditing()
-                    self.cam_lyr.changeAttributeValue(feature_id,field_idx,iid_path)
-                    self.cam_lyr.commitChanges()
+            while True:
+                new_iid_path = QFileDialog.getOpenFileName(self, "Image not found! Please, specfiy new path.", "", ("Image (*.tif *.tiff *.png *.jpg *.jpeg)"))[0]
 
+                if new_iid_path is "":
+                    break
+                
+                if os.path.exists(new_iid_path):
+                    break
+            
+            if new_iid_path is not "":
+            
+                self.camera_collection[iid].set_path(new_iid_path)
+                field_idx = self.cam_lyr.fields().indexOf('path')
+                
+                for feat in self.cam_lyr.getFeatures():
+                    if feat['iid'] == iid:
+                        feature_id = feat.id()
+                        self.cam_lyr.startEditing()
+                        self.cam_lyr.changeAttributeValue(feature_id,field_idx,new_iid_path)
+                        self.cam_lyr.commitChanges()
+
+                iid_path = new_iid_path
+            else:
+                return
+        
         self.load_img(iid, iid_path)
         
         expression = "iid = '%s'" % (iid)
@@ -1620,7 +1625,7 @@ class MainDialog(QtWidgets.QDialog):
     def activate_gui_elements(self):
         self.img_list.setEnabled(True)
         self.img_menu.setEnabled(True)
-        self.export_menu.setEnabled(True)
+        # self.export_menu.setEnabled(True)
         # self.view_menu.setEnabled(True)
         self.project_name = self.windowTitle()
                 

@@ -177,10 +177,13 @@ class MoniQue:
         self.dlg_main.set_layers(self.layer_collection)
         self.dlg_main.activate_gui_elements()
         
-        self.load_cameras_from_gpkg()
-        QApplication.processEvents()
+        success = self.load_mesh()
         
-        self.load_mesh()        #commented to switch loading single mesh to tiles
+        if success:
+            self.load_cameras_from_gpkg()
+        else:
+            self.reset_plugin()
+        
                     
     def load_cameras_from_gpkg(self):
         
@@ -200,11 +203,24 @@ class MoniQue:
         json_path = reg_feat["json_path"]
 
         if not os.path.exists(json_path):
-            json_path = QFileDialog.getOpenFileName(None, "Project not found! Please specify the new path.", "", ("JSON (*.json)"))[0]
-            field_idx = self.reg_lyr.fields().indexOf('json_path')
-            self.reg_lyr.startEditing()
-            self.reg_lyr.changeAttributeValue(1,field_idx,json_path)
-            self.reg_lyr.commitChanges()
+            while True:
+                upd_json_path = QFileDialog.getOpenFileName(None, "JSON not found! Please specify the new location.", "", ("JSON (*.json)"))[0]
+                
+                if upd_json_path == "":
+                    break
+                if os.path.exists(upd_json_path):
+                    break
+            
+            if upd_json_path == "":
+                QApplication.instance().restoreOverrideCursor()
+                return False
+            else:
+                field_idx = self.reg_lyr.fields().indexOf('json_path')
+                self.reg_lyr.startEditing()
+                self.reg_lyr.changeAttributeValue(1,field_idx,upd_json_path)
+                self.reg_lyr.commitChanges()
+                json_path = upd_json_path
+        
         
         with open(json_path, "r", encoding="utf-8") as f:
             tiles_data = json.load(f)
@@ -212,6 +228,7 @@ class MoniQue:
             tiles_data["op_dir"] = os.path.normpath(os.path.join(os.path.dirname(json_path), "op"))
         
         self.dlg_main.add_mesh_to_obj_canvas(tiles_data)
+        return True
         
     def reset_plugin(self):
         
