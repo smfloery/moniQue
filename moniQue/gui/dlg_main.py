@@ -681,10 +681,10 @@ class MainDialog(QtWidgets.QDialog):
             img_array = np.asarray(img)
             tex = gfx.Texture(img_array, dim=2)
             
-            if gfx.__version__ != '0.7.0':
-                plane_material = gfx.MeshBasicMaterial(map=tex, side="FRONT", map_interpolation="linear")
-            else:
-                plane_material = gfx.MeshBasicMaterial(map=tex, side="FRONT")
+            # if gfx.__version__ != '0.7.0':
+            #     plane_material = gfx.MeshBasicMaterial(map=tex, side="FRONT", map_interpolation="linear")
+            # else:
+            plane_material = gfx.MeshBasicMaterial(map=tex, side="FRONT")
                 
             plane_mesh = gfx.Mesh(plane_geom, plane_material, visible=True)
             
@@ -851,10 +851,10 @@ class MainDialog(QtWidgets.QDialog):
                     tex = gfx.Texture(img_arr, dim=2, generate_mipmaps=True)
                     
                     #prior to 0.7.0 it was possible to define the texture interpolation for meshes; appaers to be removed with 0.7.0
-                    if gfx.__version__ != '0.7.0':
-                        mesh_material = gfx.MeshBasicMaterial(map=tex, side="FRONT", map_interpolation="linear", pick_write=True)  
-                    else:
-                        mesh_material = gfx.MeshBasicMaterial(map=tex, side="FRONT", pick_write=True)
+                    # if gfx.__version__ != '0.7.0':
+                    #     mesh_material = gfx.MeshBasicMaterial(map=tex, side="FRONT", map_interpolation="linear", pick_write=True)  
+                    # else:
+                    mesh_material = gfx.MeshBasicMaterial(map=tex, side="FRONT", pick_write=True)
                 else:
                     mesh_material = gfx.MeshNormalMaterial(side="FRONT", pick_write=True)
             

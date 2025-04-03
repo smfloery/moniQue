@@ -8,9 +8,12 @@ def create_point_3d(pos, gid, clr):
     click_obj = gfx.Points(click_geom, 
                            gfx.PointsMaterial(color=clr, size=10))
                 
-    click_text = gfx.Text(
-        gfx.TextGeometry(markdown="**%s**" % (gid), font_size=16, anchor="Bottom-Center", screen_space=True),
-        gfx.TextMaterial(color="#000", outline_color="#fff", outline_thickness=0.25))
+    click_text = gfx.Text(geometry=None,
+                          material=gfx.TextMaterial(color="#000", outline_color="#fff", outline_thickness=0.25),
+                          markdown="**%s**" % (gid), 
+                          font_size=16, 
+                          anchor="Bottom-Center", 
+                          screen_space=True)
     click_text.local.position = click_obj.geometry.positions.data[0, :] + [0, 0, 10]
     
     click_obj.add(click_text)   

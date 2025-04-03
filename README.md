@@ -7,14 +7,18 @@ We tested moniQue with the following QGIS versions:
 | 3.34.3 | Windows | Python 3.11
 | 3.34.15 (LTR) | Windows | Python 3.12
 | 3.34.40 | Windows | Python 3.12
+| 3.40.5 (LTR) | Windows | Python 3.12
 
 ## Installation
 ### Required Python packages
 Open the **OSGeo4W Shell** and install the required python packages using pip  
 
-    pip install --user open3d pygfx glfw lmfit
+    pip install --user open3d pygfx==0.9.0 glfw lmfit
 
 `open3d` is required for raycasting, `pygfx` and `glfw` for rendering the terrain in 3D, `lmfit` for the least squares spatial resection. Installation with the `--user` option is necessary as the default QGIS Python interpreter is located on ```C:\...``` which would require admin rights.  
+
+> [!IMPORTANT]
+> We recently switched to the newest version of pygfx which introduced some breaking changes. Hence, it might be necessary to upgrade pygfx!
 
 ### Plugin
 <!-- After installing the additional Python packages, **moniQue** can be installed like any other QGIS plugin from `Plugins -> Manage plugins`. After the succesful installation you should see the logo in the QGIS main toolbar and a new entry in the `Plugin` menu is available. -->
