@@ -38,6 +38,7 @@ import json
 import sys
 import urllib.request
 import glob
+import copy
 
 from collections import OrderedDict
 from qgis.utils import iface
@@ -882,7 +883,7 @@ class MainDialog(QtWidgets.QDialog):
         
         self.obj_scene.add(gfx.AmbientLight(intensity=1), gfx.DirectionalLight())
         
-        self.default_obj_camera_state = self.obj_camera.get_state()
+        self.default_obj_camera_state = copy.deepcopy(self.obj_camera.get_state())
         
         self.mono_tool.set_minxyz(self.min_xyz)
         self.mono_vertex_tool.set_minxyz(self.min_xyz)
