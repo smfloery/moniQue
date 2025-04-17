@@ -39,6 +39,7 @@ import sys
 import urllib.request
 import glob
 import copy
+import webbrowser
 
 from collections import OrderedDict
 from qgis.utils import iface
@@ -143,10 +144,6 @@ class MainDialog(QtWidgets.QDialog):
         # self.export_action.triggered.connect(self.export_obj_canvas)
         # self.export_menu.addAction(self.export_action)
 
-        # self.showCam_action = QtWidgets.QAction("&Show Camera Position in 3D Canvas", self)
-        # self.showCam_action.triggered.connect(self.showCam)
-        # self.view_menu.addAction(self.showCam_action)
-
         self.main_toolbar = QtWidgets.QToolBar("Main toolbar")
         self.main_toolbar.setIconSize(QtCore.QSize(24, 24))
 
@@ -179,6 +176,14 @@ class MainDialog(QtWidgets.QDialog):
         self.btn_mono_vertex.setCheckable(True)
         self.btn_mono_vertex.triggered.connect(self.toggle_mono_vertex_tool)
         self.main_toolbar.addAction(self.btn_mono_vertex)
+
+        self.main_toolbar.addSeparator()
+
+        self.btn_open_help = QtWidgets.QAction("Help", self)
+        self.btn_open_help.setIcon(QtGui.QIcon(os.path.join(self.icon_dir, "mActionHelpContents.png")))
+        self.btn_open_help.triggered.connect(self.open_help_window)
+        self.main_toolbar.addAction(self.btn_open_help)
+
         
         self.img_toolbar = QtWidgets.QToolBar()
         self.img_toolbar.setIconSize(QtCore.QSize(24, 24))
@@ -228,21 +233,13 @@ class MainDialog(QtWidgets.QDialog):
         self.btn_reset_obj_canvas_camera = QtWidgets.QAction("Reset to default camera position.", self)
         self.btn_reset_obj_canvas_camera.setIcon(QtGui.QIcon(os.path.join(self.icon_dir, "zoom_to_extent.png")))
         self.btn_reset_obj_canvas_camera.triggered.connect(self.reset_obj_canvas_camera)
+        self.btn_reset_obj_canvas_camera.setEnabled(False)
         self.obj_toolbar.addAction(self.btn_reset_obj_canvas_camera)
-
-        # btn_save_obj_canvas_camera = QtWidgets.QAction("Save camera position.", self)
-        # btn_save_obj_canvas_camera.setIcon(QtGui.QIcon(os.path.join(self.icon_dir, "save_temporary_camera_position.png")))
-        # btn_save_obj_canvas_camera.triggered.connect(self.save_obj_canvas_camera)
-        # self.obj_toolbar.addAction(btn_save_obj_canvas_camera)
-
-        # btn_load_obj_canvas_camera = QtWidgets.QAction("Zoom to saved camera position.", self)
-        # btn_load_obj_canvas_camera.setIcon(QtGui.QIcon(os.path.join(self.icon_dir, "set_temporary_camera_position.png")))
-        # btn_load_obj_canvas_camera.triggered.connect(self.load_obj_canvas_camera)
-        # self.obj_toolbar.addAction(btn_load_obj_canvas_camera)
 
         self.btn_obj_canvas_camera_from_map = QtWidgets.QAction("Set camera to current QGIS canvas extent.", self)
         self.btn_obj_canvas_camera_from_map.setIcon(QtGui.QIcon(os.path.join(self.icon_dir, "mExtentFromMap.png")))
         self.btn_obj_canvas_camera_from_map.triggered.connect(self.obj_canvas_camera_from_map)
+        self.btn_obj_canvas_camera_from_map.setEnabled(False)
         self.obj_toolbar.addAction(self.btn_obj_canvas_camera_from_map)
         
         self.btn_obj_canvas_show_img = QtWidgets.QAction("Show image in 3D canvas.", self)
@@ -251,6 +248,27 @@ class MainDialog(QtWidgets.QDialog):
         self.btn_obj_canvas_show_img.setEnabled(False)
         self.btn_obj_canvas_show_img.setCheckable(True)
         self.obj_toolbar.addAction(self.btn_obj_canvas_show_img)
+
+        self.btn_show_cam_pos = QtWidgets.QAction("&Show Camera Position in 3D Canvas", self)
+        self.btn_show_cam_pos.setIcon(QtGui.QIcon(os.path.join(self.icon_dir, "mExtentFromMap.png")))
+        self.btn_show_cam_pos.triggered.connect(self.show_cam_pos)
+        self.btn_show_cam_pos.setEnabled(False)
+        self.btn_show_cam_pos.setCheckable(True)
+        self.obj_toolbar.addAction(self.btn_show_cam_pos)
+
+        self.obj_toolbar.addSeparator()
+
+        self.btn_save_obj_canvas_camera = QtWidgets.QAction("Save camera position.", self)
+        self.btn_save_obj_canvas_camera.setIcon(QtGui.QIcon(os.path.join(self.icon_dir, "save_temporary_camera_position.png")))
+        self.btn_save_obj_canvas_camera.triggered.connect(self.save_obj_canvas_camera)
+        self.btn_save_obj_canvas_camera.setEnabled(False)
+        self.obj_toolbar.addAction(self.btn_save_obj_canvas_camera)
+
+        self.btn_load_obj_canvas_camera = QtWidgets.QAction("Set camera to saved position.", self)
+        self.btn_load_obj_canvas_camera.setIcon(QtGui.QIcon(os.path.join(self.icon_dir, "set_temporary_camera_position.png")))
+        self.btn_load_obj_canvas_camera.triggered.connect(self.load_obj_canvas_camera)
+        self.btn_load_obj_canvas_camera.setEnabled(False)
+        self.obj_toolbar.addAction(self.btn_load_obj_canvas_camera)
 
         self.obj_renderer = gfx.WgpuRenderer(self.obj_canvas, pixel_ratio=1)
         self.obj_renderer.add_event_handler(self.save_camera_view, "key_down")
@@ -349,6 +367,7 @@ class MainDialog(QtWidgets.QDialog):
         self.map_check = False
 
         self.cam_dict = {}
+        self.cam_list = []
         self.active_camera = None
         
         self.img_context_menu = QtWidgets.QMenu(self)
@@ -359,7 +378,12 @@ class MainDialog(QtWidgets.QDialog):
         # self.img_context_menu_ortho = QtGui.QAction('Generate orthophoto', self)
         # self.img_context_menu_ortho.triggered.connect(self.show_orthophoto_dlg)
         # self.img_context_menu.addAction(self.img_context_menu_ortho)
-    
+
+
+    def open_help_window(self):
+        webbrowser.open_new("https://github.com/smfloery/moniQue")
+
+
     def save_camera_view(self, event):
         if event.key == "F1":
             
@@ -742,8 +766,8 @@ class MainDialog(QtWidgets.QDialog):
             self.img_plane_grp.add(plane_mesh)
 
             #hide camera objects in 3D as those intervene with rendering
-            for iid, iid_grp in self.cam_dict.items():
-                iid_grp.visible = False
+            # for iid, iid_grp in self.cam_dict.items():
+            #     iid_grp.visible = False
             
             self.obj_canvas.request_draw()
             
@@ -769,75 +793,219 @@ class MainDialog(QtWidgets.QDialog):
             
             self.img_plane_grp.clear()
             
-            for iid, iid_grp in self.cam_dict.items():
-                iid_grp.visible = True
-            
             self.obj_canvas.request_draw()
 
-    def add_camera_in_obj_canvas(self, current_iid = -1):
-        #TODO: currently the camera geometry is created all over again; This can be implemented more efficiently;
+    def create_cam_pos(self):
         for cam_feat in self.cam_lyr.getFeatures():
 
-            if cam_feat['obj_x0'] != None:
+            if cam_feat['obj_x0'] != None:   
                 img_w = int(cam_feat['img_w'])
                 img_h = int(cam_feat['img_h'])
-                        
+                            
                 prc = np.array([float(cam_feat["obj_x0"]), float(cam_feat["obj_y0"]), float(cam_feat["obj_z0"])]) - self.min_xyz
                 rmat = alzeka2rot([float(cam_feat["alpha"]), float(cam_feat["zeta"]), float(cam_feat["kappa"])])
                 cmat = np.array([[1, 0, -float(cam_feat["img_x0"])], 
-                                    [0, 1, -float(cam_feat["img_y0"])],
-                                    [0, 0, -float(cam_feat["f"])]])
-                    
+                                [0, 1, -float(cam_feat["img_y0"])],
+                                [0, 0, -float(cam_feat["f"])]])
+                        
                 plane_pnts_img = np.array([[0, 0, 1],
                                         [img_w, 0, 1],
                                         [img_w, img_h*(-1), 1],
                                         [0, img_h*(-1), 1]]).T
-                    
+                        
                 plane_pnts_dir = (rmat@cmat@plane_pnts_img).T
                 plane_pnts_dir = plane_pnts_dir / np.linalg.norm(plane_pnts_dir, axis=1).reshape(-1, 1)
-                    
+                        
                 plane_pnts_obj = prc + 500 * plane_pnts_dir
                 plane_faces = np.array([[3, 1, 0], [3, 2, 1]]).astype(np.uint32)
                 plane_uv = np.array([[0, 0], [1, 0], [1, 1], [0, 1]]).astype(np.uint32)
-                    
+                        
                 plane_geom = gfx.geometries.Geometry(indices=plane_faces, 
-                                                        positions=plane_pnts_obj.astype(np.float32),
-                                                        texcoords=plane_uv.astype(np.float32))
-                    
+                                                    positions=plane_pnts_obj.astype(np.float32),
+                                                    texcoords=plane_uv.astype(np.float32))
+                        
                 plane_material = gfx.MeshBasicMaterial(color = (1, 0.65, 0, 1), opacity=0.5)
                 plane_mesh = gfx.Mesh(plane_geom, plane_material, visible=True)
-                
-                selected_plane_material = gfx.MeshBasicMaterial(color = (1, 0, 0, 1), opacity=0.5)
-                selected_plane_mesh = gfx.Mesh(plane_geom, selected_plane_material, visible=True)
 
-                   
                 self.img_controller.set_image(plane_mesh, plane_pnts_dir, prc, distance=1000)
-                
+                    
                 positions = [[list(prc),plane_pnts_obj[i]] for i in range(4)]
                 lines = [gfx.Line(gfx.Geometry(positions=positions[i]), gfx.LineMaterial(thickness=1.0, color=(1, 0.65, 0.0), opacity=1)) for i in range(4)]
-                selected_lines = [gfx.Line(gfx.Geometry(positions=positions[i]), gfx.LineMaterial(thickness=1.0, color=(1, 0.0, 0.0), opacity=1)) for i in range(4)]
 
-                if cam_feat['iid'] in self.cam_dict.keys():
-                    self.cam_dict[cam_feat['iid']].clear()
-
-                self.cam_dict[cam_feat['iid']] = gfx.Group(visible=True)
-
-                if cam_feat['iid'] == current_iid:
-                    self.cam_dict[cam_feat['iid']].add(selected_plane_mesh)
-                else:
-                    self.cam_dict[cam_feat['iid']].add(plane_mesh)
-
-                if cam_feat['iid'] == current_iid:
-                    for i in selected_lines:
-                        self.cam_dict[cam_feat['iid']].add(i)
-                else:
-                    for i in lines:
-                        self.cam_dict[cam_feat['iid']].add(i)
-
-                self.obj_scene.add(self.cam_dict[cam_feat['iid']])
+                self.add_cam_pos_to_obj_canvas(cam_feat['iid'], plane_mesh, lines)
 
 
-        self.obj_canvas.request_draw()
+    def show_cam_pos(self):
+            if self.btn_show_cam_pos.isChecked():
+                for i in self.cam_dict.keys():
+                    self.cam_dict[i]['plane'].visible = True
+                    self.cam_dict[i]['lines'].visible = True
+
+            else:
+                for i in self.cam_dict.keys():
+                    self.cam_dict[i]['plane'].visible = False
+                    self.cam_dict[i]['lines'].visible = False
+
+            self.obj_canvas.request_draw()
+
+    def repaint_cam_pos(self, current_iid, sel_check):
+        try:
+            if sel_check:
+                for i in self.cam_dict[current_iid]['plane'].children:
+                    i.material = gfx.MeshBasicMaterial(color = (1, 0, 0, 1), opacity=0.5)
+                for i in self.cam_dict[current_iid]['lines'].children:
+                    i.material = gfx.LineMaterial(thickness=1.0, color=(1, 0, 0), opacity=1)
+                
+            else:
+                for i in self.cam_dict[current_iid]['plane'].children:
+                    i.material = gfx.MeshBasicMaterial(color = (1, 0.65, 0, 1), opacity=0.5)
+                for i in self.cam_dict[current_iid]['lines'].children:
+                    i.material = gfx.LineMaterial(thickness=1.0, color=(1, 0.65, 0), opacity=1)
+            
+            self.obj_canvas.request_draw()
+        
+        except:
+            print('Image has no orientation!')
+
+    def update_cam_pos(self, current_iid):
+        for cam_feat in self.cam_lyr.getFeatures():
+            if cam_feat['iid'] == current_iid:
+                if cam_feat['obj_x0'] != None:   
+                    img_w = int(cam_feat['img_w'])
+                    img_h = int(cam_feat['img_h'])
+                                
+                    prc = np.array([float(cam_feat["obj_x0"]), float(cam_feat["obj_y0"]), float(cam_feat["obj_z0"])]) - self.min_xyz
+                    rmat = alzeka2rot([float(cam_feat["alpha"]), float(cam_feat["zeta"]), float(cam_feat["kappa"])])
+                    cmat = np.array([[1, 0, -float(cam_feat["img_x0"])], 
+                                    [0, 1, -float(cam_feat["img_y0"])],
+                                    [0, 0, -float(cam_feat["f"])]])
+                            
+                    plane_pnts_img = np.array([[0, 0, 1],
+                                            [img_w, 0, 1],
+                                            [img_w, img_h*(-1), 1],
+                                            [0, img_h*(-1), 1]]).T
+                            
+                    plane_pnts_dir = (rmat@cmat@plane_pnts_img).T
+                    plane_pnts_dir = plane_pnts_dir / np.linalg.norm(plane_pnts_dir, axis=1).reshape(-1, 1)
+                            
+                    plane_pnts_obj = prc + 500 * plane_pnts_dir
+                    plane_faces = np.array([[3, 1, 0], [3, 2, 1]]).astype(np.uint32)
+                    plane_uv = np.array([[0, 0], [1, 0], [1, 1], [0, 1]]).astype(np.uint32)
+                            
+                    plane_geom = gfx.geometries.Geometry(indices=plane_faces, 
+                                                        positions=plane_pnts_obj.astype(np.float32),
+                                                        texcoords=plane_uv.astype(np.float32))
+                            
+                    plane_material = gfx.MeshBasicMaterial(color = (1, 0.65, 0, 1), opacity=0.5)
+                    plane_mesh = gfx.Mesh(plane_geom, plane_material, visible=True)
+
+                    self.img_controller.set_image(plane_mesh, plane_pnts_dir, prc, distance=1000)
+                        
+                    positions = [[list(prc),plane_pnts_obj[i]] for i in range(4)]
+                    lines = [gfx.Line(gfx.Geometry(positions=positions[i]), gfx.LineMaterial(thickness=1.0, color=(1, 0.65, 0.0), opacity=1)) for i in range(4)]
+
+
+                    self.cam_dict[current_iid]['plane'].clear()
+                    self.cam_dict[current_iid]['lines'].clear()
+                    self.add_cam_pos_to_obj_canvas(cam_feat['iid'], plane_mesh, lines)
+                    
+                    self.obj_canvas.request_draw()
+        
+
+    def add_cam_pos_to_obj_canvas(self, iid, plane_mesh, lines):
+        self.cam_dict[iid] = {'plane':gfx.Group(visible=False), 'lines':gfx.Group(visible=False)}
+        
+        self.cam_dict[iid]['plane'].add(plane_mesh)
+
+        for i in lines:
+            self.cam_dict[iid]['lines'].add(i)
+
+        self.obj_scene.add(self.cam_dict[iid]['plane'])
+        self.obj_scene.add(self.cam_dict[iid]['lines'])
+
+                # if cam_feat['iid'] in self.cam_dict.keys():
+                #     self.cam_dict[cam_feat['iid']].clear()
+
+                # self.cam_dict[cam_feat['iid']] = gfx.Group(visible=False)
+
+                # if cam_feat['iid'] == current_iid:
+                #     self.cam_dict[cam_feat['iid']].add(selected_plane_mesh)
+                # else:
+                #     self.cam_dict[cam_feat['iid']].add(plane_mesh)
+
+                # if cam_feat['iid'] == current_iid:
+                #     for i in selected_lines:
+                #         self.cam_dict[cam_feat['iid']].add(i)
+                # else:
+                #     for i in lines:
+                #         self.cam_dict[cam_feat['iid']].add(i)
+
+                # self.obj_scene.add(self.cam_dict[cam_feat['iid']])
+
+
+    # def add_cam_pos_to_obj_canvas(self, current_iid = -1):
+    #     #TODO: currently the camera geometry is created all over again; This can be implemented more efficiently;
+    #     for cam_feat in self.cam_lyr.getFeatures():
+
+    #         if cam_feat['obj_x0'] != None:   
+    #             img_w = int(cam_feat['img_w'])
+    #             img_h = int(cam_feat['img_h'])
+                            
+    #             prc = np.array([float(cam_feat["obj_x0"]), float(cam_feat["obj_y0"]), float(cam_feat["obj_z0"])]) - self.min_xyz
+    #             rmat = alzeka2rot([float(cam_feat["alpha"]), float(cam_feat["zeta"]), float(cam_feat["kappa"])])
+    #             cmat = np.array([[1, 0, -float(cam_feat["img_x0"])], 
+    #                             [0, 1, -float(cam_feat["img_y0"])],
+    #                             [0, 0, -float(cam_feat["f"])]])
+                        
+    #             plane_pnts_img = np.array([[0, 0, 1],
+    #                                     [img_w, 0, 1],
+    #                                     [img_w, img_h*(-1), 1],
+    #                                     [0, img_h*(-1), 1]]).T
+                        
+    #             plane_pnts_dir = (rmat@cmat@plane_pnts_img).T
+    #             plane_pnts_dir = plane_pnts_dir / np.linalg.norm(plane_pnts_dir, axis=1).reshape(-1, 1)
+                        
+    #             plane_pnts_obj = prc + 500 * plane_pnts_dir
+    #             plane_faces = np.array([[3, 1, 0], [3, 2, 1]]).astype(np.uint32)
+    #             plane_uv = np.array([[0, 0], [1, 0], [1, 1], [0, 1]]).astype(np.uint32)
+                        
+    #             plane_geom = gfx.geometries.Geometry(indices=plane_faces, 
+    #                                                 positions=plane_pnts_obj.astype(np.float32),
+    #                                                 texcoords=plane_uv.astype(np.float32))
+                        
+    #             plane_material = gfx.MeshBasicMaterial(color = (1, 0.65, 0, 1), opacity=0.5)
+    #             plane_mesh = gfx.Mesh(plane_geom, plane_material, visible=True)
+
+    #             # selected_plane_material = gfx.MeshBasicMaterial(color = (1, 0, 0, 1), opacity=0.5)
+    #             # selected_plane_mesh = gfx.Mesh(plane_geom, selected_plane_material, visible=True)
+
+    #             self.img_controller.set_image(plane_mesh, plane_pnts_dir, prc, distance=1000)
+                    
+    #             positions = [[list(prc),plane_pnts_obj[i]] for i in range(4)]
+    #             lines = [gfx.Line(gfx.Geometry(positions=positions[i]), gfx.LineMaterial(thickness=1.0, color=(1, 0.65, 0.0), opacity=1)) for i in range(4)]
+    #             # selected_lines = [gfx.Line(gfx.Geometry(positions=positions[i]), gfx.LineMaterial(thickness=1.0, color=(1, 0.0, 0.0), opacity=1)) for i in range(4)]
+
+
+    #             # if cam_feat['iid'] in self.cam_dict.keys():
+    #             #     self.cam_dict[cam_feat['iid']].clear()
+
+    #             # self.cam_dict[cam_feat['iid']] = gfx.Group(visible=False)
+
+    #             # if cam_feat['iid'] == current_iid:
+    #             #     self.cam_dict[cam_feat['iid']].add(selected_plane_mesh)
+    #             # else:
+    #             #     self.cam_dict[cam_feat['iid']].add(plane_mesh)
+
+    #             # if cam_feat['iid'] == current_iid:
+    #             #     for i in selected_lines:
+    #             #         self.cam_dict[cam_feat['iid']].add(i)
+    #             # else:
+    #             #     for i in lines:
+    #             #         self.cam_dict[cam_feat['iid']].add(i)
+
+    #             # self.obj_scene.add(self.cam_dict[cam_feat['iid']])
+
+    #     self.obj_canvas.request_draw()
 
     def add_mesh_to_obj_canvas(self, tiles_data):
         
@@ -854,7 +1022,7 @@ class MainDialog(QtWidgets.QDialog):
         self.min_xyz = np.array(self.tiles_data["min_xyz"])
         self.max_xyz = np.array(self.tiles_data["max_xyz"])
 
-        self.add_camera_in_obj_canvas()
+        self.create_cam_pos()
         
         self.o3d_scene = o3d.t.geometry.RaycastingScene()
         
@@ -1237,7 +1405,7 @@ class MainDialog(QtWidgets.QDialog):
         
         self.cam_lyr.triggerRepaint()
 
-        self.add_camera_in_obj_canvas(self.active_camera.iid)
+        self.update_cam_pos(self.active_camera.iid)
     
     def update_gcps(self, data):
         curr_img_gcps = self.img_gcps_lyr.getFeatures(expression = "iid = '%s'" % (self.active_camera.iid))
@@ -1321,7 +1489,7 @@ class MainDialog(QtWidgets.QDialog):
 
         self.camera_collection[cam.iid] = cam
         self.active_camera = self.camera_collection[cam.iid]
-        self.add_camera_in_obj_canvas(cam.iid)
+        self.update_cam_pos(cam.iid)
         
     def discard_changes(self):
         self.img_gcps_lyr.rollBack()
@@ -1361,7 +1529,7 @@ class MainDialog(QtWidgets.QDialog):
             
     def save_obj_canvas_camera(self):
         self.obj_camera_state = None
-        self.obj_camera_state = self.obj_camera.get_state()
+        self.obj_camera_state = copy.deepcopy(self.obj_camera.get_state())
     
     def load_obj_canvas_camera(self):
         if self.obj_camera_state is None:
@@ -1527,7 +1695,8 @@ class MainDialog(QtWidgets.QDialog):
         self.active_camera = None
         self.setWindowTitle("%s" % (self.project_name))
 
-        self.add_camera_in_obj_canvas()
+        iid = item.text()
+        self.repaint_cam_pos(iid, False)
         
     def toggle_camera(self, item):
         
@@ -1609,7 +1778,7 @@ class MainDialog(QtWidgets.QDialog):
             self.btn_obj_canvas_show_img.setEnabled(False)
             # self.btn_obj_canvas_show_img.setEnabled(False)
 
-        self.add_camera_in_obj_canvas(iid)      
+        self.repaint_cam_pos(iid, True)   
         self.obj_canvas.request_draw()
         
     def toggle_mono_tool(self):
@@ -1674,8 +1843,13 @@ class MainDialog(QtWidgets.QDialog):
         self.img_menu.setEnabled(True)
         # self.export_menu.setEnabled(True)
         # self.view_menu.setEnabled(True)
+        self.btn_reset_obj_canvas_camera.setEnabled(True)
+        self.btn_obj_canvas_camera_from_map.setEnabled(True)
+        self.btn_show_cam_pos.setEnabled(True)
+        self.btn_save_obj_canvas_camera.setEnabled(True)
+        self.btn_load_obj_canvas_camera.setEnabled(True)
         self.project_name = self.windowTitle()
-                
+
     def activate_gcp_picking(self):
 
         #GCP picking in image space
@@ -1828,7 +2002,7 @@ class MainDialog(QtWidgets.QDialog):
     
                 click_pos_local, _ = self.pick_to_world(event)
                 
-                self.obj_camera_origin = self.obj_camera.get_state()
+                self.obj_camera_origin = copy.deepcopy(self.obj_camera.get_state())
                 self.origin_memory.append(self.obj_camera_origin)
 
                 vektor = [click_pos_local[0] - self.obj_camera_origin['position'][0], click_pos_local[1] - self.obj_camera_origin['position'][1], click_pos_local[2] - self.obj_camera_origin['position'][2]]
