@@ -61,6 +61,7 @@ After the camera parameters have been estimated, we can now use monoplotting. By
 | Right Mouse (drag) | Translate camera | 3D
 | Strg + Left click | Add GCP | 3D & Image (during orientation)
 | Strg + Right click | Zoom to position | 3D
+| Strg + Mouse wheel | Adjust FOV | 3D
 | ALG + Right click  | Go back to previous position | 3D
 | A W S D | Move camera in object space | 3D
 | &uarr;  &darr;  &larr;  &rarr; | Rotate camera in object space | 3D

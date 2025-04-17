@@ -186,6 +186,12 @@ class MainDialog(QtWidgets.QDialog):
         self.img_canvas = QgsMapCanvas(parent=self)
         self.img_canvas.setMinimumSize(QtCore.QSize(300, 16777215))
         
+        self.img_statusbar = QtWidgets.QStatusBar()
+        self.img_statusbar.setFixedHeight(24)
+        # self.img_text = QtWidgets.QLabel()
+        # self.img_text.setText("Dummy/Dummy")
+        # self.img_statusbar.addWidget(self.img_text)
+        
         self.img_pan_tool = QgsMapToolPan(self.img_canvas)
         self.mono_tool = MonoMapTool(self.img_canvas, self.parent.map_canvas, MonoMetaDialog())
         self.mono_vertex_tool = VertexTool(self.img_canvas, self.parent.map_canvas)
@@ -203,9 +209,22 @@ class MainDialog(QtWidgets.QDialog):
         
         self.obj_toolbar = QtWidgets.QToolBar()
         self.obj_toolbar.setIconSize(QtCore.QSize(24, 24))
+
         self.obj_canvas = WgpuCanvas(parent=self)
         self.obj_canvas.setMinimumSize(QtCore.QSize(300, 16777215))
 
+        self.obj_statusbar = QtWidgets.QStatusBar()
+        self.obj_statusbar.setFixedHeight(24)
+        
+        self.obj_status_fov = QtWidgets.QLabel()
+        self.obj_status_fov.setText("FOV")
+        self.obj_status_fov_edit = QtWidgets.QLineEdit()
+        self.obj_status_fov_edit.setEnabled(False)
+        self.obj_status_fov_edit.setFixedWidth(35)
+        self.obj_status_fov_edit.setFixedHeight(20)
+        self.obj_statusbar.addWidget(self.obj_status_fov)
+        self.obj_statusbar.addWidget(self.obj_status_fov_edit)
+        
         self.btn_reset_obj_canvas_camera = QtWidgets.QAction("Reset to default camera position.", self)
         self.btn_reset_obj_canvas_camera.setIcon(QtGui.QIcon(os.path.join(self.icon_dir, "zoom_to_extent.png")))
         self.btn_reset_obj_canvas_camera.triggered.connect(self.reset_obj_canvas_camera)
@@ -233,7 +252,7 @@ class MainDialog(QtWidgets.QDialog):
         self.btn_obj_canvas_show_img.setCheckable(True)
         self.obj_toolbar.addAction(self.btn_obj_canvas_show_img)
 
-        self.obj_renderer = gfx.WgpuRenderer(self.obj_canvas)
+        self.obj_renderer = gfx.WgpuRenderer(self.obj_canvas, pixel_ratio=1)
         self.obj_renderer.add_event_handler(self.save_camera_view, "key_down")
         self.obj_scene = gfx.Scene()
         self.obj_stats = gfx.Stats(viewport=self.obj_renderer)
@@ -252,6 +271,7 @@ class MainDialog(QtWidgets.QDialog):
         
         #fov of the camera appaars to represent the vertical FOV!
         self.obj_camera = gfx.PerspectiveCamera(fov=45, depth_range=(1, 100000))
+        
         
         self.obj_canvas.request_draw()
 
@@ -280,6 +300,7 @@ class MainDialog(QtWidgets.QDialog):
         img_split_layout.setContentsMargins(0, 0, 0, 0)
         img_split_layout.addWidget(self.img_toolbar)
         img_split_layout.addWidget(self.img_canvas)
+        img_split_layout.addWidget(self.img_statusbar)
         self.img_split.setLayout(img_split_layout)
         
         self.obj_split = QtWidgets.QWidget()
@@ -288,6 +309,7 @@ class MainDialog(QtWidgets.QDialog):
         obj_split_layout.setContentsMargins(0, 0, 5, 0)
         obj_split_layout.addWidget(self.obj_toolbar)
         obj_split_layout.addWidget(self.obj_canvas)
+        obj_split_layout.addWidget(self.obj_statusbar)
         self.obj_split.setLayout(obj_split_layout)
         
         self.split_canvas.addWidget(self.img_split)
@@ -327,7 +349,7 @@ class MainDialog(QtWidgets.QDialog):
         self.map_check = False
 
         self.cam_dict = {}
-        # self.showCam_check = False
+        self.active_camera = None
         
         self.img_context_menu = QtWidgets.QMenu(self)
         self.img_context_menu_align = QtGui.QAction('Align 3D view with camera view', self)
@@ -340,26 +362,52 @@ class MainDialog(QtWidgets.QDialog):
     
     def save_camera_view(self, event):
         if event.key == "F1":
-            curr_cam = self.obj_camera.get_state()
+            
+            curr_cam = self.obj_camera.get_state()                                    
+            (canvas_h, canvas_w) = self.obj_canvas.get_logical_size()
+            
+            #https://github.com/pygfx/pygfx/blob/dc443c4b6356cdd276c1cbfdab1b15d2142a07dc/pygfx/cameras/_perspective.py#L291
+            #it appars that the vfov and hfov are somehow manipulated to maintain aspect; Directly using them in separate
+            #rendering leads to completely different extents; By adjusting it in that way, inspired by the above link, 
+            #its somehow similar to what was seen in the scene --> not applied anymore
+            # vfov = np.deg2rad(curr_cam["fov"])
+            # hfov = vfov*(canvas_w/canvas_h)#*(canvas_w/canvas_h) #second multiplication to correct for aspect ratio maintenance
+            # vfov *= (1 / (canvas_h / canvas_w))
+            
+            #through the maintain_aspect=True of the camera it appaers that the view is so adjusted as if hfov is equal to vfov; At least using these settings
+            #leads to the best render results in monique-helper; Only empirically tested; I have no idea why but it does somehow make sense?
+            #therefore we only use "fov" in the output json
+            vfov = np.deg2rad(curr_cam["fov"])
+            # hfov = vfov
             
             cam_pos = self.obj_camera.local.position + self.min_xyz
             cam_rmat_pygfx = self.obj_camera.local.rotation_matrix[:3, :3]  #already transposed in contrast to self.obj_camera.view_matrix; otherweise the same
             alzekas = rot2alzeka(cam_rmat_pygfx)
             
-            # canvas_w, canvas_h = self.obj_canvas.get_physical_size()
-            # f = (canvas_h/2.) / np.tan(curr_cam["fov"]/2.)
-            
-            cam_dict = {"project":self.gpkg_path,
-                        "X0":cam_pos[0],
-                        "Y0":cam_pos[1],
-                        "Z0":cam_pos[2],
-                        "alpha":alzekas[0, 0],
-                        "zeta":alzekas[0, 1],
-                        "kappa":alzekas[0, 2],
-                        "vfov":np.deg2rad(curr_cam["fov"])}
-                        # "hfov":np.deg2rad(curr_cam["fov"])*(canvas_w/canvas_h)}
+            if self.active_camera is not None:
+                width = self.active_camera.img_w
+                height = self.active_camera.img_h
+                name = self.active_camera.iid
+            else:
+                width = None
+                height = None
+                name = "unknown"
                         
-            json_path = QtWidgets.QFileDialog.getSaveFileName(None, "JSON path", "", ("Json (*.json)"))[0]
+            cam_dict = {name: {"project":self.gpkg_path,
+                               "X0":cam_pos[0],
+                               "Y0":cam_pos[1],
+                               "Z0":cam_pos[2],
+                               "alpha":alzekas[0, 0],
+                               "zeta":alzekas[0, 1],
+                               "kappa":alzekas[0, 2],
+                               "fov":vfov,
+                               "img_w":width,
+                               "img_h":height
+                               }
+                        }
+            
+                        
+            json_path = QtWidgets.QFileDialog.getSaveFileName(None, "JSON path", name if name is not "unknown" else "", ("Json (*.json)"))[0]
             if json_path:
                 json_cam = json.dumps(cam_dict, indent=4, ensure_ascii=False).encode("utf-8")
                 with open(json_path, "w", encoding="utf-8") as json_file:
@@ -583,7 +631,6 @@ class MainDialog(QtWidgets.QDialog):
             self.btn_mono_tool.setEnabled(False)
             self.btn_mono_vertex.setEnabled(False)
             
-    
     def load_project(self, gpkg_path=None):
         if not gpkg_path:
             gpkg_path = QtWidgets.QFileDialog.getOpenFileName(None, "Open project", "", ("Geopackage (*.gpkg)"))[0]
@@ -850,11 +897,7 @@ class MainDialog(QtWidgets.QDialog):
                                     
                     img_arr = np.flipud(img_arr)
                     tex = gfx.Texture(img_arr, dim=2, generate_mipmaps=True)
-                    
-                    #prior to 0.7.0 it was possible to define the texture interpolation for meshes; appaers to be removed with 0.7.0
-                    # if gfx.__version__ != '0.7.0':
-                    #     mesh_material = gfx.MeshBasicMaterial(map=tex, side="FRONT", map_interpolation="linear", pick_write=True)  
-                    # else:
+
                     mesh_material = gfx.MeshBasicMaterial(map=tex, side="FRONT", pick_write=True)
                 else:
                     mesh_material = gfx.MeshNormalMaterial(side="FRONT", pick_write=True)
@@ -866,11 +909,13 @@ class MainDialog(QtWidgets.QDialog):
             
         self.obj_scene.add(self.terrain)
         local_cx = self.tiles_data["cx"] - self.min_xyz
-        
+                
         offset_z = local_cx[0] / np.tan(np.deg2rad(self.obj_camera.get_state()["fov"])/2)
         
         self.obj_camera.local.position = local_cx + np.array([0, 0, offset_z])
         self.obj_camera.show_pos(local_cx)
+        
+        self.default_obj_camera_state = copy.deepcopy(self.obj_camera.get_state())
         
         #intitial render call
         self.msg_box.setLabelText("Rendering initial scene...")
@@ -882,17 +927,17 @@ class MainDialog(QtWidgets.QDialog):
         self.obj_scene.add(self.obj_gcps_grp)
         
         self.obj_scene.add(gfx.AmbientLight(intensity=1), gfx.DirectionalLight())
-        
-        self.default_obj_camera_state = copy.deepcopy(self.obj_camera.get_state())
-        
+                
         self.mono_tool.set_minxyz(self.min_xyz)
         self.mono_vertex_tool.set_minxyz(self.min_xyz)
                        
         self.mono_tool.set_scene(self.o3d_scene)
         self.mono_vertex_tool.set_scene(self.o3d_scene)
+    
+    def animate(self): 
+        cam_state = self.obj_camera.get_state()
+        self.obj_status_fov_edit.setText("%.1f" % (cam_state["fov"]))
         
-    def animate(self):     
-
         if self.tiles_data is not None:
                         
             # cam_pos = self.obj_camera.local.position
@@ -949,7 +994,9 @@ class MainDialog(QtWidgets.QDialog):
                 self.msg_box.setValue(len(self.tiles_data["tiles"])+1)
                 QtWidgets.QApplication.instance().restoreOverrideCursor()
                 self.initial_render = False        
-                
+            
+            
+              
     def import_images(self):
         """Import selected images.
         """       
@@ -1144,7 +1191,6 @@ class MainDialog(QtWidgets.QDialog):
         self.img_canvas.refresh()
     
     def get_wpgu_camera(self):
-        # cam_state = self.obj_camera.get_state()
         
         cam_pos = self.obj_camera.local.position + self.min_xyz
 

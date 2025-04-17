@@ -44,11 +44,8 @@ class OrbitFlightController(PanZoomController):
         "mouse2": ("pan", "drag", (1, 1)),
         "mouse4": ("quickzoom", "peek", 2),
         "wheel": ("zoom", "push", -0.001),
-        "control+wheel":("zoom_new", "push", 0.001),
-        # "alt+wheel": ("fov", "push", -0.01),
-        # "control+wheel": ("speed", "push", -0.001),
+        "control+wheel":("zoom_fov", "push", 0.005),
         "control+mouse1": ("rotate", "drag", (0.005, 0)),
-        # "alt+mouse1": ("rotate", "drag", (0, 0.005)),
         "q": ("roll", "repeat", -2),
         "e": ("roll", "repeat", +2),
         "w": ("move", "repeat", (0, 0, -1)),
@@ -267,7 +264,7 @@ class OrbitFlightController(PanZoomController):
     # def get_speed(self):
     #     return self.speed
     
-    def zoom_new(self, delta: Tuple, rect: Tuple, *, animate=False):
+    def zoom_fov(self, delta: Tuple, rect: Tuple, *, animate=False):
         """Zoom the view with the given amount.
 
         The delta can be either a scalar or 2-element tuple. The zoom
@@ -282,22 +279,22 @@ class OrbitFlightController(PanZoomController):
         """
 
         if animate:
-            action_tuple = ("zoom_new", "push", (1.0, 1.0))
+            action_tuple = ("zoom_fov", "push", (1.0, 1.0))
             action = self._create_action(None, action_tuple, (0.0, 0.0), None, rect)
             action.set_target(delta)
             action.done = True
         elif self._cameras:
-            self._update_zoom_new(delta)
+            self._update_zoom_fov(delta)
             return self._update_cameras()
 
-    def _update_zoom_new(self, delta):
+    def _update_zoom_fov(self, delta):
         
         if isinstance(delta, (int, float)):
             delta = (delta, delta)
         assert isinstance(delta, tuple) and len(delta) == 2
                 
         camera_state = self._get_camera_state()
-        upd_fov = camera_state["fov"]+delta[0]
+        upd_fov = camera_state["fov"] + delta[0]
         
         #limit possible range of fov
         if upd_fov > 170:
