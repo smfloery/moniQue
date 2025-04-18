@@ -178,9 +178,15 @@ class MainDialog(QtWidgets.QDialog):
         self.main_toolbar.addAction(self.btn_mono_vertex)
 
         self.main_toolbar.addSeparator()
-
-        self.btn_open_help = QtWidgets.QAction("Help", self)
-        self.btn_open_help.setIcon(QtGui.QIcon(os.path.join(self.icon_dir, "mActionHelpContents.png")))
+        
+        spacer = QtWidgets.QWidget()
+        spacer.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
+        self.main_toolbar.addWidget(spacer)
+        
+        self.main_toolbar.addSeparator()
+        
+        self.btn_open_help = QtWidgets.QAction("Open documentation on GitHub.", self)
+        self.btn_open_help.setIcon(QtGui.QIcon(os.path.join(self.icon_dir, "help_icon.png")))
         self.btn_open_help.triggered.connect(self.open_help_window)
         self.main_toolbar.addAction(self.btn_open_help)
 
@@ -241,6 +247,8 @@ class MainDialog(QtWidgets.QDialog):
         self.btn_obj_canvas_camera_from_map.triggered.connect(self.obj_canvas_camera_from_map)
         self.btn_obj_canvas_camera_from_map.setEnabled(False)
         self.obj_toolbar.addAction(self.btn_obj_canvas_camera_from_map)
+        
+        self.obj_toolbar.addSeparator()
         
         self.btn_obj_canvas_show_img = QtWidgets.QAction("Show image in 3D canvas.", self)
         self.btn_obj_canvas_show_img.setIcon(QtGui.QIcon(os.path.join(self.icon_dir, "add_image_to_3d_canvas.png")))

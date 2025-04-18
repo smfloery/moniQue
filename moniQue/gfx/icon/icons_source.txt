@@ -3,3 +3,5 @@ ii) all others - QGIS: https://github.com/qgis/QGIS/tree/master/images/themes/de
 
 Kamera (new): https://www.svgrepo.com/svg/490961/camera
 Import icon: https://www.svgrepo.com/svg/108232/import
+
+Help_icon : Self-designed
