@@ -257,8 +257,8 @@ class MainDialog(QtWidgets.QDialog):
         self.btn_obj_canvas_show_img.setCheckable(True)
         self.obj_toolbar.addAction(self.btn_obj_canvas_show_img)
 
-        self.btn_show_cam_pos = QtWidgets.QAction("&Show Camera Position in 3D Canvas", self)
-        self.btn_show_cam_pos.setIcon(QtGui.QIcon(os.path.join(self.icon_dir, "mExtentFromMap.png")))
+        self.btn_show_cam_pos = QtWidgets.QAction("Show/hide camera in 3D Canvas", self)
+        self.btn_show_cam_pos.setIcon(QtGui.QIcon(os.path.join(self.icon_dir, "hide_view_camera_3d.png")))
         self.btn_show_cam_pos.triggered.connect(self.show_cam_pos)
         self.btn_show_cam_pos.setEnabled(False)
         self.btn_show_cam_pos.setCheckable(True)
@@ -1039,7 +1039,13 @@ class MainDialog(QtWidgets.QDialog):
             self.msg_box.setValue(tx+1)
             
             geom_path = os.path.normpath(os.path.join(self.tiles_data["tile_dir"], "%s.ply" % (tile["tid"])))
-            op_path = os.path.normpath(os.path.join(self.tiles_data["op_dir"], "%s.jpg" % (tile["tid"])))
+            # op_path = os.path.normpath(os.path.join(self.tiles_data["op_dir"], "%s.jpg" % (tile["tid"])))
+            op_paths = glob.glob(os.path.normpath(os.path.join(self.tiles_data["op_dir"], "%s.*" % (tile["tid"]))))
+                        
+            if len(op_paths) == 1:
+                op_path = op_paths[0]            
+            else:
+                op_path = None     
                         
             if os.path.exists(geom_path):
                 
@@ -1060,21 +1066,23 @@ class MainDialog(QtWidgets.QDialog):
                                                     positions=verts,
                                                     texcoords=uv.astype(np.float32),
                                                     tid=[int(tile["tid_int"])])
-            
-                if os.path.exists(op_path):
-                    img_ds = gdal.Open(op_path)
-                    img_h = img_ds.RasterYSize
-                    img_w = img_ds.RasterXSize
-                    img_arr = np.zeros((img_h, img_w, 3), dtype=np.uint8)
-                                
-                    for bx in range(3):
-                        bx_arr = img_ds.GetRasterBand(bx+1).ReadAsArray()
-                        img_arr[:, :, bx] = bx_arr
+                if op_path is not None:
+                    if os.path.exists(op_path):
+                        img_ds = gdal.Open(op_path)
+                        img_h = img_ds.RasterYSize
+                        img_w = img_ds.RasterXSize
+                        img_arr = np.zeros((img_h, img_w, 3), dtype=np.uint8)
                                     
-                    img_arr = np.flipud(img_arr)
-                    tex = gfx.Texture(img_arr, dim=2, generate_mipmaps=True)
+                        for bx in range(3):
+                            bx_arr = img_ds.GetRasterBand(bx+1).ReadAsArray()
+                            img_arr[:, :, bx] = bx_arr
+                                        
+                        img_arr = np.flipud(img_arr)
+                        tex = gfx.Texture(img_arr, dim=2, generate_mipmaps=True)
 
-                    mesh_material = gfx.MeshBasicMaterial(map=tex, side="FRONT", pick_write=True)
+                        mesh_material = gfx.MeshBasicMaterial(map=tex, side="FRONT", pick_write=True)
+                    else:
+                        mesh_material = gfx.MeshNormalMaterial(side="FRONT", pick_write=True)
                 else:
                     mesh_material = gfx.MeshNormalMaterial(side="FRONT", pick_write=True)
             
