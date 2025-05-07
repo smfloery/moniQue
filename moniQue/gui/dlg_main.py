@@ -366,6 +366,16 @@ class MainDialog(QtWidgets.QDialog):
         layout.addLayout(main_layout)
         self.setLayout(layout)
         
+        self.img_context_menu = QtWidgets.QMenu(self)
+        self.img_context_menu_align = QtGui.QAction('Align 3D view with camera view', self)
+        self.img_context_menu_align.triggered.connect(self.align_view)
+        self.img_context_menu.addAction(self.img_context_menu_align)
+        
+        # self.img_context_menu_ortho = QtGui.QAction('Generate orthophoto', self)
+        # self.img_context_menu_ortho.triggered.connect(self.show_orthophoto_dlg)
+        # self.img_context_menu.addAction(self.img_context_menu_ortho)
+
+
         self.sel_gid = None
         self.obj_camera_state = None
         self.obj_camera_origin = None
@@ -376,16 +386,8 @@ class MainDialog(QtWidgets.QDialog):
 
         self.cam_dict = {}
         self.cam_list = []
+        self.first_toggle = True
         self.active_camera = None
-        
-        self.img_context_menu = QtWidgets.QMenu(self)
-        self.img_context_menu_align = QtGui.QAction('Align 3D view with camera view', self)
-        self.img_context_menu_align.triggered.connect(self.align_view)
-        self.img_context_menu.addAction(self.img_context_menu_align)
-        
-        # self.img_context_menu_ortho = QtGui.QAction('Generate orthophoto', self)
-        # self.img_context_menu_ortho.triggered.connect(self.show_orthophoto_dlg)
-        # self.img_context_menu.addAction(self.img_context_menu_ortho)
 
 
     def open_help_window(self):
@@ -844,16 +846,10 @@ class MainDialog(QtWidgets.QDialog):
 
 
     def show_cam_pos(self):
-            if self.btn_show_cam_pos.isChecked():
-                for i in self.cam_dict.keys():
-                    self.cam_dict[i]['plane'].visible = True
-                    self.cam_dict[i]['lines'].visible = True
-
-            else:
-                for i in self.cam_dict.keys():
-                    self.cam_dict[i]['plane'].visible = False
-                    self.cam_dict[i]['lines'].visible = False
-
+            for i in self.cam_dict.keys():
+                self.cam_dict[i]['plane'].visible = self.btn_show_cam_pos.isChecked()
+                self.cam_dict[i]['lines'].visible = self.btn_show_cam_pos.isChecked()
+                
             self.obj_canvas.request_draw()
 
     def repaint_cam_pos(self, current_iid, sel_check):
@@ -912,9 +908,12 @@ class MainDialog(QtWidgets.QDialog):
                     positions = [[list(prc),plane_pnts_obj[i]] for i in range(4)]
                     lines = [gfx.Line(gfx.Geometry(positions=positions[i]), gfx.LineMaterial(thickness=1.0, color=(1, 0.65, 0.0), opacity=1)) for i in range(4)]
 
+                    try:
+                        self.cam_dict[current_iid]['plane'].clear()
+                        self.cam_dict[current_iid]['lines'].clear()
+                    except:
+                        pass
 
-                    self.cam_dict[current_iid]['plane'].clear()
-                    self.cam_dict[current_iid]['lines'].clear()
                     self.add_cam_pos_to_obj_canvas(cam_feat['iid'], plane_mesh, lines)
                     
                     self.obj_canvas.request_draw()
@@ -1794,8 +1793,15 @@ class MainDialog(QtWidgets.QDialog):
             self.btn_obj_canvas_show_img.setEnabled(False)
             # self.btn_obj_canvas_show_img.setEnabled(False)
 
-        self.repaint_cam_pos(iid, True)   
+        if self.first_toggle:
+            self.first_toggle = False
+        else:
+            self.repaint_cam_pos(self.prior_iid, False)
+
+        self.repaint_cam_pos(iid, True)
         self.obj_canvas.request_draw()
+
+        self.prior_iid = iid   
         
     def toggle_mono_tool(self):
         if self.btn_mono_tool.isChecked():                  #activate
