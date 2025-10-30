@@ -67,9 +67,10 @@ from PyQt5.QtCore import Qt
 # from .dlg_create import CreateDialog
 from .dlg_orient import OrientDialog
 from .dlg_meta_gcp import GcpMetaDialog
-# from .dlg_meta_export import ExportMetaDialog
+from .dlg_meta_export import ExportMetaDialog
 # from .dlg_import_akon import ImportAkonDialog
 from .dlg_meta_mono import MonoMetaDialog
+from .dlg_orthophoto import OrthophotoDialog
 from ..tools.ImgPickerTool import ImgPickerTool
 from ..tools.MonoMapTool import MonoMapTool
 from ..tools.SelectTool import SelectTool
@@ -116,9 +117,9 @@ class MainDialog(QtWidgets.QDialog):
         self.img_menu.setEnabled(False)
         self.menu.addMenu(self.img_menu)
 
-        # self.export_menu = QtWidgets.QMenu("&Export", self)
-        # self.export_menu.setEnabled(False)
-        # self.menu.addMenu(self.export_menu)
+        self.export_menu = QtWidgets.QMenu("&Export", self)
+        self.export_menu.setEnabled(False)
+        self.menu.addMenu(self.export_menu)
 
         # self.view_menu = QtWidgets.QMenu("&View", self)
         # self.view_menu.setEnabled(False)
@@ -140,9 +141,9 @@ class MainDialog(QtWidgets.QDialog):
         self.import_json_action.triggered.connect(self.import_json)
         self.img_menu.addAction(self.import_json_action)
 
-        # self.export_action = QtWidgets.QAction("&Export Object View to PNG", self)
-        # self.export_action.triggered.connect(self.export_obj_canvas)
-        # self.export_menu.addAction(self.export_action)
+        self.export_action = QtWidgets.QAction("&Export Object View to PNG", self)
+        self.export_action.triggered.connect(self.export_obj_canvas)
+        self.export_menu.addAction(self.export_action)
 
         self.main_toolbar = QtWidgets.QToolBar("Main toolbar")
         self.main_toolbar.setIconSize(QtCore.QSize(24, 24))
@@ -281,7 +282,7 @@ class MainDialog(QtWidgets.QDialog):
         self.obj_renderer = gfx.WgpuRenderer(self.obj_canvas, pixel_ratio=1)
         self.obj_renderer.add_event_handler(self.save_camera_view, "key_down")
         self.obj_scene = gfx.Scene()
-        self.obj_stats = gfx.Stats(viewport=self.obj_renderer)
+        # self.obj_stats = gfx.Stats(viewport=self.obj_renderer)
 
         self.background = gfx.Background(None, gfx.BackgroundMaterial([1, 1, 1, 1]))
         self.obj_scene.add(self.background)
@@ -294,11 +295,10 @@ class MainDialog(QtWidgets.QDialog):
 
         self.cam_lines_grp = gfx.Group()
         self.obj_scene.add(self.cam_lines_grp)
-        
+                
         #fov of the camera appaars to represent the vertical FOV!
         self.obj_camera = gfx.PerspectiveCamera(fov=45, depth_range=(1, 100000))
-        
-        
+                
         self.obj_canvas.request_draw()
 
         self.obj_controller = OrbitFlightController(self.obj_camera, speed=2500, register_events=self.obj_renderer, damping=0)
@@ -371,10 +371,9 @@ class MainDialog(QtWidgets.QDialog):
         self.img_context_menu_align.triggered.connect(self.align_view)
         self.img_context_menu.addAction(self.img_context_menu_align)
         
-        # self.img_context_menu_ortho = QtGui.QAction('Generate orthophoto', self)
-        # self.img_context_menu_ortho.triggered.connect(self.show_orthophoto_dlg)
-        # self.img_context_menu.addAction(self.img_context_menu_ortho)
-
+        self.img_context_menu_ortho = QtGui.QAction('Generate orthophoto', self)
+        self.img_context_menu_ortho.triggered.connect(self.show_orthophoto_dlg)
+        self.img_context_menu.addAction(self.img_context_menu_ortho)
 
         self.sel_gid = None
         self.obj_camera_state = None
@@ -397,36 +396,48 @@ class MainDialog(QtWidgets.QDialog):
     def save_camera_view(self, event):
         if event.key == "F1":
             
-            curr_cam = self.obj_camera.get_state()                                    
-            (canvas_h, canvas_w) = self.obj_canvas.get_logical_size()
+            curr_cam = self.obj_camera.get_state()                 
+            (canvas_w, canvas_h) = self.obj_canvas.get_logical_size()
             
-            #https://github.com/pygfx/pygfx/blob/dc443c4b6356cdd276c1cbfdab1b15d2142a07dc/pygfx/cameras/_perspective.py#L291
-            #it appars that the vfov and hfov are somehow manipulated to maintain aspect; Directly using them in separate
-            #rendering leads to completely different extents; By adjusting it in that way, inspired by the above link, 
-            #its somehow similar to what was seen in the scene --> not applied anymore
-            # vfov = np.deg2rad(curr_cam["fov"])
-            # hfov = vfov*(canvas_w/canvas_h)#*(canvas_w/canvas_h) #second multiplication to correct for aspect ratio maintenance
-            # vfov *= (1 / (canvas_h / canvas_w))
-            
-            #through the maintain_aspect=True of the camera it appaers that the view is so adjusted as if hfov is equal to vfov; At least using these settings
-            #leads to the best render results in monique-helper; Only empirically tested; I have no idea why but it does somehow make sense?
-            #therefore we only use "fov" in the output json
-            vfov = np.deg2rad(curr_cam["fov"])
-            # hfov = vfov
+            canvas_vfov = curr_cam["fov"]
+            canvas_hfov = canvas_vfov * (canvas_w/canvas_h)
             
             cam_pos = self.obj_camera.local.position + self.min_xyz
             cam_rmat_pygfx = self.obj_camera.local.rotation_matrix[:3, :3]  #already transposed in contrast to self.obj_camera.view_matrix; otherweise the same
             alzekas = rot2alzeka(cam_rmat_pygfx)
             
             if self.active_camera is not None:
-                width = self.active_camera.img_w
-                height = self.active_camera.img_h
+                img_w = self.active_camera.img_w
+                img_h = self.active_camera.img_h
                 name = self.active_camera.iid
+                
+                if img_w > img_h:
+                    img_w_canvas = canvas_w
+                    img_h_canvas = img_w_canvas * (img_h/img_w)
+                    
+                    if img_h_canvas > canvas_h:
+                        self.msg_bar.pushMessage("Error", "Image size greater than canvas, increase canvas!", level=Qgis.Critical, duration=3)
+                        raise ValueError("Could not save camera position!")
+                    
+                else:
+                    img_h_canvas = canvas_h
+                    img_w_canvas = img_h_canvas * (img_w/img_h)
+
+                    if img_w_canvas > canvas_w:
+                        self.msg_bar.pushMessage("Error", "Image size greater than canvas, increase canvas!", level=Qgis.Critical, duration=3)
+                        raise ValueError("Could not save camera position!")
+                
+                
+                img_vfov = canvas_vfov * (img_h_canvas / canvas_h)   #rescale the FOV of the canvas to the FOV of the image
+                img_hfov = img_vfov * (img_w / img_h)
+                
             else:
-                width = None
-                height = None
+                img_w = None
+                img_h = None
                 name = "unknown"
-                        
+                img_vfov = None
+                img_hfov = None
+                    
             cam_dict = {name: {"project":self.gpkg_path,
                                "X0":cam_pos[0],
                                "Y0":cam_pos[1],
@@ -434,14 +445,19 @@ class MainDialog(QtWidgets.QDialog):
                                "alpha":alzekas[0, 0],
                                "zeta":alzekas[0, 1],
                                "kappa":alzekas[0, 2],
-                               "fov":vfov,
-                               "img_w":width,
-                               "img_h":height
-                               }
+                               "img_vfov":img_vfov,
+                               "img_hfov":img_hfov,
+                               "img_w":img_w,
+                               "img_h":img_h,
+                               "canvas_h":canvas_h,
+                               "canvas_w":canvas_w,
+                               "canvas_vfov":canvas_vfov,
+                               "canvas_hfov":canvas_hfov,
+                               "near":self.obj_camera.near,
+                               "far":self.obj_camera.far}
                         }
             
-                        
-            json_path = QtWidgets.QFileDialog.getSaveFileName(None, "JSON path", name if name is not "unknown" else "", ("Json (*.json)"))[0]
+            json_path = QtWidgets.QFileDialog.getSaveFileName(None, "JSON path", os.path.join(os.path.dirname(self.gpkg_path), name if name is not "unknown" else ""), ("Json (*.json)"))[0]
             if json_path:
                 json_cam = json.dumps(cam_dict, indent=4, ensure_ascii=False).encode("utf-8")
                 with open(json_path, "w", encoding="utf-8") as json_file:
@@ -844,7 +860,6 @@ class MainDialog(QtWidgets.QDialog):
 
                 self.add_cam_pos_to_obj_canvas(cam_feat['iid'], plane_mesh, lines)
 
-
     def show_cam_pos(self):
             for i in self.cam_dict.keys():
                 self.cam_dict[i]['plane'].visible = self.btn_show_cam_pos.isChecked()
@@ -918,7 +933,6 @@ class MainDialog(QtWidgets.QDialog):
                     
                     self.obj_canvas.request_draw()
         
-
     def add_cam_pos_to_obj_canvas(self, iid, plane_mesh, lines):
         self.cam_dict[iid] = {'plane':gfx.Group(visible=False), 'lines':gfx.Group(visible=False)}
         
@@ -948,7 +962,6 @@ class MainDialog(QtWidgets.QDialog):
                 #         self.cam_dict[cam_feat['iid']].add(i)
 
                 # self.obj_scene.add(self.cam_dict[cam_feat['iid']])
-
 
     # def add_cam_pos_to_obj_canvas(self, current_iid = -1):
     #     #TODO: currently the camera geometry is created all over again; This can be implemented more efficiently;
@@ -1038,14 +1051,18 @@ class MainDialog(QtWidgets.QDialog):
             self.msg_box.setValue(tx+1)
             
             geom_path = os.path.normpath(os.path.join(self.tiles_data["tile_dir"], "%s.ply" % (tile["tid"])))
-            # op_path = os.path.normpath(os.path.join(self.tiles_data["op_dir"], "%s.jpg" % (tile["tid"])))
-            op_paths = glob.glob(os.path.normpath(os.path.join(self.tiles_data["op_dir"], "%s.*" % (tile["tid"]))))
-                        
-            if len(op_paths) == 1:
-                op_path = op_paths[0]            
-            else:
-                op_path = None     
-                        
+            
+            op_path = None
+            op_exts = ["tif", "tiff", "jpeg", "jpg", "png"]
+            
+            for ext in op_exts:
+                
+                ext_path = os.path.normpath(os.path.join(self.tiles_data["op_dir"], f"{tile["tid"]}.{ext}"))
+                
+                if os.path.exists(ext_path):
+                    op_path = ext_path
+                    break        
+                                    
             if os.path.exists(geom_path):
                 
                 tile_mesh = o3d.io.read_triangle_mesh(geom_path)
@@ -1170,9 +1187,53 @@ class MainDialog(QtWidgets.QDialog):
                     self.terrain.children[int(tile["tid_int"])].visible = True
                 else:
                     self.terrain.children[int(tile["tid_int"])].visible = False
-                    
-            self.obj_renderer.render(self.obj_scene, self.obj_camera, flush=True) #flash=True if fps not used anymore
             
+            if self.active_camera is None:
+                self.obj_renderer.render(self.obj_scene, self.obj_camera, flush=True) #flash=True if fps not used anymore
+
+            # geometry = gfx.Geometry(positions=[(0, 0, 0)])
+            # ob = gfx.Points(geometry, gfx.PointsMaterial(color=(1, 0, 0, 1), size=5))
+            
+            else:
+                
+                self.obj_renderer.render(self.obj_scene, self.obj_camera, flush=True) #flash=True if fps not used anymore
+                
+                # self.obj_renderer.render(self.obj_scene, self.obj_camera, flush=False) #flash=True if fps not used anymore
+                
+                # canvas_w, canvas_h = self.obj_canvas.get_logical_size()
+                
+                # img_w = self.active_camera.img_w
+                # img_h = self.active_camera.img_h
+                # img_ratio = img_w/img_h
+                
+                # if img_w > img_h:
+                    
+                #     lx = -1
+                #     rx = +1 
+                    
+                #     ty = (canvas_w*(img_h/img_w)/canvas_h)
+                #     if ty > 1:
+                #         ty = 1
+                #     ly = -ty
+                    
+                # else:
+                #     ty = 1
+                #     ly = -1
+                #     lx = -(canvas_h*(img_w/img_h)/canvas_w)
+                #     if lx < -1:
+                #         lx = 1
+                #     rx = -  lx             
+
+                # geometry = gfx.Geometry(positions=[(lx, ty, 0), 
+                #                                     (rx, ty, 0),
+                #                                     (rx, ly, 0),
+                #                                     (lx, ly, 0),
+                #                                     (lx, ty, 0)])    
+                
+                # ob = gfx.Line(geometry, gfx.LineMaterial(color=(1, 0, 0, 1), thickness=2))
+                # self.obj_renderer.render(ob, gfx.NDCCamera())
+
+
             if self.initial_render is True:
                 self.msg_box.setValue(len(self.tiles_data["tiles"])+1)
                 QtWidgets.QApplication.instance().restoreOverrideCursor()
@@ -1594,61 +1655,79 @@ class MainDialog(QtWidgets.QDialog):
         except:
             print('No project seems to be loaded!')
 
-    # def export_obj_canvas(self):
-    #     try:
-    #         def_res = [str(self.active_camera.img_w), str(self.active_camera.img_h)]
-    #     except:
-    #         def_res = ['1920','1080']
-
-    #     def_name = self.parent.project_name
-
-    #     export_dialog = ExportMetaDialog(def_res, def_name)
-    #     export_dialog.exec_()
-    #     depth_set = False
-
-    #     if export_dialog.ok == True:
-    #         export_path = QtWidgets.QFileDialog.getExistingDirectory(self)
-    #     else:
-    #         export_path=''
-
-    #     if len(export_path) > 0:
-    #         resolution = [int(export_dialog.res_width.text()), int(export_dialog.res_height.text())]
-            
-    #         offscreen_canvas = offscreenCanvas(size=(resolution[0], resolution[1]), pixel_ratio=1)
-    #         offscreen_renderer = gfx.WgpuRenderer(offscreen_canvas)
-
-    #         if export_dialog.depth_offset.text() == '':
-    #             pass
-    #         else:
-    #             if int(export_dialog.depth_offset.text()) > 0:
-    #                 depth_set = True  
-    #                 curr_depth = self.obj_camera.depth_range
-    #                 self.obj_camera.depth_range = (int(export_dialog.depth_offset.text()), curr_depth[1])
-    #             else:
-    #                 pass
-
-    #         for pnts in self.obj_gcps_grp.children:
-    #             pnts.visible = False
-
-    #         bg = gfx.Background(None, gfx.BackgroundMaterial([0.086, 0.475, 0.671, 1]))
-    #         self.obj_scene.remove(self.background)
-    #         self.obj_scene.add(bg)
-
-    #         offscreen_canvas.request_draw(offscreen_renderer.render(self.obj_scene, self.obj_camera))
-    #         img = Image.fromarray(np.asarray(offscreen_canvas.draw()))
-    #         img.save(os.path.join(export_path, export_dialog.file_name.text() + "_render.png"))
-
-    #         self.obj_scene.remove(bg)
-    #         self.obj_scene.add(self.background)
-
-    #         for pnts in self.obj_gcps_grp.children:
-    #             pnts.visible = True
-
-    #         if depth_set:
-    #             self.obj_camera.depth_range = (curr_depth[0], curr_depth[1])
+    def get_rendered_scene(self):
         
-    #     else:
-    #         pass
+        (canvas_w, canvas_h) = self.obj_canvas.get_logical_size()
+        
+        offscreen_canvas = offscreenCanvas(size=(canvas_w, canvas_h), pixel_ratio=1)
+        offscreen_renderer = gfx.WgpuRenderer(offscreen_canvas)
+        
+        for pnts in self.obj_gcps_grp.children:
+                pnts.visible = False
+        
+        offscreen_canvas.request_draw(offscreen_renderer.render(self.obj_scene, self.obj_camera))
+        img = np.asarray(offscreen_canvas.draw())
+        
+        for pnts in self.obj_gcps_grp.children:
+                pnts.visible = True
+        
+        return img[:, :, :3] #contains additional alpha channel we don't need
+        
+    def export_obj_canvas(self):
+        try:
+            def_res = [str(self.active_camera.img_w), str(self.active_camera.img_h)]
+        except:
+            def_res = ['1920','1080']
+
+        def_name = self.parent.project_name
+
+        export_dialog = ExportMetaDialog(def_res, def_name)
+        export_dialog.exec_()
+        depth_set = False
+
+        if export_dialog.ok == True:
+            export_path = QtWidgets.QFileDialog.getExistingDirectory(self)
+        else:
+            export_path=''
+
+        if len(export_path) > 0:
+            resolution = [int(export_dialog.res_width.text()), int(export_dialog.res_height.text())]
+            
+            offscreen_canvas = offscreenCanvas(size=(resolution[0], resolution[1]), pixel_ratio=1)
+            offscreen_renderer = gfx.WgpuRenderer(offscreen_canvas)
+
+            if export_dialog.depth_offset.text() == '':
+                pass
+            else:
+                if int(export_dialog.depth_offset.text()) > 0:
+                    depth_set = True  
+                    curr_depth = self.obj_camera.depth_range
+                    self.obj_camera.depth_range = (int(export_dialog.depth_offset.text()), curr_depth[1])
+                else:
+                    pass
+
+            # for pnts in self.obj_gcps_grp.children:
+            #     pnts.visible = False
+
+            # bg = gfx.Background(None, gfx.BackgroundMaterial([0.086, 0.475, 0.671, 1]))
+            # self.obj_scene.remove(self.background)
+            # self.obj_scene.add(bg)
+
+            offscreen_canvas.request_draw(offscreen_renderer.render(self.obj_scene, self.obj_camera))
+            img = Image.fromarray(np.asarray(offscreen_canvas.draw()))
+            img.save(os.path.join(export_path, export_dialog.file_name.text() + "_render.png"))
+
+            # self.obj_scene.remove(bg)
+            # self.obj_scene.add(self.background)
+
+            # for pnts in self.obj_gcps_grp.children:
+            #     pnts.visible = True
+
+            # if depth_set:
+            #     self.obj_camera.depth_range = (curr_depth[0], curr_depth[1])
+        
+        else:
+            pass
         
     def show_image_menu(self, point):
         clicked_list_item = self.img_list.itemAt(point.x(), point.y())
@@ -1669,7 +1748,9 @@ class MainDialog(QtWidgets.QDialog):
         self.set_obj_canvas_camera(self.camera_collection[self.img_context_menu.title()].asdict())
     
     def show_orthophoto_dlg(self):
-        pass
+        orthophoto_dlg = OrthophotoDialog(main_dlg=self.parent)
+        # orthophoto_dlg.set_main_dlg(self.parent)  #self.parent refers to the main moniQue dialog
+        orthophoto_dlg.exec_()
     
     def camera_clicked(self, item):
         
@@ -1863,7 +1944,7 @@ class MainDialog(QtWidgets.QDialog):
     def activate_gui_elements(self):
         self.img_list.setEnabled(True)
         self.img_menu.setEnabled(True)
-        # self.export_menu.setEnabled(True)
+        self.export_menu.setEnabled(True)
         # self.view_menu.setEnabled(True)
         self.btn_reset_obj_canvas_camera.setEnabled(True)
         self.btn_obj_canvas_camera_from_map.setEnabled(True)

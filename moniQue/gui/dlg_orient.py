@@ -35,6 +35,7 @@ import operator
 from ..lsq import srs_lm
 from ..helpers import calc_hfov, calc_vfov, alzeka2rot, alpha2azi, rot2alzeka
 from .dlg_meta_offset import OffsetMetaDialog
+from .dlg_matching import MatchingDialog
 
 import pygfx as gfx
 
@@ -116,10 +117,12 @@ class OrientDialog(QtWidgets.QDialog):
         self.btn_offset_dlg.triggered.connect(self.show_offset_dlg)
         table_toolbar.addAction(self.btn_offset_dlg)
 
-        # self.offset = {'offset_x': 0.0, 
-        #                'offset_y': 0.0, 
-        #                'offset_z': 0.0}
-    
+        
+        # self.btn_matchng_dlg = QtWidgets.QAction("Feature point matching.", self)
+        # self.btn_matchng_dlg.setIcon(QtGui.QIcon(os.path.join(self.icon_dir, "matching.png")))
+        # self.btn_matchng_dlg.triggered.connect(self.show_matching_dlg)
+        # table_toolbar.addAction(self.btn_matchng_dlg)
+        
         self.table_gcps = QtWidgets.QTableWidget()
         
         self.table_gcps.setSizeAdjustPolicy(QtWidgets.QAbstractScrollArea.AdjustToContents)
@@ -657,7 +660,12 @@ class OrientDialog(QtWidgets.QDialog):
             self.parent.btn_mono_tool.setEnabled(True)
             self.parent.btn_mono_select.setEnabled(True)
             self.parent.btn_mono_vertex.setEnabled(True)
-        
+    
+    def show_matching_dlg(self):
+        matching_dlg = MatchingDialog()
+        matching_dlg.set_main_dlg(self.parent)  #self.parent refers to the main moniQue dialog
+        matching_dlg.exec_()
+    
     def show_offset_dlg(self):
         # self.offset = None
         # self.first_time = True

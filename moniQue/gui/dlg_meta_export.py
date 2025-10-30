@@ -39,10 +39,10 @@ class ExportMetaDialog(QDialog):
         self.depth_offset.setPlaceholderText('0')
 
         w_res_validator = QIntValidator()
-        w_res_validator.setRange(1, 7680)
+        w_res_validator.setRange(1, 9999)
 
         h_res_validator = QIntValidator()
-        h_res_validator.setRange(1, 4320)
+        h_res_validator.setRange(1, 9999)
 
         offset_validator = QIntValidator()
         offset_validator.setRange(1, 9999999)
