@@ -8,8 +8,8 @@
    version="1.1"
    id="svg1"
    inkscape:version="1.4.2 (f4327f4, 2025-05-13)"
-   sodipodi:docname="help_icon.svg"
-   inkscape:export-filename="help_icon.png"
+   sodipodi:docname="not_icon.svg"
+   inkscape:export-filename="not_icon.png"
    inkscape:export-xdpi="96"
    inkscape:export-ydpi="96"
    xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
@@ -27,8 +27,8 @@
      inkscape:deskcolor="#d1d1d1"
      inkscape:document-units="mm"
      inkscape:zoom="15.70285"
-     inkscape:cx="5.6996023"
-     inkscape:cy="27.733819"
+     inkscape:cx="15.443057"
+     inkscape:cy="27.542771"
      inkscape:window-width="1920"
      inkscape:window-height="1177"
      inkscape:window-x="1912"
@@ -42,7 +42,7 @@
      inkscape:groupmode="layer"
      id="layer1">
     <ellipse
-       style="fill:none;stroke:#000000;stroke-width:0.460494;stroke-linejoin:bevel;stroke-dasharray:none;paint-order:markers stroke fill;stroke-opacity:1"
+       style="display:none;fill:none;stroke:#000000;stroke-width:0.460494;stroke-linejoin:bevel;stroke-dasharray:none;stroke-opacity:1;paint-order:markers stroke fill"
        id="path1"
        cx="3.175"
        cy="3.175"
@@ -50,14 +50,14 @@
        ry="2.9447532" />
     <text
        xml:space="preserve"
-       style="font-weight:bold;font-size:5.29167px;line-height:1.5;font-family:Roboto;-inkscape-font-specification:'Roboto Bold';text-align:start;text-decoration-color:#000000;letter-spacing:0px;writing-mode:lr-tb;direction:ltr;text-anchor:start;fill:#218bbf;fill-opacity:0.741573;stroke:none;stroke-width:0.79375;stroke-linecap:round;stroke-linejoin:round;stroke-opacity:0.747917;paint-order:markers stroke fill"
-       x="1.8947157"
-       y="5.0663586"
-       id="text1"><tspan
+       style="font-style:normal;font-variant:normal;font-weight:bold;font-stretch:normal;font-size:5.29167px;line-height:1.5;font-family:Roboto;-inkscape-font-specification:'Roboto Bold';text-align:start;text-decoration-color:#000000;letter-spacing:0px;writing-mode:lr-tb;direction:ltr;text-anchor:start;fill:#bf2121;fill-opacity:0.74157304;stroke:none;stroke-width:0.79375;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;paint-order:markers stroke fill"
+       x="1.8210766"
+       y="4.5728483"
+       id="text2"><tspan
          sodipodi:role="line"
-         id="tspan1"
-         style="fill:#218bbf;fill-opacity:0.741573;stroke:none;stroke-width:0.79375"
-         x="1.8947157"
-         y="5.0663586">?</tspan></text>
+         id="tspan2"
+         style="font-style:normal;font-variant:normal;font-weight:bold;font-stretch:normal;font-size:5.29167px;font-family:Roboto;-inkscape-font-specification:'Roboto Bold';fill:#bf2121;fill-opacity:0.74157304;stroke:none;stroke-width:0.79375;stroke-opacity:1"
+         x="1.8210766"
+         y="4.5728483">x</tspan></text>
   </g>
 </svg>

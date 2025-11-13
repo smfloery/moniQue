@@ -20,9 +20,10 @@ class SelectTool(QgsMapTool):
         self.isEmittingPoint = False
         self.rubberBand.reset(QgsWkbTypes.PolygonGeometry)
 
-    def set_layers(self, img_lyr, map_lyr):
+    def set_layers(self, img_lyr, map_lyr, vex_lyr):
         self.img_lyr = img_lyr
         self.map_lyr = map_lyr
+        self.vex_lyr = vex_lyr
     
     def canvasPressEvent(self, e):
         if e.button() == Qt.LeftButton:
@@ -47,19 +48,30 @@ class SelectTool(QgsMapTool):
             self.reset()
             
             img_sel_feat_ids = self.img_lyr.selectedFeatureIds()
+            
             if len(img_sel_feat_ids) > 0:
                 self.map_lyr.selectByIds(img_sel_feat_ids)
-    
+                
+                qgis_expr = []
+                for fid in img_sel_feat_ids:
+                    qgis_expr.append("\"lid\"=%i"%(fid))
+                
+                qgis_expr_str = " or ".join(qgis_expr)
+                self.vex_lyr.selectByExpression(qgis_expr_str)
+                
     def keyPressEvent(self, e):
         if e.key() == Qt.Key_Delete:
             self.map_lyr.startEditing()
             self.img_lyr.startEditing()
+            self.vex_lyr.startEditing()
             
             self.map_lyr.deleteSelectedFeatures()
             self.img_lyr.deleteSelectedFeatures()
+            self.vex_lyr.deleteSelectedFeatures()
             
             self.map_lyr.commitChanges()
             self.img_lyr.commitChanges()
+            self.vex_lyr.commitChanges()
         else:
             pass
                 
@@ -100,5 +112,7 @@ class SelectTool(QgsMapTool):
     def deactivate(self):
         self.map_lyr.removeSelection()
         self.img_lyr.removeSelection()
+        self.vex_lyr.removeSelection()
+        
         QgsMapTool.deactivate(self)
         self.deactivated.emit()

@@ -184,7 +184,6 @@ class VertexTool(QgsMapTool):
             else:
                 
                 obj_coord = self.monoplot(e)
-                print(obj_coord)
                 
                 if obj_coord is not None:
                 
@@ -300,9 +299,7 @@ class VertexTool(QgsMapTool):
                 
                 curr_mouse_pos = self.toMapCoordinates(e.pos())
                 obj_coord = self.monoplot(e)
-                
-                print(obj_coord)
-                
+                                
                 if obj_coord is not None:
                     
                     obj_pnt = QgsPointXY(obj_coord[0], obj_coord[1])
@@ -383,6 +380,11 @@ class VertexTool(QgsMapTool):
     
     def set_camera(self, camera):
         self.camera = camera
+        print(self.camera)
+        
+    def set_covar_samples(self, smpls, dir2pnts):
+        self.smpls = smpls
+        self.dir2pnts = dir2pnts         
     
     def set_minxyz(self, min_xyz):
         self.min_xyz = min_xyz

@@ -207,11 +207,11 @@ class CreateDialog(QtWidgets.QDialog):
                               QgsField("obj_y0_std", QtCore.QVariant.Double, "double", 10, 3),
                               QgsField("obj_z0_std", QtCore.QVariant.Double, "double", 10, 3),
                               QgsField("alpha", QtCore.QVariant.Double, "double", 10, 5),
-                              QgsField("zeta", QtCore.QVariant.Double, "double", 10, 3),
+                              QgsField("zeta", QtCore.QVariant.Double, "double", 10, 5),
                               QgsField("kappa", QtCore.QVariant.Double, "double", 10, 5),
-                              QgsField("alpha_std", QtCore.QVariant.Double, "double", 10, 3),
+                              QgsField("alpha_std", QtCore.QVariant.Double, "double", 10, 5),
                               QgsField("zeta_std", QtCore.QVariant.Double, "double", 10, 5),
-                              QgsField("kappa_std", QtCore.QVariant.Double, "double", 10, 3),
+                              QgsField("kappa_std", QtCore.QVariant.Double, "double", 10, 5),
                               QgsField("s0", QtCore.QVariant.Double, "double", 10, 1),
                               QgsField("img_x0", QtCore.QVariant.Double, "double", 10, 1),
                               QgsField("img_y0", QtCore.QVariant.Double, "double", 10, 1),
@@ -220,7 +220,10 @@ class CreateDialog(QtWidgets.QDialog):
                               QgsField("img_w", QtCore.QVariant.Int),
                               QgsField("img_h", QtCore.QVariant.Int),
                               QgsField("hfov", QtCore.QVariant.Double, "double", 6, 3),
-                              QgsField("vfov", QtCore.QVariant.Double, "double", 6, 3)])
+                              QgsField("vfov", QtCore.QVariant.Double, "double", 6, 3),
+                              QgsField("min_d_mono", QtCore.QVariant.Double, "double", 5, 1),
+                              QgsField("xx_std", QtCore.QVariant.Double, "double", 4, 1),
+                              QgsField("yy_std", QtCore.QVariant.Double, "double", 4, 1)])
         cam_lyr.updateFields() 
                 
         gcps_lyr = QgsVectorLayer("Point?crs=%s" % (crs), "gcps", "memory")
@@ -253,16 +256,30 @@ class CreateDialog(QtWidgets.QDialog):
         map_line_pr = map_line_lyr.dataProvider()
         map_line_pr.addAttributes([QgsField("iid", QtCore.QVariant.String), 
                                    QgsField("type", QtCore.QVariant.String), 
-                                   QgsField("comment", QtCore.QVariant.String)]);
+                                   QgsField("comment", QtCore.QVariant.String)])
         map_line_lyr.updateFields() 
         
         map_line_pnts_lyr = QgsVectorLayer("Point?crs=%s" % (crs), "lines_vx", "memory")
+        map_line_pnts_pr = map_line_pnts_lyr.dataProvider()
+        map_line_pnts_pr.addAttributes([QgsField("iid", QtCore.QVariant.String),
+                                        QgsField("lid", QtCore.QVariant.String),  
+                                        QgsField("obj_x", QtCore.QVariant.Double, "double", 10, 3),
+                                        QgsField("obj_y", QtCore.QVariant.Double, "double", 10, 3),
+                                        QgsField("obj_z", QtCore.QVariant.Double, "double", 10, 3),
+                                        QgsField("obj_x_std", QtCore.QVariant.Double, "double", 10, 3),
+                                        QgsField("obj_y_std", QtCore.QVariant.Double, "double", 10, 3),
+                                        QgsField("obj_z_std", QtCore.QVariant.Double, "double", 10, 3),
+                                        QgsField("img_x", QtCore.QVariant.Double, "double", 5, 1),
+                                        QgsField("img_y", QtCore.QVariant.Double, "double", 5, 1),
+                                        QgsField("pval", QtCore.QVariant.Double, "double", 3, 2),
+                                        QgsField("max_evec_dir", QtCore.QVariant.Double, "double", 1, 5)])
+        map_line_pnts_lyr.updateFields() 
         
         img_line_lyr = QgsVectorLayer("LineString", "lines_img", "memory")
         img_line_pr = img_line_lyr.dataProvider()
         img_line_pr.addAttributes([QgsField("iid", QtCore.QVariant.String), 
                                    QgsField("type", QtCore.QVariant.String), 
-                                   QgsField("comment", QtCore.QVariant.String)]);
+                                   QgsField("comment", QtCore.QVariant.String)])
         img_line_lyr.updateFields() 
         
         img_line_pnts_lyr = QgsVectorLayer("Point", "lines_img_vx", "memory")

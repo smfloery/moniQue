@@ -32,8 +32,7 @@ from PyQt5.QtGui import QCursor
 from PyQt5.QtCore import Qt
 
 import operator
-from ..lsq import srs_lm
-from ..helpers import calc_hfov, calc_vfov, alzeka2rot, alpha2azi, rot2alzeka
+from ..helpers import calc_hfov, calc_vfov, alzeka2rot, alpha2azi, rot2alzeka, srs_lm
 from .dlg_meta_offset import OffsetMetaDialog
 from .dlg_matching import MatchingDialog
 

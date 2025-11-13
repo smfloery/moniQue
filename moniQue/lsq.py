@@ -40,7 +40,6 @@ def srs_lm(data, offset):
 
     return r
 
-
 def world2img(gcp_obj, p):
 
     """Transform world coordinates in camera coordinates.

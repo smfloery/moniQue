@@ -21,12 +21,12 @@
  *                                                                         *
  ***************************************************************************/
 """
-from qgis.PyQt.QtCore import Qt
+from qgis.PyQt.QtCore import Qt, QVariant
 from qgis.PyQt.QtGui import QIcon
-from qgis.PyQt.QtWidgets import QAction, QApplication, QFileDialog, QProgressDialog
+from qgis.PyQt.QtWidgets import QAction, QApplication, QFileDialog
 
-from qgis.core import QgsProject, QgsVectorLayer, QgsJsonUtils
-from qgis.gui import QgsMapToolPan, QgsMessageBar
+from qgis.core import QgsProject, QgsVectorLayer, QgsJsonUtils, QgsVectorLayer, QgsField, NULL
+from qgis.gui import QgsMapToolPan
 
 # # Initialize Qt resources from file resources.py
 # from .resources import *
@@ -70,7 +70,7 @@ class MoniQue:
         self.map_region_qml_path = os.path.join(self.plugin_dir, "gfx", "qml", "region_map.qml")
         self.map_gcps_qml_path = os.path.join(self.plugin_dir, "gfx", "qml", "gcps_map.qml")
         self.img_gcps_qml_path = os.path.join(self.plugin_dir, "gfx", "qml", "gcps_img.qml")
-        
+        self.map_line_vx_qml_path = os.path.join(self.plugin_dir, "gfx", "qml", "lines_map_vx.qml")
         #map_canvas is the canvas of the QGIS main window
         self.map_canvas = iface.mapCanvas()
         
@@ -130,37 +130,117 @@ class MoniQue:
         self.cam_lyr.setProviderEncoding(u'UTF-8')
         self.cam_lyr.dataProvider().setEncoding(u'UTF-8')
         self.cam_lyr.loadNamedStyle(self.cam_qml_path)
-                        
-        gpkg_map_lines_lyr = self.gpkg_path + "|layername=lines"
-        self.map_line_lyr = QgsVectorLayer(gpkg_map_lines_lyr, "lines", "ogr")
+        
+        #add missing fields to vertex layer in case they are not present
+        cam_lyr_pr = self.cam_lyr.dataProvider()
+        field_names = [field.name() for field in cam_lyr_pr.fields()]
+        
+        pot_fields = {"min_d_mono": QgsField("min_d_mono", QVariant.Double, "double", 6, 3),
+                      "xx_std": QgsField("xx_std", QVariant.Double, "double", 6, 3),
+                      "yy_std": QgsField("yy_std", QVariant.Double, "double", 6, 3),
+                      "nr_trials": QgsField("nr_trials", QVariant.Int)}
+        
+        add_fields = []        
+        for name, qfield in pot_fields.items():
+            if name not in field_names:
+                add_fields.append(qfield)
+        
+        cam_lyr_pr.addAttributes(add_fields)
+        self.cam_lyr.updateFields() 
+        
+        mono_idx = self.cam_lyr.fields().indexOf('min_d_mono')
+        xx_idx = self.cam_lyr.fields().indexOf('xx_std')
+        yy_idx = self.cam_lyr.fields().indexOf('yy_std')
+        trials_idx = self.cam_lyr.fields().indexOf("nr_trials")
+        
+        for feat in self.cam_lyr.getFeatures():
+            if feat[mono_idx] == NULL:
+                self.cam_lyr.startEditing()
+                self.cam_lyr.changeAttributeValue(feat.id(), mono_idx, 100)
+                self.cam_lyr.commitChanges()
+                
+            if feat[xx_idx] == NULL:
+                self.cam_lyr.startEditing()
+                self.cam_lyr.changeAttributeValue(feat.id(), xx_idx, 1) 
+                self.cam_lyr.commitChanges()
+            
+            if feat[yy_idx] == NULL:
+                self.cam_lyr.startEditing()
+                self.cam_lyr.changeAttributeValue(feat.id(), yy_idx, 1) 
+                self.cam_lyr.commitChanges()
+
+            if feat[trials_idx] == NULL:
+                self.cam_lyr.startEditing()
+                self.cam_lyr.changeAttributeValue(feat.id(), trials_idx, 1000) 
+                self.cam_lyr.commitChanges()
+
+        lyr_name = "lines"
+        gpkg_map_lines_lyr = f"{self.gpkg_path}|layername={lyr_name}"
+        self.map_line_lyr = QgsVectorLayer(gpkg_map_lines_lyr, lyr_name, "ogr")
         self.map_line_lyr.loadNamedStyle(self.map_line_qml_path)
-       
-        gpkg_img_lines_lyr = self.gpkg_path + "|layername=lines_img"
-        self.img_line_lyr = QgsVectorLayer(gpkg_img_lines_lyr, "lines_img", "ogr")
+
+        lyr_name = "lines_img"
+        gpkg_img_lines_lyr = f"{self.gpkg_path}|layername={lyr_name}"
+        self.img_line_lyr = QgsVectorLayer(gpkg_img_lines_lyr, lyr_name, "ogr")
         self.img_line_lyr.loadNamedStyle(self.img_line_qml_path)       
 
-        gpkg_map_gcps_lyr = self.gpkg_path + "|layername=gcps"
-        self.map_gcps_lyr = QgsVectorLayer(gpkg_map_gcps_lyr, "gcps", "ogr")
+        
+        lyr_name = "gcps"
+        gpkg_map_gcps_lyr = f"{self.gpkg_path}|layername={lyr_name}"
+        self.map_gcps_lyr = QgsVectorLayer(gpkg_map_gcps_lyr, lyr_name, "ogr")
+        # field_names = [field.name() for field in self.map_gcps_lyr.fields()]
+
+        self.map_gcps_lyr = self.map_gcps_lyr
         self.map_gcps_lyr.loadNamedStyle(self.map_gcps_qml_path)       
         
-        gpkg_img_gcps_lyr = self.gpkg_path + "|layername=gcps_img"
-        self.img_gcps_lyr = QgsVectorLayer(gpkg_img_gcps_lyr, "gcps_img", "ogr")
+        lyr_name = "gcps_img"
+        gpkg_img_gcps_lyr = f"{self.gpkg_path}|layername={lyr_name}"
+        self.img_gcps_lyr = QgsVectorLayer(gpkg_img_gcps_lyr, lyr_name, "ogr")
         self.img_gcps_lyr.loadNamedStyle(self.img_gcps_qml_path)       
-                    
+        
+        lyr_name = "lines_vx"
+        gpkg_map_line_vx_lyr = f"{self.gpkg_path}|layername={lyr_name}"
+        self.map_line_vx_lyr = QgsVectorLayer(gpkg_map_line_vx_lyr, lyr_name, "ogr")
+        self.map_line_vx_lyr.loadNamedStyle(self.map_line_vx_qml_path)   
+        
+        #add missing fields to vertex layer in case they are not present
+        map_line_pnts_pr = self.map_line_vx_lyr.dataProvider()
+        field_names = [field.name() for field in map_line_pnts_pr.fields()]
+        
+        pot_fields = {"iid":QgsField("iid", QVariant.String),
+                      "lid":QgsField("lid", QVariant.String),
+                      "obj_x":QgsField("obj_x", QVariant.Double, "double", 10, 3),
+                      "obj_y":QgsField("obj_y", QVariant.Double, "double", 10, 3),
+                      "obj_z":QgsField("obj_z", QVariant.Double, "double", 10, 3),
+                      "obj_x_std":QgsField("obj_x_std", QVariant.Double, "double", 10, 3),
+                      "obj_y_std":QgsField("obj_y_std", QVariant.Double, "double", 10, 3),
+                      "obj_z_std":QgsField("obj_z_std", QVariant.Double, "double", 10, 3),
+                      "max_evec_dir":QgsField("max_evec_dir", QVariant.Double, "double", 10, 3),
+                      "img_x": QgsField("img_x", QVariant.Double, "double", 5, 1),
+                      "img_y": QgsField("img_y", QVariant.Double, "double", 5, 1),
+                      "pval": QgsField("pval", QVariant.Double, "double", 3, 2)}
+        
+        add_fields = []        
+        for name, qfield in pot_fields.items():
+            if name not in field_names:
+                add_fields.append(qfield)
+        
+        map_line_pnts_pr.addAttributes(add_fields)
+        self.map_line_vx_lyr.updateFields() 
+        
+        map_line_pnts_pr = self.map_line_vx_lyr.dataProvider()
+        field_names = [field.name() for field in map_line_pnts_pr.fields()]
+                                    
         root = QgsProject.instance().layerTreeRoot()
         monoGroup = root.insertGroup(0, self.project_name)  
         monoGroup.addLayer(self.map_line_lyr) 
         monoGroup.addLayer(self.cam_lyr) 
         monoGroup.addLayer(self.reg_lyr)
         monoGroup.addLayer(self.map_gcps_lyr)
-
-        expression = "iid = 'sth_not_existing'"
-        self.img_line_lyr.setSubsetString(expression) #show only those lines which correspond to the currently selected image
-        self.img_gcps_lyr.setSubsetString(expression)
-        self.map_gcps_lyr.setSubsetString(expression)
+        monoGroup.addLayer(self.map_line_vx_lyr)
         
         #define layers which should be shown/considered in which canvas
-        self.map_canvas.setLayers([self.map_line_lyr, self.cam_lyr, self.reg_lyr, self.map_gcps_lyr])
+        self.map_canvas.setLayers([self.map_line_lyr, self.cam_lyr, self.reg_lyr, self.map_gcps_lyr, self.map_line_vx_lyr])
         self.map_canvas.setExtent(self.reg_lyr.extent())
         self.map_canvas.refresh()
         
@@ -172,7 +252,8 @@ class MoniQue:
                                  "img_line_lyr":self.img_line_lyr,
                                  "img_gcps_lyr":self.img_gcps_lyr,
                                  "map_line_lyr":self.map_line_lyr,
-                                 "map_gcps_lyr":self.map_gcps_lyr}
+                                 "map_gcps_lyr":self.map_gcps_lyr,
+                                 "map_line_vx_lyr":self.map_line_vx_lyr}
         
         self.dlg_main.set_layers(self.layer_collection)
         self.dlg_main.activate_gui_elements()
@@ -183,8 +264,7 @@ class MoniQue:
             self.load_cameras_from_gpkg()
         else:
             self.reset_plugin()
-        
-                    
+              
     def load_cameras_from_gpkg(self):
         
         cam_feats = self.cam_lyr.getFeatures() 
@@ -237,6 +317,7 @@ class MoniQue:
         #project_name is only set if anything was loaded; 
         #if its not available than we don't have to do anything
         if self.project_name:
+            
             monoGroup = root.findGroup(self.project_name)
             if monoGroup:
                 root.removeChildNode(monoGroup)
@@ -247,11 +328,7 @@ class MoniQue:
             self.map_canvas.setMapTool(self.map_pan_tool)
             
             self.dlg_main.setWindowTitle("moniQue")
-    
-    # def open_convert_dlg(self):
-    #     self.dlg_convert = ConvertDialog(icon_dir=self.icon_dir, parent=self)
-    #     self.dlg_convert.show()
-    
+        
     def open_main_dlg(self):
                 
         self.dlg_main = MainDialog(plugin_dir=self.plugin_dir, parent=self)
@@ -259,6 +336,12 @@ class MoniQue:
         self.dlg_main.camera_collection = self.camera_collection
         self.dlg_main.load_project_signal.connect(self.on_load_project_signal)
         self.dlg_main.close_dialog_signal.connect(self.reset_plugin)
+        
+        #if QGIS shows the welcome screen setting the extent etc. does not work; 
+        #with this workaround we check if a project is already openend (no welcome screen)
+        #if not (if no layers were added) than we manually create a new project
+        if len(QgsProject.instance().mapLayers()) == 0: 
+            self.iface.newProject()
         
         self.dlg_main.show()
 

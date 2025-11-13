@@ -8,11 +8,11 @@ class Camera():
                  obj_x0=None, obj_y0=None, obj_z0=None, obj_x0_std=None, obj_y0_std=None, obj_z0_std=None, 
                  alpha=None, alpha_std=None, kappa=None, kappa_std=None, zeta = None, zeta_std=None, 
                  s0=None, img_x0=None, img_y0=None, f=None, f_std=None, 
-                 gcps=None, img_gcps=None, obj_gcps=None):
+                 gcps=None, img_gcps=None, obj_gcps=None, min_d_mono=None, xx_std=None, yy_std=None, nr_trials = None):
         
         self.is_oriented=is_oriented
         
-        self.min_dist = 100
+        # self.min_dist = 100
         
         self.iid = iid
         self.path = path
@@ -66,7 +66,12 @@ class Camera():
         
         self.hfov = hfov
         self.vfov = vfov
-    
+        
+        self.min_d_mono = min_d_mono
+        self.xx_std = xx_std
+        self.yy_std = yy_std
+        self.nr_trials = nr_trials
+        
     def from_json(self, data):
         meta = data["meta"]
         self.s0 = meta["s0"]
@@ -118,7 +123,8 @@ class Camera():
                 "obj_x0_std":self.obj_x0_std, "obj_y0_std":self.obj_y0_std, "obj_z0_std":self.obj_z0_std,
                 "alpha":self.alpha, "zeta":self.zeta, "kappa":self.kappa,
                 "alpha_std":self.alpha_std, "zeta_std":self.zeta_std, "kappa_std":self.kappa_std,
-                "img_x0":self.img_x0, "img_y0":self.img_y0, "f":self.f, "f_std":self.f_std, "hfov":self.hfov, "vfov":self.vfov}
+                "img_x0":self.img_x0, "img_y0":self.img_y0, "f":self.f, "f_std":self.f_std, "hfov":self.hfov, "vfov":self.vfov,
+                "min_d_mono":self.min_d_mono, "xx_std":self.xx_std, "yy_std":self.yy_std, "nr_trials":self.nr_trials}
     
     def ray(self, img_x=None, img_y=None):
         
@@ -131,7 +137,7 @@ class Camera():
         pnts_obj_dir_norm = np.ravel(pnts_obj_dir / (np.sum(np.abs(pnts_obj_dir)**2, axis=-1)**(1./2)).reshape(-1, 1))
         
         # if min_dist is not None:
-        ray_start = np.ravel(self.prc + self.min_dist * pnts_obj_dir_norm)
+        ray_start = np.ravel(self.prc + self.min_d_mono * pnts_obj_dir_norm)
         return np.array([[ray_start[0], ray_start[1], ray_start[2], pnts_obj_dir_norm[0], pnts_obj_dir_norm[1], pnts_obj_dir_norm[2]]])
     
     def set_path(self, new_path):

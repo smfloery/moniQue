@@ -31,7 +31,7 @@ from wgpu.gui.offscreen import WgpuCanvas as offscreenCanvas
 import pygfx as gfx
 import open3d as o3d
 import numpy as np
-# import imageio.v3 as iio
+from scipy.stats import multivariate_normal
 from PIL import Image
 from osgeo import gdal
 import json
@@ -40,6 +40,7 @@ import urllib.request
 import glob
 import copy
 import webbrowser
+import diptest
 
 from collections import OrderedDict
 from qgis.utils import iface
@@ -56,7 +57,9 @@ from qgis.core import (QgsFeature,
                        QgsCoordinateReferenceSystem, 
                        QgsCoordinateTransform, 
                        Qgis, 
-                       QgsPointXY)
+                       QgsPointXY,
+                       QgsFeatureRequest,
+                       QgsExpression)
 
 from qgis.gui import QgsMapToolPan
 from qgis.PyQt.QtWidgets import QFileDialog
@@ -78,7 +81,7 @@ from ..tools.VertexTool import VertexTool
 from ..tools.jsonImport import jsonImport
 
 from ..camera import Camera
-from ..helpers import create_point_3d, rot2alzeka, alzeka2rot, calc_hfov, calc_vfov
+from ..helpers import create_point_3d, rot2alzeka, alzeka2rot, calc_hfov, calc_vfov, smpls_to_rays, create_mono_smpls, max_evec_dir_north, srs_lm
 
 from ..tools.map_controller import OrbitFlightController
 from ..tools.img_controller import ImageController
@@ -367,6 +370,11 @@ class MainDialog(QtWidgets.QDialog):
         self.setLayout(layout)
         
         self.img_context_menu = QtWidgets.QMenu(self)
+        
+        self.img_context_menu_remove = QtGui.QAction('Remove camera from project', self)
+        self.img_context_menu_remove.triggered.connect(self.remove_camera)
+        self.img_context_menu.addAction(self.img_context_menu_remove)
+        
         self.img_context_menu_align = QtGui.QAction('Align 3D view with camera view', self)
         self.img_context_menu_align.triggered.connect(self.align_view)
         self.img_context_menu.addAction(self.img_context_menu_align)
@@ -374,6 +382,14 @@ class MainDialog(QtWidgets.QDialog):
         self.img_context_menu_ortho = QtGui.QAction('Generate orthophoto', self)
         self.img_context_menu_ortho.triggered.connect(self.show_orthophoto_dlg)
         self.img_context_menu.addAction(self.img_context_menu_ortho)
+        
+        # self.img_context_menu_ortho = QtGui.QAction('Calculate viewshed', self)
+        # self.img_context_menu_ortho.triggered.connect(self.calc_viewshed)
+        # self.img_context_menu.addAction(self.img_context_menu_ortho)
+
+        self.img_context_menu_mono = QtGui.QAction('Re-estimate monoplotting uncertainty', self)
+        self.img_context_menu_mono.triggered.connect(self.recalc_mono_uncertainty)
+        self.img_context_menu.addAction(self.img_context_menu_mono)
 
         self.sel_gid = None
         self.obj_camera_state = None
@@ -470,24 +486,33 @@ class MainDialog(QtWidgets.QDialog):
         
         self.img_line_lyr = lyr_dict["img_line_lyr"]
         self.map_line_lyr = lyr_dict["map_line_lyr"]
+        self.map_line_vx_lyr = lyr_dict["map_line_vx_lyr"]
         
         self.img_gcps_lyr = lyr_dict["img_gcps_lyr"]
         self.map_gcps_lyr = lyr_dict["map_gcps_lyr"]
         
+        # expression = "\"iid\" = 'sth_not_existing'"
+        # self.img_line_lyr.setSubsetString(expression) #show only those lines which correspond to the currently selected image
+        # self.img_gcps_lyr.setSubsetString(expression)
+        # self.map_gcps_lyr.setSubsetString(expression)
+        # self.map_line_vx_lyr.setSubsetString(expression)
+        
         self.img_gcps_gid_ix = self.img_gcps_lyr.dataProvider().fieldNameIndex('gid')
         
-        self.map_gcps_gid_ix = self.map_gcps_lyr.dataProvider().fieldNameIndex('gid')
-        self.map_gcps_lyr_obj_x_ix = self.map_gcps_lyr.dataProvider().fieldNameIndex('obj_x')
-        self.map_gcps_lyr_obj_y_ix = self.map_gcps_lyr.dataProvider().fieldNameIndex('obj_y')
-        self.map_gcps_lyr_obj_z_ix = self.map_gcps_lyr.dataProvider().fieldNameIndex('obj_z')
+        map_gcps_lyr_pr = self.map_gcps_lyr.dataProvider()
+        self.map_gcps_gid_ix = map_gcps_lyr_pr.fieldNameIndex('gid')
+        self.map_gcps_lyr_obj_x_ix = map_gcps_lyr_pr.fieldNameIndex('obj_x')
+        self.map_gcps_lyr_obj_y_ix = map_gcps_lyr_pr.fieldNameIndex('obj_y')
+        self.map_gcps_lyr_obj_z_ix = map_gcps_lyr_pr.fieldNameIndex('obj_z')
         
         #define layers which should be shown/considered in which canvas
         self.img_canvas.setLayers([self.img_line_lyr, self.img_gcps_lyr])
         self.img_canvas.setMapTool(self.img_pan_tool)
         
-        self.mono_tool.set_layers(self.img_line_lyr, self.map_line_lyr)
-        self.mono_select_tool.set_layers(self.img_line_lyr, self.map_line_lyr)
+        self.mono_tool.set_layers(self.img_line_lyr, self.map_line_lyr, self.map_line_vx_lyr)
+        self.mono_select_tool.set_layers(self.img_line_lyr, self.map_line_lyr, self.map_line_vx_lyr)
         self.mono_vertex_tool.set_layers(self.img_line_lyr, self.map_line_lyr)
+        
         
     def show_dlg_create(self):
         json_path = QtWidgets.QFileDialog.getOpenFileName(None, "Open project", "", ("Geopackage (*.json)"))[0]
@@ -669,7 +694,7 @@ class MainDialog(QtWidgets.QDialog):
             self.dlg_orient.activate_mouse_projection_signal.connect(self.toggle_project_mouse_pos)
             self.dlg_orient.deactivate_mouse_projection_signal.connect(self.untoggle_project_mouse_pos)
 
-            self.dlg_orient.add_gcps_from_lyr(self.get_gcps_from_gpkg())
+            self.dlg_orient.add_gcps_from_lyr(self.get_gcps_from_gpkg(self.active_camera.iid))
 
             if self.active_camera.is_oriented == 1:
                 self.dlg_orient.set_init_params(self.active_camera.asdict())
@@ -884,7 +909,7 @@ class MainDialog(QtWidgets.QDialog):
             self.obj_canvas.request_draw()
         
         except:
-            print('Image has no orientation!')
+            pass
 
     def update_cam_pos(self, current_iid):
         for cam_feat in self.cam_lyr.getFeatures():
@@ -943,89 +968,6 @@ class MainDialog(QtWidgets.QDialog):
 
         self.obj_scene.add(self.cam_dict[iid]['plane'])
         self.obj_scene.add(self.cam_dict[iid]['lines'])
-
-                # if cam_feat['iid'] in self.cam_dict.keys():
-                #     self.cam_dict[cam_feat['iid']].clear()
-
-                # self.cam_dict[cam_feat['iid']] = gfx.Group(visible=False)
-
-                # if cam_feat['iid'] == current_iid:
-                #     self.cam_dict[cam_feat['iid']].add(selected_plane_mesh)
-                # else:
-                #     self.cam_dict[cam_feat['iid']].add(plane_mesh)
-
-                # if cam_feat['iid'] == current_iid:
-                #     for i in selected_lines:
-                #         self.cam_dict[cam_feat['iid']].add(i)
-                # else:
-                #     for i in lines:
-                #         self.cam_dict[cam_feat['iid']].add(i)
-
-                # self.obj_scene.add(self.cam_dict[cam_feat['iid']])
-
-    # def add_cam_pos_to_obj_canvas(self, current_iid = -1):
-    #     #TODO: currently the camera geometry is created all over again; This can be implemented more efficiently;
-    #     for cam_feat in self.cam_lyr.getFeatures():
-
-    #         if cam_feat['obj_x0'] != None:   
-    #             img_w = int(cam_feat['img_w'])
-    #             img_h = int(cam_feat['img_h'])
-                            
-    #             prc = np.array([float(cam_feat["obj_x0"]), float(cam_feat["obj_y0"]), float(cam_feat["obj_z0"])]) - self.min_xyz
-    #             rmat = alzeka2rot([float(cam_feat["alpha"]), float(cam_feat["zeta"]), float(cam_feat["kappa"])])
-    #             cmat = np.array([[1, 0, -float(cam_feat["img_x0"])], 
-    #                             [0, 1, -float(cam_feat["img_y0"])],
-    #                             [0, 0, -float(cam_feat["f"])]])
-                        
-    #             plane_pnts_img = np.array([[0, 0, 1],
-    #                                     [img_w, 0, 1],
-    #                                     [img_w, img_h*(-1), 1],
-    #                                     [0, img_h*(-1), 1]]).T
-                        
-    #             plane_pnts_dir = (rmat@cmat@plane_pnts_img).T
-    #             plane_pnts_dir = plane_pnts_dir / np.linalg.norm(plane_pnts_dir, axis=1).reshape(-1, 1)
-                        
-    #             plane_pnts_obj = prc + 500 * plane_pnts_dir
-    #             plane_faces = np.array([[3, 1, 0], [3, 2, 1]]).astype(np.uint32)
-    #             plane_uv = np.array([[0, 0], [1, 0], [1, 1], [0, 1]]).astype(np.uint32)
-                        
-    #             plane_geom = gfx.geometries.Geometry(indices=plane_faces, 
-    #                                                 positions=plane_pnts_obj.astype(np.float32),
-    #                                                 texcoords=plane_uv.astype(np.float32))
-                        
-    #             plane_material = gfx.MeshBasicMaterial(color = (1, 0.65, 0, 1), opacity=0.5)
-    #             plane_mesh = gfx.Mesh(plane_geom, plane_material, visible=True)
-
-    #             # selected_plane_material = gfx.MeshBasicMaterial(color = (1, 0, 0, 1), opacity=0.5)
-    #             # selected_plane_mesh = gfx.Mesh(plane_geom, selected_plane_material, visible=True)
-
-    #             self.img_controller.set_image(plane_mesh, plane_pnts_dir, prc, distance=1000)
-                    
-    #             positions = [[list(prc),plane_pnts_obj[i]] for i in range(4)]
-    #             lines = [gfx.Line(gfx.Geometry(positions=positions[i]), gfx.LineMaterial(thickness=1.0, color=(1, 0.65, 0.0), opacity=1)) for i in range(4)]
-    #             # selected_lines = [gfx.Line(gfx.Geometry(positions=positions[i]), gfx.LineMaterial(thickness=1.0, color=(1, 0.0, 0.0), opacity=1)) for i in range(4)]
-
-
-    #             # if cam_feat['iid'] in self.cam_dict.keys():
-    #             #     self.cam_dict[cam_feat['iid']].clear()
-
-    #             # self.cam_dict[cam_feat['iid']] = gfx.Group(visible=False)
-
-    #             # if cam_feat['iid'] == current_iid:
-    #             #     self.cam_dict[cam_feat['iid']].add(selected_plane_mesh)
-    #             # else:
-    #             #     self.cam_dict[cam_feat['iid']].add(plane_mesh)
-
-    #             # if cam_feat['iid'] == current_iid:
-    #             #     for i in selected_lines:
-    #             #         self.cam_dict[cam_feat['iid']].add(i)
-    #             # else:
-    #             #     for i in lines:
-    #             #         self.cam_dict[cam_feat['iid']].add(i)
-
-    #             # self.obj_scene.add(self.cam_dict[cam_feat['iid']])
-
-    #     self.obj_canvas.request_draw()
 
     def add_mesh_to_obj_canvas(self, tiles_data):
         
@@ -1238,9 +1180,7 @@ class MainDialog(QtWidgets.QDialog):
                 self.msg_box.setValue(len(self.tiles_data["tiles"])+1)
                 QtWidgets.QApplication.instance().restoreOverrideCursor()
                 self.initial_render = False        
-            
-            
-              
+                    
     def import_images(self):
         """Import selected images.
         """       
@@ -1295,40 +1235,42 @@ class MainDialog(QtWidgets.QDialog):
             self.json_check = False
             return   
                  
-    def get_gcps_from_gpkg(self):
+    def get_gcps_from_gpkg(self, iid):
         gcps = OrderedDict()
         gcp_data = {"obj_x":None, "obj_y":None, "obj_z":None, "img_x":None, "img_y":None, "img_dx":None, "img_dy":None, "active":None}
         
         for feat in self.img_gcps_lyr.getFeatures():
-            curr_gcp = gcp_data.copy()
-            img_gcp = json.loads(QgsJsonUtils.exportAttributes(feat))
-            
-            curr_gid = img_gcp["gid"]
-            
-            curr_gcp["img_x"] = img_gcp["img_x"]
-            curr_gcp["img_y"] = img_gcp["img_y"]
-            curr_gcp["img_dx"] = img_gcp["img_dx"]
-            curr_gcp["img_dy"] = img_gcp["img_dy"]
-            curr_gcp["active"] = img_gcp["active"]
-            
-            gcps[curr_gid] = curr_gcp
-        
-        for feat in self.map_gcps_lyr.getFeatures():
-            map_gcp = json.loads(QgsJsonUtils.exportAttributes(feat))
-            curr_gid = map_gcp["gid"]
-            
-            if curr_gid in gcps.keys():
-                gcps[curr_gid]["obj_x"] = map_gcp["obj_x"]
-                gcps[curr_gid]["obj_y"] = map_gcp["obj_y"]
-                gcps[curr_gid]["obj_z"] = map_gcp["obj_z"]
-            else:
+            if feat["iid"] == iid:
                 curr_gcp = gcp_data.copy()
-                curr_gcp["obj_x"] = map_gcp["obj_x"]
-                curr_gcp["obj_y"] = map_gcp["obj_y"]
-                curr_gcp["obj_z"] = map_gcp["obj_z"]
-                curr_gcp["active"] = map_gcp["active"]
+                img_gcp = json.loads(QgsJsonUtils.exportAttributes(feat))
+                
+                curr_gid = img_gcp["gid"]
+                
+                curr_gcp["img_x"] = img_gcp["img_x"]
+                curr_gcp["img_y"] = img_gcp["img_y"]
+                curr_gcp["img_dx"] = img_gcp["img_dx"]
+                curr_gcp["img_dy"] = img_gcp["img_dy"]
+                curr_gcp["active"] = img_gcp["active"]
                 
                 gcps[curr_gid] = curr_gcp
+        
+        for feat in self.map_gcps_lyr.getFeatures():
+            if feat["iid"] == iid:
+                map_gcp = json.loads(QgsJsonUtils.exportAttributes(feat))
+                curr_gid = map_gcp["gid"]
+                
+                if curr_gid in gcps.keys():
+                    gcps[curr_gid]["obj_x"] = map_gcp["obj_x"]
+                    gcps[curr_gid]["obj_y"] = map_gcp["obj_y"]
+                    gcps[curr_gid]["obj_z"] = map_gcp["obj_z"]
+                else:
+                    curr_gcp = gcp_data.copy()
+                    curr_gcp["obj_x"] = map_gcp["obj_x"]
+                    curr_gcp["obj_y"] = map_gcp["obj_y"]
+                    curr_gcp["obj_z"] = map_gcp["obj_z"]
+                    curr_gcp["active"] = map_gcp["active"]
+                    
+                    gcps[curr_gid] = curr_gcp
 
         return gcps
     
@@ -1381,8 +1323,10 @@ class MainDialog(QtWidgets.QDialog):
         Args:
             camera (_type_): Camera object.
         """
-        
-        item = QtWidgets.QListWidgetItem(camera.iid)
+        if camera.is_oriented == 1:
+            item = QtWidgets.QListWidgetItem(QtGui.QIcon(os.path.join(self.icon_dir, "ok_icon.png")), camera.iid)
+        else:
+            item = QtWidgets.QListWidgetItem(QtGui.QIcon(os.path.join(self.icon_dir, "not_icon.png")), camera.iid)
         item.setSizeHint(QtCore.QSize(24, 24))
         item.setFlags(item.flags() ^ QtCore.Qt.ItemIsUserCheckable)
         item.setCheckState(QtCore.Qt.Unchecked)
@@ -1395,11 +1339,15 @@ class MainDialog(QtWidgets.QDialog):
             camera (_type_): Camera object.
         """
         feat = QgsFeature(self.cam_lyr.fields())
+        
         feat["iid"] = camera.iid
         feat["path"] = camera.path
         feat["ext"] = camera.ext
         feat["img_w"] = camera.img_w
         feat["img_h"] = camera.img_h
+        feat["xx_std"] = 1              #default value for image measurement uncertainty (x)
+        feat["yy_std"] = 1              #default value for image measurement uncertainty (y)
+        feat["min_d_mono"] = 100        #default minimum distance for monoplotting; Intersection starts this distance from the PRC
         
         pr = self.cam_lyr.dataProvider()
         pr.addFeatures([feat])
@@ -1431,8 +1379,9 @@ class MainDialog(QtWidgets.QDialog):
             self.img_canvas.refresh()
             
     def set_img_canvas_extent(self):
-        self.img_canvas.setExtent(self.img_lyr.extent())
-        self.img_canvas.refresh()
+        if self.img_lyr is not None:
+            self.img_canvas.setExtent(self.img_lyr.extent())
+            self.img_canvas.refresh()
     
     def get_wpgu_camera(self):
         
@@ -1463,7 +1412,7 @@ class MainDialog(QtWidgets.QDialog):
             self.update_gcps(data)
         
     def update_camera(self, data):
-        curr_cam = list(self.cam_lyr.getFeatures(expression = "iid = '%s'" % (self.active_camera.iid)))[0]
+        curr_cam = list(self.cam_lyr.getFeatures(expression = "\"iid\" = '%s'" % (self.active_camera.iid)))[0]
         curr_cam_fid = curr_cam.id()
         
         self.cam_lyr.startEditing()
@@ -1484,8 +1433,8 @@ class MainDialog(QtWidgets.QDialog):
         self.update_cam_pos(self.active_camera.iid)
     
     def update_gcps(self, data):
-        curr_img_gcps = self.img_gcps_lyr.getFeatures(expression = "iid = '%s'" % (self.active_camera.iid))
-        curr_map_gcps = self.map_gcps_lyr.getFeatures(expression = "iid = '%s'" % (self.active_camera.iid))
+        curr_img_gcps = self.img_gcps_lyr.getFeatures(expression = "\"iid\" = '%s'" % (self.active_camera.iid))
+        curr_map_gcps = self.map_gcps_lyr.getFeatures(expression = "\"iid\" = '%s'" % (self.active_camera.iid))
         
         used_gids = list(data["residuals"].keys())
         
@@ -1557,7 +1506,7 @@ class MainDialog(QtWidgets.QDialog):
         self.img_gcps_lyr.commitChanges()
         self.map_gcps_lyr.commitChanges()
         
-        cam_feat = list(self.cam_lyr.getFeatures(expression = "iid = '%s'" % (self.active_camera.iid)))[0]
+        cam_feat = list(self.cam_lyr.getFeatures(expression = "\"iid\" = '%s'" % (self.active_camera.iid)))[0]
         cam_feat_json = json.loads(QgsJsonUtils.exportAttributes(cam_feat))
         
         del cam_feat_json["fid"]
@@ -1566,6 +1515,9 @@ class MainDialog(QtWidgets.QDialog):
         self.camera_collection[cam.iid] = cam
         self.active_camera = self.camera_collection[cam.iid]
         self.update_cam_pos(cam.iid)
+        
+        sel_img_list_item = self.img_list.findItems(self.active_camera.iid, Qt.MatchFixedString)[0]
+        sel_img_list_item.setIcon(QtGui.QIcon(os.path.join(self.icon_dir, "ok_icon.png")))
         
     def discard_changes(self):
         self.img_gcps_lyr.rollBack()
@@ -1736,14 +1688,54 @@ class MainDialog(QtWidgets.QDialog):
         
         
         for action in self.img_context_menu.actions():
-            if self.camera_collection[clicked_list_item.text()].is_oriented == 1:
-                action.setEnabled(True)
+            
+            if action.text() == "Remove camera from project":
+                continue
             else:
-                action.setEnabled(False)
+            
+                if self.camera_collection[clicked_list_item.text()].is_oriented == 1:
+                    action.setEnabled(True)
+                else:
+                    action.setEnabled(False)
         
         
         self.img_context_menu.exec(self.img_list.mapToGlobal(point))
     
+    def remove_camera(self):
+        cam_iid = self.img_context_menu.title()
+        cam_iid_item = self.img_list.findItems(cam_iid, Qt.MatchFixedString)[0]
+        self.img_list.takeItem(self.img_list.row(cam_iid_item))
+
+        self.cam_lyr.selectByExpression(u"\"iid\" = '%s'" % (cam_iid), QgsVectorLayer.SelectBehavior.SetSelection)
+        if self.cam_lyr.selectedFeatureCount() > 0:
+            self.cam_lyr.startEditing()
+            self.cam_lyr.deleteSelectedFeatures()
+            self.cam_lyr.commitChanges()
+        
+        self.map_line_lyr.selectByExpression(u"\"iid\" = '%s'" % (cam_iid), QgsVectorLayer.SelectBehavior.SetSelection)
+        if self.map_line_lyr.selectedFeatureCount() > 0:
+            self.map_line_lyr.startEditing()
+            self.map_line_lyr.deleteSelectedFeatures()
+            self.map_line_lyr.commitChanges()
+        
+        self.img_line_lyr.selectByExpression(u"\"iid\" = '%s'" % (cam_iid), QgsVectorLayer.SelectBehavior.SetSelection)
+        if self.img_line_lyr.selectedFeatureCount() > 0:
+            self.img_line_lyr.startEditing()
+            self.img_line_lyr.deleteSelectedFeatures()
+            self.img_line_lyr.commitChanges()
+
+        self.map_line_vx_lyr.selectByExpression(u"\"iid\" = '%s'" % (cam_iid), QgsVectorLayer.SelectBehavior.SetSelection)
+        if self.map_line_vx_lyr.selectedFeatureCount() > 0:
+            self.map_line_vx_lyr.startEditing()
+            self.map_line_vx_lyr.deleteSelectedFeatures()
+            self.map_line_vx_lyr.commitChanges()
+        
+        self.map_gcps_lyr.selectByExpression(u"\"iid\" = '%s'" % (cam_iid), QgsVectorLayer.SelectBehavior.SetSelection)    
+        if self.map_gcps_lyr.selectedFeatureCount() > 0:
+            self.map_gcps_lyr.startEditing()
+            self.map_gcps_lyr.deleteSelectedFeatures()
+            self.map_gcps_lyr.commitChanges()
+        
     def align_view(self):
         self.set_obj_canvas_camera(self.camera_collection[self.img_context_menu.title()].asdict())
     
@@ -1752,6 +1744,148 @@ class MainDialog(QtWidgets.QDialog):
         # orthophoto_dlg.set_main_dlg(self.parent)  #self.parent refers to the main moniQue dialog
         orthophoto_dlg.exec_()
     
+    def recalc_mono_uncertainty(self):
+                
+        cam_iid = self.img_context_menu.title()
+        expression = QgsExpression("\"iid\" = '%s'" % (cam_iid))
+                
+        img_lines = self.img_line_lyr.getFeatures(QgsFeatureRequest(expression))
+        nr_lines = len(list(img_lines))
+        
+        if nr_lines > 0:
+            
+            prog_box = QtWidgets.QProgressDialog("Recalculating uncertainty...", None, 0, nr_lines, self)
+            prog_box.setWindowTitle("%s" % (cam_iid))
+            prog_box.setWindowModality(QtCore.Qt.WindowModal)
+            prog_box.show()
+            QtWidgets.QApplication.processEvents()  
+            
+            prog_box.setValue(0)
+            QtWidgets.QApplication.processEvents()  #required otherwise msg_box stays empty and is not updated; found here: https://stackoverflow.com/questions/47879413/pyqt-qprogressdialog-displays-as-an-empty-white-window
+                        
+            cam_feat = next(self.cam_lyr.getFeatures(QgsFeatureRequest(expression)))
+            cam_dict = json.loads(QgsJsonUtils.exportAttributes(cam_feat))
+            
+            curr_gcps = self.get_gcps_from_gpkg(cam_iid)
+            _, smpls, pnts2dir_raw = create_mono_smpls(cam_dict, curr_gcps)
+            
+            self.map_line_lyr.startEditing()
+            vex_feats = []
+            lx = 0
+            for line_feat in self.img_line_lyr.getFeatures(QgsFeatureRequest(expression)):
+                line_geom = line_feat.geometry()
+                
+                line_fid = line_feat["fid"]
+                
+                line_vex = []
+                
+                for vx in line_geom.vertices():  # Iterate over each vertex
+                    img_x = vx.x()
+                    img_y = vx.y()
+
+                    rays = smpls_to_rays(smpls, pnts2dir_raw, img_x, img_y, cam_dict["min_d_mono"], self.min_xyz)
+                    o3d_rays = o3d.core.Tensor(rays, dtype=o3d.core.Dtype.Float32)
+                    ans = self.o3d_scene.cast_rays(o3d_rays)
+                    
+                    ans_dist = ans["t_hit"].numpy().ravel()
+                    ans_valid = np.isfinite(ans_dist)
+            
+                    ans_coords = rays[:, :3] + rays[:, 3:] * ans_dist.reshape(-1,1)
+                    ans_coords = ans_coords[ans_valid, :]
+                                        
+                    ans_covar = np.cov(ans_coords, rowvar=False)
+                    xyz_std = np.sqrt(np.diag(ans_covar))
+                    
+                    #project coordinates onto line of sight to create 1D distribution along the LOS
+                    coords_vec = ans_coords - rays[0, :3]
+                    coords_ld = np.sum(coords_vec*rays[0, 3:], axis=1) - ans_dist[0]
+                    
+                    #use this 1D distributed pnts to calculate the diptest
+                    _, pval = diptest.diptest(coords_ld)
+                    
+                    dir_evec_north = max_evec_dir_north(ans_covar)
+                    
+                    vex_obj_coords = ans_coords[0, :] + self.min_xyz
+                    
+                    vex_geom = QgsPoint(vex_obj_coords[0], vex_obj_coords[1], vex_obj_coords[2])
+                    
+                    vex_feat = QgsFeature(self.map_line_vx_lyr.fields())
+                    vex_feat.setGeometry(QgsGeometry.fromPoint(vex_geom))
+                    vex_feat["iid"] = cam_iid
+                    vex_feat["lid"] = line_fid
+                    vex_feat["obj_x_std"] = xyz_std[0]
+                    vex_feat["obj_y_std"] = xyz_std[1]
+                    vex_feat["obj_z_std"] = xyz_std[2]
+                    vex_feat["img_x"] = img_x
+                    vex_feat["img_y"] = img_y
+                    vex_feat["max_evec_dir"] = dir_evec_north
+                    vex_feat["pval"] = pval
+                    
+                    vex_feats.append(vex_feat)
+                    line_vex.append(vex_geom)
+                
+                line_geom_upd = QgsGeometry.fromPolyline(line_vex)
+                self.map_line_lyr.changeGeometry(line_fid, line_geom_upd)
+                
+                prog_box.setValue(lx+1)
+                lx+=1
+                QtWidgets.QApplication.processEvents()  
+            
+            self.map_line_lyr.commitChanges()
+            self.map_line_lyr.triggerRepaint()
+
+            # accessing Vector layer provider
+            map_line_vx_lyr_pr = self.map_line_vx_lyr.dataProvider()
+            map_line_vx_lyr_pr.truncate()                               # deleting all features in the Vector layer
+            
+            map_line_vx_lyr_pr.addFeatures(vex_feats)
+            self.map_line_vx_lyr.commitChanges()
+            self.map_line_vx_lyr.triggerRepaint()
+                    
+            # prog_box = QtWidgets.QProgressDialog("Recalculating uncertainty...", None, 0, nr_lines, self)
+            # prog_box.setWindowTitle("%s" % (cam_iid))
+            # prog_box.setWindowModality(QtCore.Qt.WindowModal)
+            # prog_box.show()
+            # QtWidgets.QApplication.processEvents()  
+            
+            # prog_box.setValue(0)
+            # QtWidgets.QApplication.processEvents()  #required otherwise msg_box stays empty and is not updated; found here: https://stackoverflow.com/questions/47879413/pyqt-qprogressdialog-displays-as-an-empty-white-window
+                        
+        #     self.map_line_vx_lyr.startEditing()
+        #     fx = 0
+            
+        #     for feat in self.map_line_vx_lyr.getFeatures(QgsFeatureRequest(expression)):
+        #         img_x = feat["img_x"]
+        #         img_y = feat["img_y"]
+                
+        #         rays = smpls_to_rays(smpls, pnts2dir_raw, img_x, img_y, cam_dict["min_d_mono"], self.min_xyz)
+        #         o3d_rays = o3d.core.Tensor(rays, dtype=o3d.core.Dtype.Float32)
+        #         ans = self.o3d_scene.cast_rays(o3d_rays)
+                
+        #         ans_dist = ans["t_hit"].numpy().ravel()
+        #         ans_valid = np.isfinite(ans_dist)
+        
+        #         ans_coords = rays[:, :3] + rays[:, 3:] * ans_dist.reshape(-1,1)
+        #         ans_coords = ans_coords[ans_valid, :]      
+                          
+        #         ans_covar = np.cov(ans_coords, rowvar=False)
+        #         xyz_std = np.sqrt(np.diag(ans_covar))
+                
+        #         dir_evec_north = max_evec_dir_north(ans_covar)
+                            
+        #         feat["obj_x_std"] = xyz_std[0]
+        #         feat["obj_y_std"] = xyz_std[1]
+        #         feat["obj_z_std"] = xyz_std[2]
+        #         feat["max_evec_dir"] = dir_evec_north
+        #         self.map_line_vx_lyr.updateFeature(feat)
+
+        #         prog_box.setValue(fx+1)
+        #         QtWidgets.QApplication.processEvents()
+        #         fx += 1
+                
+        # self.map_line_vx_lyr.commitChanges()
+        # self.map_line_vx_lyr.triggerRepaint()
+        
     def camera_clicked(self, item):
         
         if item.isSelected():
@@ -1780,10 +1914,13 @@ class MainDialog(QtWidgets.QDialog):
         self.btn_obj_canvas_show_img.setChecked(False)
         self.btn_obj_canvas_show_img.setEnabled(False)
         
-        expression = "iid = 'some_crap_that_doesnt_exist'"
+        expression = u"\"iid\" = ''"
         self.img_line_lyr.setSubsetString(expression)
         self.img_gcps_lyr.setSubsetString(expression)
         self.map_gcps_lyr.setSubsetString(expression)
+        self.map_line_vx_lyr.setSubsetString(expression)
+        
+        self.cam_lyr.removeSelection()
         
         self.img_canvas.setLayers([])
         self.img_canvas.refresh()        
@@ -1824,7 +1961,7 @@ class MainDialog(QtWidgets.QDialog):
                     if feat['iid'] == iid:
                         feature_id = feat.id()
                         self.cam_lyr.startEditing()
-                        self.cam_lyr.changeAttributeValue(feature_id,field_idx,new_iid_path)
+                        self.cam_lyr.changeAttributeValue(feature_id, field_idx, new_iid_path)
                         self.cam_lyr.commitChanges()
 
                 iid_path = new_iid_path
@@ -1833,11 +1970,25 @@ class MainDialog(QtWidgets.QDialog):
         
         self.load_img(iid, iid_path)
         
-        expression = "iid = '%s'" % (iid)
+        field_names = [field.name() for field in self.map_gcps_lyr.fields()]
+        
+        expression = u"\"iid\" = '%s'" % (iid)
         self.img_line_lyr.setSubsetString(expression) #show only those lines which correspond to the currently selected image
         self.img_gcps_lyr.setSubsetString(expression)
+        self.map_line_vx_lyr.setSubsetString(expression)
         self.map_gcps_lyr.setSubsetString(expression)
+        
+        # Set the selection
+        self.cam_lyr.selectByExpression(expression, QgsVectorLayer.SelectBehavior.SetSelection)
+        
 
+        #sometimes setting the expressions somehow corrupts the map_gcps_lyr; as result no attributes are available anymore
+        #I couldnt figure out the reason; however, by raising the error and reloading the project the error can be bypassed
+        field_names = [field.name() for field in self.map_gcps_lyr.fields()]
+        if len(field_names) == 0:
+            self.msg_bar.pushMessage("Error", "Something went wrong! Please reload the project.", level=Qgis.Critical, duration=3)
+            return None
+                
         self.active_camera = self.camera_collection[iid]
         self.setWindowTitle("%s - %s" % (self.project_name, iid))
         
@@ -1845,9 +1996,9 @@ class MainDialog(QtWidgets.QDialog):
         self.obj_gcps_grp.clear()
         
         for gcp in self.map_gcps_lyr.getFeatures():
-            gcp_pos = [gcp["obj_x"]-self.min_xyz[0], 
-                        gcp["obj_y"]-self.min_xyz[1], 
-                        gcp["obj_z"]-self.min_xyz[2]]
+            gcp_pos = [gcp["obj_x"] - self.min_xyz[0], 
+                       gcp["obj_y"] - self.min_xyz[1], 
+                       gcp["obj_z"] - self.min_xyz[2]]
             
             if gcp["active"] == '1':
                 gcp_clr = (0.78, 0, 0, 1)
@@ -1864,9 +2015,7 @@ class MainDialog(QtWidgets.QDialog):
             self.btn_mono_vertex.setEnabled(True)
             self.btn_obj_canvas_show_img.setEnabled(True)
             self.temporary_camera = self.camera_collection[iid].asdict()
-                            
-            self.mono_tool.set_camera(self.active_camera)
-            self.mono_vertex_tool.set_camera(self.active_camera)
+            
         else:
             self.btn_mono_tool.setEnabled(False)
             self.btn_mono_select.setEnabled(False)
@@ -1892,7 +2041,25 @@ class MainDialog(QtWidgets.QDialog):
             #during monoplotting user cant adjust image orientation            
             self.img_canvas.setMapTool(self.mono_tool)
             self.img_list.setEnabled(False)
+            
+            #for the uncertainty estimation we need the full covariance matrix from the camera estimation
+            #therefore we rerun the LSQ with the current parameters; By providing the offset in srs_lm
+            #the projection center is more or less fixed which we want...as we dont want to change
+            #any estimated parameter but only obtain the covariance matrix
+            
+            curr_gcps = self.get_gcps_from_gpkg(self.active_camera.iid)
+            init_params = self.active_camera.asdict()
+            
+            _, smpls, dir2pnts_raw = create_mono_smpls(init_params, curr_gcps)
+                                    
+            self.mono_tool.set_camera(self.active_camera)
+            self.mono_vertex_tool.set_camera(self.active_camera)
+            
+            self.mono_tool.set_covar_samples(smpls, dir2pnts_raw)
+            self.mono_vertex_tool.set_covar_samples(smpls, dir2pnts_raw)           
+            
             self.mono_tool.reset()
+            
         else:                                               #deactivate
             self.btn_ori_tool.setEnabled(True)
             self.btn_mono_select.setEnabled(True)
@@ -1931,6 +2098,7 @@ class MainDialog(QtWidgets.QDialog):
             self.img_list.setEnabled(True)
             #during monoplotting user cant adjust image orientation
             self.img_canvas.setMapTool(self.mono_vertex_tool)
+            self.mono_vertex_tool.set_camera(self.active_camera)
             self.mono_vertex_tool.reset()
         else:                                           #deactivate tool
             self.btn_ori_tool.setEnabled(True)
