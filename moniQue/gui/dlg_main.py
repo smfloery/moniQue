@@ -65,7 +65,7 @@ from qgis.gui import QgsMapToolPan
 from qgis.PyQt.QtWidgets import QFileDialog
 
 from PyQt5.QtGui import QColor, QCursor
-from PyQt5.QtCore import Qt
+from PyQt5.QtCore import Qt, QTimer
 
 # from .dlg_create import CreateDialog
 from .dlg_orient import OrientDialog
@@ -478,8 +478,34 @@ class MainDialog(QtWidgets.QDialog):
                 json_cam = json.dumps(cam_dict, indent=4, ensure_ascii=False).encode("utf-8")
                 with open(json_path, "w", encoding="utf-8") as json_file:
                     json_file.write(json_cam.decode(encoding="utf-8"))
-    
+
+
+    def apply_subset(self, expression):
+        self.img_line_lyr.setSubsetString(expression) #show only those lines which correspond to the currently selected image
+        self.img_gcps_lyr.setSubsetString(expression)
+        self.map_line_vx_lyr.setSubsetString(expression)
+        self.map_gcps_lyr.setSubsetString(expression) 
+
+    def draw_obj_gcps(self):
+        self.obj_gcps_grp.clear()
+
+        try:
+            for gcp in self.map_gcps_lyr.getFeatures():
+                gcp_pos = [
+                    gcp["obj_x"] - self.min_xyz[0],
+                    gcp["obj_y"] - self.min_xyz[1],
+                    gcp["obj_z"] - self.min_xyz[2]
+                ]
+                gcp_clr = (0.78, 0, 0, 1) if gcp["active"] == '1' else (0.86, 0.86, 0.86, 1)
+                gcp_gfx = create_point_3d(gcp_pos, gcp["gid"], gcp_clr)
+                self.obj_gcps_grp.add(gcp_gfx)
+        except:
+            self.msg_bar.pushMessage("Error", "Something went wrong! Please reload the project.", level=Qgis.Critical, duration=3)
+
+        self.obj_canvas.request_draw()
+
     def set_layers(self, lyr_dict):
+
         self.reg_lyr = lyr_dict["reg_lyr"]
         self.cam_lyr = lyr_dict["cam_lyr"]        
         self.img_lyr = None                     #will be set layer when terrestrial image is loaded
@@ -1478,7 +1504,7 @@ class MainDialog(QtWidgets.QDialog):
         img_feat.setAttribute("iid", self.active_camera.iid)
         img_feat.setAttribute("gid", data["gid"])
         img_feat.setAttribute("img_x", data["img_x"])
-        img_feat.setAttribute("img_y", data["img_x"])
+        img_feat.setAttribute("img_y", data["img_y"])
         img_feat.setAttribute("desc", "")
         img_feat.setAttribute("active", 1)
         
@@ -1915,10 +1941,7 @@ class MainDialog(QtWidgets.QDialog):
         self.btn_obj_canvas_show_img.setEnabled(False)
         
         expression = u"\"iid\" = ''"
-        self.img_line_lyr.setSubsetString(expression)
-        self.img_gcps_lyr.setSubsetString(expression)
-        self.map_gcps_lyr.setSubsetString(expression)
-        self.map_line_vx_lyr.setSubsetString(expression)
+        QTimer.singleShot(100, lambda: self.apply_subset(expression))
         
         self.cam_lyr.removeSelection()
         
@@ -1973,10 +1996,7 @@ class MainDialog(QtWidgets.QDialog):
         field_names = [field.name() for field in self.map_gcps_lyr.fields()]
         
         expression = u"\"iid\" = '%s'" % (iid)
-        self.img_line_lyr.setSubsetString(expression) #show only those lines which correspond to the currently selected image
-        self.img_gcps_lyr.setSubsetString(expression)
-        self.map_line_vx_lyr.setSubsetString(expression)
-        self.map_gcps_lyr.setSubsetString(expression)
+        QTimer.singleShot(80, lambda: self.apply_subset(expression))
         
         # Set the selection
         self.cam_lyr.selectByExpression(expression, QgsVectorLayer.SelectBehavior.SetSelection)
@@ -1984,32 +2004,17 @@ class MainDialog(QtWidgets.QDialog):
 
         #sometimes setting the expressions somehow corrupts the map_gcps_lyr; as result no attributes are available anymore
         #I couldnt figure out the reason; however, by raising the error and reloading the project the error can be bypassed
-        field_names = [field.name() for field in self.map_gcps_lyr.fields()]
-        if len(field_names) == 0:
-            self.msg_bar.pushMessage("Error", "Something went wrong! Please reload the project.", level=Qgis.Critical, duration=3)
-            return None
+        # field_names = [field.name() for field in self.map_gcps_lyr.fields()]
+        # if len(field_names) == 0:
+        #     self.msg_bar.pushMessage("Error", "Something went wrong! Please reload the project.", level=Qgis.Critical, duration=3)
+        #     return None
                 
         self.active_camera = self.camera_collection[iid]
         self.setWindowTitle("%s - %s" % (self.project_name, iid))
         
-        #remove all children from the group --> removes all prevously loaded GCPs
-        self.obj_gcps_grp.clear()
-        
-        for gcp in self.map_gcps_lyr.getFeatures():
-            gcp_pos = [gcp["obj_x"] - self.min_xyz[0], 
-                       gcp["obj_y"] - self.min_xyz[1], 
-                       gcp["obj_z"] - self.min_xyz[2]]
-            
-            if gcp["active"] == '1':
-                gcp_clr = (0.78, 0, 0, 1)
-            else:
-                gcp_clr = (0.86, 0.86, 0.86, 1)
-            
-            gcp_gfx = create_point_3d(gcp_pos, gcp["gid"], gcp_clr)
-            self.obj_gcps_grp.add(gcp_gfx)
+        QTimer.singleShot(100, self.draw_obj_gcps)
 
         if self.active_camera.is_oriented == 1:
-                        
             self.btn_mono_tool.setEnabled(True)
             self.btn_mono_select.setEnabled(True)
             self.btn_mono_vertex.setEnabled(True)
@@ -2028,9 +2033,8 @@ class MainDialog(QtWidgets.QDialog):
         else:
             self.repaint_cam_pos(self.prior_iid, False)
 
-        self.repaint_cam_pos(iid, True)
         self.obj_canvas.request_draw()
-
+        self.repaint_cam_pos(iid, True)
         self.prior_iid = iid   
         
     def toggle_mono_tool(self):

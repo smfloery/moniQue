@@ -55,7 +55,9 @@ class OrbitFlightController(PanZoomController):
         "arrowup": ("pitch", "repeat", -2),
         "arrowdown": ("pitch", "repeat", +2),
         "arrowleft": ("yaw", "repeat", -2),
-        "arrowright": ("yaw", "repeat", +2)
+        "arrowright": ("yaw", "repeat", +2),
+        " ": ("move", "repeat", (0, +1, 0)),
+        "shift": ("move", "repeat", (0, -1, 0)),
     }
 
     def __init__(self, camera, *, speed=None, **kwargs):
