@@ -13,7 +13,7 @@ We tested moniQue with the following QGIS versions:
 ### Required Python packages
 Open the **OSGeo4W Shell** and install the required python packages using pip  
 
-    pip install --user open3d pygfx==0.9.0 glfw lmfit
+    pip install --user open3d pygfx==0.9.0 glfw lmfit diptest
 
 `open3d` is required for raycasting, `pygfx` and `glfw` for rendering the terrain in 3D, `lmfit` for the least squares spatial resection. Installation with the `--user` option is necessary as the default QGIS Python interpreter is located on ```C:\...``` which would require admin rights.  
 
@@ -28,6 +28,8 @@ Open the **OSGeo4W Shell** and install the required python packages using pip
 > here. 
 
 Click on ``Code`` and ``Download ZIP``. From the downloaded ZIP only the ``moniQue`` subdirectory is required. Create a new archive which only contains this directory. In QGIS go to `Plugins -> Mange and install plugins --> Install from ZIP` and select the newly created ZIP. 
+
+You can download a demo project containting three historical images of the Pasterze in Austria and all necessary additional datasets (terrain model, orthophoto) here: [Demo project](https://cloud.geo.tuwien.ac.at/s/Xkj3pHywGEGrHTL)
 
 
 # Dokumentation
