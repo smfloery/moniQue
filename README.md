@@ -29,6 +29,8 @@ Open the **OSGeo4W Shell** and install the required python packages using pip
 
 Click on ``Code`` and ``Download ZIP``. From the downloaded ZIP only the ``moniQue`` subdirectory is required. Create a new archive which only contains this directory. In QGIS go to `Plugins -> Mange and install plugins --> Install from ZIP` and select the newly created ZIP. 
 
+You can download a demo project containting three historical images of the Pasterze in Austria and all necessary additional datasets (terrain model, orthophoto) here: [Demo project](https://cloud.geo.tuwien.ac.at/s/Xkj3pHywGEGrHTL)
+
 
 # Dokumentation
 
