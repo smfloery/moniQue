@@ -13,7 +13,7 @@ We tested moniQue with the following QGIS versions:
 ### Required Python packages
 Open the **OSGeo4W Shell** and install the required python packages using pip  
 
-    pip install --user open3d pygfx==0.9.0 glfw lmfit
+    pip install --user open3d pygfx==0.9.0 glfw lmfit piptest
 
 `open3d` is required for raycasting, `pygfx` and `glfw` for rendering the terrain in 3D, `lmfit` for the least squares spatial resection. Installation with the `--user` option is necessary as the default QGIS Python interpreter is located on ```C:\...``` which would require admin rights.  
 
