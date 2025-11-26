@@ -31,6 +31,7 @@ from wgpu.gui.offscreen import WgpuCanvas as offscreenCanvas
 import pygfx as gfx
 import open3d as o3d
 import numpy as np
+import pandas as pd
 from scipy.stats import multivariate_normal
 from PIL import Image
 from osgeo import gdal
@@ -66,6 +67,7 @@ from qgis.PyQt.QtWidgets import QFileDialog
 
 from PyQt5.QtGui import QColor, QCursor
 from PyQt5.QtCore import Qt, QTimer
+from PyQt5.QtWidgets import QMessageBox
 
 # from .dlg_create import CreateDialog
 from .dlg_orient import OrientDialog
@@ -371,14 +373,14 @@ class MainDialog(QtWidgets.QDialog):
         
         self.img_context_menu = QtWidgets.QMenu(self)
         
-        self.img_context_menu_remove = QtGui.QAction('Remove camera from project', self)
-        self.img_context_menu_remove.triggered.connect(self.remove_camera)
-        self.img_context_menu.addAction(self.img_context_menu_remove)
-        
         self.img_context_menu_align = QtGui.QAction('Align 3D view with camera view', self)
         self.img_context_menu_align.triggered.connect(self.align_view)
         self.img_context_menu.addAction(self.img_context_menu_align)
-        
+
+        self.img_context_menu_export = QtGui.QAction('Export GCPs to *.csv', self)
+        self.img_context_menu_export.triggered.connect(self.export_gcps_to_csv)
+        self.img_context_menu.addAction(self.img_context_menu_export)
+
         self.img_context_menu_ortho = QtGui.QAction('Generate orthophoto', self)
         self.img_context_menu_ortho.triggered.connect(self.show_orthophoto_dlg)
         self.img_context_menu.addAction(self.img_context_menu_ortho)
@@ -390,6 +392,10 @@ class MainDialog(QtWidgets.QDialog):
         self.img_context_menu_mono = QtGui.QAction('Re-estimate monoplotting uncertainty', self)
         self.img_context_menu_mono.triggered.connect(self.recalc_mono_uncertainty)
         self.img_context_menu.addAction(self.img_context_menu_mono)
+
+        self.img_context_menu_remove = QtGui.QAction('Remove camera from project', self)
+        self.img_context_menu_remove.triggered.connect(self.remove_camera)
+        self.img_context_menu.addAction(self.img_context_menu_remove)
 
         self.sel_gid = None
         self.obj_camera_state = None
@@ -517,12 +523,6 @@ class MainDialog(QtWidgets.QDialog):
         self.img_gcps_lyr = lyr_dict["img_gcps_lyr"]
         self.map_gcps_lyr = lyr_dict["map_gcps_lyr"]
         
-        # expression = "\"iid\" = 'sth_not_existing'"
-        # self.img_line_lyr.setSubsetString(expression) #show only those lines which correspond to the currently selected image
-        # self.img_gcps_lyr.setSubsetString(expression)
-        # self.map_gcps_lyr.setSubsetString(expression)
-        # self.map_line_vx_lyr.setSubsetString(expression)
-        
         self.img_gcps_gid_ix = self.img_gcps_lyr.dataProvider().fieldNameIndex('gid')
         
         map_gcps_lyr_pr = self.map_gcps_lyr.dataProvider()
@@ -530,6 +530,11 @@ class MainDialog(QtWidgets.QDialog):
         self.map_gcps_lyr_obj_x_ix = map_gcps_lyr_pr.fieldNameIndex('obj_x')
         self.map_gcps_lyr_obj_y_ix = map_gcps_lyr_pr.fieldNameIndex('obj_y')
         self.map_gcps_lyr_obj_z_ix = map_gcps_lyr_pr.fieldNameIndex('obj_z')
+
+        img_gcps_lyr_pr = self.img_gcps_lyr.dataProvider()
+        self.img_gcps_gid_ix = img_gcps_lyr_pr.fieldNameIndex('gid')
+        self.img_gcps_img_x_ix = img_gcps_lyr_pr.fieldNameIndex('img_x')
+        self.img_gcps_img_y_ix = img_gcps_lyr_pr.fieldNameIndex('img_y')
         
         #define layers which should be shown/considered in which canvas
         self.img_canvas.setLayers([self.img_line_lyr, self.img_gcps_lyr])
@@ -1650,7 +1655,7 @@ class MainDialog(QtWidgets.QDialog):
                 pnts.visible = True
         
         return img[:, :, :3] #contains additional alpha channel we don't need
-        
+  
     def export_obj_canvas(self):
         try:
             def_res = [str(self.active_camera.img_w), str(self.active_camera.img_h)]
@@ -1726,41 +1731,113 @@ class MainDialog(QtWidgets.QDialog):
         
         
         self.img_context_menu.exec(self.img_list.mapToGlobal(point))
+
+    
+    def export_gcps_to_csv(self):
+
+        default_name = f"GCPs_{self.current_iid}.csv"
+
+        csv_path, _ = QtWidgets.QFileDialog.getSaveFileName(
+            None,
+            "Save GCPs to *.csv",
+            default_name,
+            "GCPs (*.csv)"
+        )
+        if not csv_path:
+            return
+
+        img_features = {f['gid']: f for f in self.img_gcps_lyr.getFeatures()}
+        map_features = {f['gid']: f for f in self.map_gcps_lyr.getFeatures()}
+
+        gcp_list = []
+
+        for gid, img_feat in img_features.items():
+            if gid not in map_features:
+                continue
+
+            map_feat = map_features[gid]
+
+            img_attrs = img_feat.attributes()
+            map_attrs = map_feat.attributes()
+
+            img_x = img_attrs[self.img_gcps_img_x_ix]
+            img_y = img_attrs[self.img_gcps_img_y_ix]
+
+            obj_x = map_attrs[self.map_gcps_lyr_obj_x_ix]
+            obj_y = map_attrs[self.map_gcps_lyr_obj_y_ix]
+            obj_z = map_attrs[self.map_gcps_lyr_obj_z_ix]
+
+            gcp_list.append({
+                "gid": gid,
+                "img_x": img_x,
+                "img_y": img_y,
+                "obj_x": obj_x,
+                "obj_y": obj_y,
+                "obj_z": obj_z
+            })
+
+        if not gcp_list:
+            QtWidgets.QMessageBox.warning(None, "Export GCPs", "No GCPs found to export!")
+            return
+
+        df = pd.DataFrame(gcp_list)
+        df.to_csv(csv_path, sep=";", index=False, encoding="utf-8")
+
+        QtWidgets.QMessageBox.information(None, "Export GCPs", f"GCPs exported to {csv_path}")
+
+
     
     def remove_camera(self):
         cam_iid = self.img_context_menu.title()
-        cam_iid_item = self.img_list.findItems(cam_iid, Qt.MatchFixedString)[0]
-        self.img_list.takeItem(self.img_list.row(cam_iid_item))
+        parent_widget = self.parent.iface.mainWindow()
 
-        self.cam_lyr.selectByExpression(u"\"iid\" = '%s'" % (cam_iid), QgsVectorLayer.SelectBehavior.SetSelection)
-        if self.cam_lyr.selectedFeatureCount() > 0:
-            self.cam_lyr.startEditing()
-            self.cam_lyr.deleteSelectedFeatures()
-            self.cam_lyr.commitChanges()
-        
-        self.map_line_lyr.selectByExpression(u"\"iid\" = '%s'" % (cam_iid), QgsVectorLayer.SelectBehavior.SetSelection)
-        if self.map_line_lyr.selectedFeatureCount() > 0:
-            self.map_line_lyr.startEditing()
-            self.map_line_lyr.deleteSelectedFeatures()
-            self.map_line_lyr.commitChanges()
-        
-        self.img_line_lyr.selectByExpression(u"\"iid\" = '%s'" % (cam_iid), QgsVectorLayer.SelectBehavior.SetSelection)
-        if self.img_line_lyr.selectedFeatureCount() > 0:
-            self.img_line_lyr.startEditing()
-            self.img_line_lyr.deleteSelectedFeatures()
-            self.img_line_lyr.commitChanges()
+        reply = QMessageBox.question(
+            parent_widget,
+            "Remove Camera",
+            "Do you really want to remove {} from the project?".format(cam_iid),
+            QMessageBox.Yes | QMessageBox.Cancel,
+            QMessageBox.Cancel
+        )
 
-        self.map_line_vx_lyr.selectByExpression(u"\"iid\" = '%s'" % (cam_iid), QgsVectorLayer.SelectBehavior.SetSelection)
-        if self.map_line_vx_lyr.selectedFeatureCount() > 0:
-            self.map_line_vx_lyr.startEditing()
-            self.map_line_vx_lyr.deleteSelectedFeatures()
-            self.map_line_vx_lyr.commitChanges()
-        
-        self.map_gcps_lyr.selectByExpression(u"\"iid\" = '%s'" % (cam_iid), QgsVectorLayer.SelectBehavior.SetSelection)    
-        if self.map_gcps_lyr.selectedFeatureCount() > 0:
-            self.map_gcps_lyr.startEditing()
-            self.map_gcps_lyr.deleteSelectedFeatures()
-            self.map_gcps_lyr.commitChanges()
+        if reply == QMessageBox.Yes:
+            cam_iid_item = self.img_list.findItems(cam_iid, Qt.MatchFixedString)[0]
+            self.img_list.takeItem(self.img_list.row(cam_iid_item))
+
+            self.cam_lyr.selectByExpression(u"\"iid\" = '%s'" % (cam_iid), QgsVectorLayer.SelectBehavior.SetSelection)
+            if self.cam_lyr.selectedFeatureCount() > 0:
+                self.cam_lyr.startEditing()
+                self.cam_lyr.deleteSelectedFeatures()
+                self.cam_lyr.commitChanges()
+            
+            self.map_line_lyr.selectByExpression(u"\"iid\" = '%s'" % (cam_iid), QgsVectorLayer.SelectBehavior.SetSelection)
+            if self.map_line_lyr.selectedFeatureCount() > 0:
+                self.map_line_lyr.startEditing()
+                self.map_line_lyr.deleteSelectedFeatures()
+                self.map_line_lyr.commitChanges()
+            
+            self.img_line_lyr.selectByExpression(u"\"iid\" = '%s'" % (cam_iid), QgsVectorLayer.SelectBehavior.SetSelection)
+            if self.img_line_lyr.selectedFeatureCount() > 0:
+                self.img_line_lyr.startEditing()
+                self.img_line_lyr.deleteSelectedFeatures()
+                self.img_line_lyr.commitChanges()
+
+            self.map_line_vx_lyr.selectByExpression(u"\"iid\" = '%s'" % (cam_iid), QgsVectorLayer.SelectBehavior.SetSelection)
+            if self.map_line_vx_lyr.selectedFeatureCount() > 0:
+                self.map_line_vx_lyr.startEditing()
+                self.map_line_vx_lyr.deleteSelectedFeatures()
+                self.map_line_vx_lyr.commitChanges()
+            
+            self.map_gcps_lyr.selectByExpression(u"\"iid\" = '%s'" % (cam_iid), QgsVectorLayer.SelectBehavior.SetSelection)    
+            if self.map_gcps_lyr.selectedFeatureCount() > 0:
+                self.map_gcps_lyr.startEditing()
+                self.map_gcps_lyr.deleteSelectedFeatures()
+                self.map_gcps_lyr.commitChanges()
+            
+            self.img_canvas.setLayers([])
+            self.img_canvas.refresh()
+
+        else:
+            pass
         
     def align_view(self):
         self.set_obj_canvas_camera(self.camera_collection[self.img_context_menu.title()].asdict())
@@ -1952,6 +2029,7 @@ class MainDialog(QtWidgets.QDialog):
         self.setWindowTitle("%s" % (self.project_name))
 
         iid = item.text()
+        self.current_iid = None
         self.repaint_cam_pos(iid, False)
         
     def toggle_camera(self, item):
@@ -1962,6 +2040,7 @@ class MainDialog(QtWidgets.QDialog):
         self.uncheck_list_items(item)
                     
         iid = item.text()
+        self.current_iid = iid
         iid_path = self.camera_collection[iid].path
                 
         if not os.path.exists(iid_path):
@@ -1996,7 +2075,7 @@ class MainDialog(QtWidgets.QDialog):
         field_names = [field.name() for field in self.map_gcps_lyr.fields()]
         
         expression = u"\"iid\" = '%s'" % (iid)
-        QTimer.singleShot(80, lambda: self.apply_subset(expression))
+        QTimer.singleShot(200, lambda: self.apply_subset(expression))
         
         # Set the selection
         self.cam_lyr.selectByExpression(expression, QgsVectorLayer.SelectBehavior.SetSelection)
@@ -2012,7 +2091,7 @@ class MainDialog(QtWidgets.QDialog):
         self.active_camera = self.camera_collection[iid]
         self.setWindowTitle("%s - %s" % (self.project_name, iid))
         
-        QTimer.singleShot(100, self.draw_obj_gcps)
+        QTimer.singleShot(300, self.draw_obj_gcps)
 
         if self.active_camera.is_oriented == 1:
             self.btn_mono_tool.setEnabled(True)
