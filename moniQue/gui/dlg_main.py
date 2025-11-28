@@ -498,7 +498,7 @@ class MainDialog(QtWidgets.QDialog):
 
             attempts['n'] += 1
 
-            if attempts['n'] <= 40:
+            if attempts['n'] <= 100:
                 QTimer.singleShot(retry_ms, check_fields)
             else:
                 self.msg_bar.pushMessage("Error", "Layer attributes not available. Please reload the project.", level=Qgis.Critical, duration=3)

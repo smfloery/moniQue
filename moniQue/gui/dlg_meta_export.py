@@ -101,7 +101,7 @@ class ExportMetaDialog(QDialog):
         layout.addRow(QLabel("Height"), self.res_height)
         layout.addRow(QLabel("Depth Offset"), self.depth_offset)
 
-        self.hide_gcps_checkbox = QCheckBox("Hide GCPs in export")
+        self.hide_gcps_checkbox = QCheckBox("Hide GCPs in Export")
         self.hide_gcps_checkbox.setChecked(False)
         layout.addRow(self.hide_gcps_checkbox)
   
