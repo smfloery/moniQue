@@ -1,4 +1,4 @@
-from PyQt5.QtWidgets import QDialog, QGroupBox, QLineEdit, QDialogButtonBox, QVBoxLayout, QFormLayout, QLabel, QComboBox, QErrorMessage, QFileDialog
+from PyQt5.QtWidgets import QDialog, QGroupBox, QLineEdit, QDialogButtonBox, QVBoxLayout, QFormLayout, QLabel, QErrorMessage, QCheckBox
 from PyQt5.QtGui import QIntValidator
 
 class ExportMetaDialog(QDialog):
@@ -100,6 +100,10 @@ class ExportMetaDialog(QDialog):
         layout.addRow(QLabel("Width"), self.res_width)
         layout.addRow(QLabel("Height"), self.res_height)
         layout.addRow(QLabel("Depth Offset"), self.depth_offset)
+
+        self.hide_gcps_checkbox = QCheckBox("Hide GCPs in export")
+        self.hide_gcps_checkbox.setChecked(False)
+        layout.addRow(self.hide_gcps_checkbox)
   
         # setting layout
         self.formGroupBox.setLayout(layout)

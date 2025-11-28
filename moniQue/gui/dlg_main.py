@@ -485,10 +485,29 @@ class MainDialog(QtWidgets.QDialog):
                 with open(json_path, "w", encoding="utf-8") as json_file:
                     json_file.write(json_cam.decode(encoding="utf-8"))
 
+    def apply_subset_when_ready(self, lyr, expression, on_success=None, retry_ms=50):
+        attempts = {'n': 0}
+
+        def check_fields():
+
+            if lyr and lyr.fields() and lyr.fields().count() > 0:
+                self.apply_subset(expression)
+                if on_success:
+                    on_success()
+                return
+
+            attempts['n'] += 1
+
+            if attempts['n'] <= 40:
+                QTimer.singleShot(retry_ms, check_fields)
+            else:
+                self.msg_bar.pushMessage("Error", "Layer attributes not available. Please reload the project.", level=Qgis.Critical, duration=3)
+
+        QTimer.singleShot(retry_ms, check_fields)
 
     def apply_subset(self, expression):
         self.img_line_lyr.setSubsetString(expression) #show only those lines which correspond to the currently selected image
-        self.img_gcps_lyr.setSubsetString(expression)
+        self.img_gcps_lyr.setSubsetString(expression) #show only those gcps which correspond to the currently selected image
         self.map_line_vx_lyr.setSubsetString(expression)
         self.map_gcps_lyr.setSubsetString(expression) 
 
@@ -1672,45 +1691,35 @@ class MainDialog(QtWidgets.QDialog):
             export_path = QtWidgets.QFileDialog.getExistingDirectory(self)
         else:
             export_path=''
-
+        
         if len(export_path) > 0:
+
             resolution = [int(export_dialog.res_width.text()), int(export_dialog.res_height.text())]
             
             offscreen_canvas = offscreenCanvas(size=(resolution[0], resolution[1]), pixel_ratio=1)
             offscreen_renderer = gfx.WgpuRenderer(offscreen_canvas)
 
-            if export_dialog.depth_offset.text() == '':
-                pass
-            else:
+            if export_dialog.depth_offset.text() != '':
                 if int(export_dialog.depth_offset.text()) > 0:
                     depth_set = True  
                     curr_depth = self.obj_camera.depth_range
                     self.obj_camera.depth_range = (int(export_dialog.depth_offset.text()), curr_depth[1])
-                else:
-                    pass
 
-            # for pnts in self.obj_gcps_grp.children:
-            #     pnts.visible = False
-
-            # bg = gfx.Background(None, gfx.BackgroundMaterial([0.086, 0.475, 0.671, 1]))
-            # self.obj_scene.remove(self.background)
-            # self.obj_scene.add(bg)
+            restore_visibility = []
+            if export_dialog.hide_gcps_checkbox.isChecked():
+                for p in self.obj_gcps_grp.children:
+                    restore_visibility.append((p, p.visible))
+                    p.visible = False
 
             offscreen_canvas.request_draw(offscreen_renderer.render(self.obj_scene, self.obj_camera))
             img = Image.fromarray(np.asarray(offscreen_canvas.draw()))
             img.save(os.path.join(export_path, export_dialog.file_name.text() + "_render.png"))
 
-            # self.obj_scene.remove(bg)
-            # self.obj_scene.add(self.background)
+            for p, was_visible in restore_visibility:
+                p.visible = was_visible
 
-            # for pnts in self.obj_gcps_grp.children:
-            #     pnts.visible = True
-
-            # if depth_set:
-            #     self.obj_camera.depth_range = (curr_depth[0], curr_depth[1])
-        
-        else:
-            pass
+            if depth_set:
+                self.obj_camera.depth_range = (curr_depth[0], curr_depth[1])
         
     def show_image_menu(self, point):
         clicked_list_item = self.img_list.itemAt(point.x(), point.y())
@@ -2018,7 +2027,7 @@ class MainDialog(QtWidgets.QDialog):
         self.btn_obj_canvas_show_img.setEnabled(False)
         
         expression = u"\"iid\" = ''"
-        QTimer.singleShot(100, lambda: self.apply_subset(expression))
+        self.apply_subset_when_ready(self.map_gcps_lyr, expression)
         
         self.cam_lyr.removeSelection()
         
@@ -2070,28 +2079,20 @@ class MainDialog(QtWidgets.QDialog):
             else:
                 return
         
+        #Load image
         self.load_img(iid, iid_path)
         
-        field_names = [field.name() for field in self.map_gcps_lyr.fields()]
-        
+        #Define expression
         expression = u"\"iid\" = '%s'" % (iid)
-        QTimer.singleShot(200, lambda: self.apply_subset(expression))
+
+        #Apply Subset after ensuring the layer has been loaded
+        self.apply_subset_when_ready(self.map_gcps_lyr, expression, on_success=self.draw_obj_gcps)
         
         # Set the selection
         self.cam_lyr.selectByExpression(expression, QgsVectorLayer.SelectBehavior.SetSelection)
-        
-
-        #sometimes setting the expressions somehow corrupts the map_gcps_lyr; as result no attributes are available anymore
-        #I couldnt figure out the reason; however, by raising the error and reloading the project the error can be bypassed
-        # field_names = [field.name() for field in self.map_gcps_lyr.fields()]
-        # if len(field_names) == 0:
-        #     self.msg_bar.pushMessage("Error", "Something went wrong! Please reload the project.", level=Qgis.Critical, duration=3)
-        #     return None
                 
         self.active_camera = self.camera_collection[iid]
         self.setWindowTitle("%s - %s" % (self.project_name, iid))
-        
-        QTimer.singleShot(300, self.draw_obj_gcps)
 
         if self.active_camera.is_oriented == 1:
             self.btn_mono_tool.setEnabled(True)
