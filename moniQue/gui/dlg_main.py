@@ -538,31 +538,39 @@ class MainDialog(QtWidgets.QDialog):
             if src_lyr is None:
                 return None
 
-            crs = src_lyr.crs().authid()
+            crs = src_lyr.crs()
+            crs_authid = crs.authid()
+
+            if not crs_authid:
+                print(f"WARNING: Layer {src_lyr.name()} CRS has no authid → using EPSG:3035 fallback")
+                crs_authid = "EPSG:3035"
+
             geom = src_lyr.geometryType()
 
             if geom == QgsWkbTypes.PointGeometry:
-                uri = f"Point?crs={crs}"
+                uri = f"Point?crs={crs_authid}"
             elif geom == QgsWkbTypes.LineGeometry:
-                uri = f"LineString?crs={crs}"
+                uri = f"LineString?crs={crs_authid}"
             elif geom == QgsWkbTypes.PolygonGeometry:
-                uri = f"Polygon?crs={crs}"
+                uri = f"Polygon?crs={crs_authid}"
             else:
-                uri = f"Point?crs={crs}"
+                uri = f"Point?crs={crs_authid}"
 
             mem = QgsVectorLayer(uri, name, "memory")
-            
+
+            mem.setCrs(crs)
+
             pr = mem.dataProvider()
             pr.addAttributes(src_lyr.fields())
             mem.updateFields()
 
-            feats = [f for f in src_lyr.getFeatures()]
+            feats = list(src_lyr.getFeatures())
             if feats:
                 pr.addFeatures(feats)
                 mem.updateExtents()
 
             return mem
-        
+
         self.original_img_gcps_lyr = lyr_dict.get("img_gcps_lyr")
         self.original_map_gcps_lyr = lyr_dict.get("map_gcps_lyr")
         self.original_img_line_lyr = lyr_dict.get("img_line_lyr")
@@ -650,6 +658,7 @@ class MainDialog(QtWidgets.QDialog):
         self.btn_save_prj.setEnabled(changed)
 
     def save_memory_layers_to_gpkg(self):
+
         layer_pairs = [
             (self.original_img_gcps_lyr, self.img_gcps_lyr),
             (self.original_map_gcps_lyr, self.map_gcps_lyr),
@@ -660,38 +669,33 @@ class MainDialog(QtWidgets.QDialog):
 
         project = QgsProject.instance()
 
-        for orig, mem in layer_pairs:
+        def copy_features(orig, mem):
             if orig is None or mem is None:
-                print("WARNING: Missing layer pair:", orig, mem)
-                continue
+                return
 
-            orig.startEditing()
-            pr = orig.dataProvider()
-            pr.truncate()
-            pr.addFeatures(mem.getFeatures())
-            orig.commitChanges()
+            prov = orig.dataProvider()
+
+            prov.truncate()
+            prov.addFeatures(list(mem.getFeatures()))
+
+            if mem.crs().isValid():
+                orig.setCrs(mem.crs())
+
             orig.triggerRepaint()
 
             vis = project.mapLayer(orig.id())
             if vis:
-                vis.startEditing()
                 prv = vis.dataProvider()
                 prv.truncate()
-                prv.addFeatures(mem.getFeatures())
-                vis.commitChanges()
+                prv.addFeatures(list(mem.getFeatures()))
+                if mem.crs().isValid():
+                    vis.setCrs(mem.crs())
                 vis.triggerRepaint()
-            else:
-                print("WARNING: original layer not found in project:", orig.name())
+
+        for orig, mem in layer_pairs:
+            copy_features(orig, mem)
 
         self.mark_gcp_changed(False)
-
-        self.msg_bar.pushMessage(
-            "Success",
-            "Project has been successfully saved.",
-            level=Qgis.Success,
-            duration=3
-        )
-
 
     def show_dlg_create(self):
         json_path = QtWidgets.QFileDialog.getOpenFileName(None, "Open project", "", ("Geopackage (*.json)"))[0]
