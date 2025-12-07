@@ -188,11 +188,15 @@ class MonoMapTool(QgsMapTool):
                     img_feat["type"] = feat_attr["type"]
                     img_feat["comment"] = feat_attr["comment"]
                     
+                    self.img_lyr.startEditing()
                     self.img_lyr.dataProvider().addFeatures([img_feat])
                     self.img_lyr.commitChanges()
                     self.img_lyr.triggerRepaint()
                     
                     self.img_canvas.refresh()
+
+                    if self.main_dlg:
+                        self.main_dlg.mark_gcp_changed(True)
 
                     vx_feats = []
                     for vx in range(len(map_line_pnts_h)):

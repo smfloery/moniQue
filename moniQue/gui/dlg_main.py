@@ -144,10 +144,6 @@ class MainDialog(QtWidgets.QDialog):
         self.export_menu = QtWidgets.QMenu("&Export", self)
         self.export_menu.setEnabled(False)
         self.menu.addMenu(self.export_menu)
-
-        # self.view_menu = QtWidgets.QMenu("&View", self)
-        # self.view_menu.setEnabled(False)
-        # self.menu.addMenu(self.view_menu)
         
         self.create_action = QtWidgets.QAction("&Create from *.json", self)
         self.create_action.triggered.connect(self.show_dlg_create)
@@ -528,18 +524,9 @@ class MainDialog(QtWidgets.QDialog):
                 with open(json_path, "w", encoding="utf-8") as json_file:
                     json_file.write(json_cam.decode(encoding="utf-8"))
 
-
     def set_layers(self, lyr_dict):
 
-        self.original_img_gcps_lyr = lyr_dict.get("img_gcps_lyr")
-        self.original_map_gcps_lyr = lyr_dict.get("map_gcps_lyr")
-
-        self.reg_lyr = lyr_dict["reg_lyr"]
-        self.cam_lyr = lyr_dict["cam_lyr"]
-        self.img_lyr = None  # will be set when terrestrial image is loaded
-
         def clone_to_memory(src_lyr, name):
-
             if src_lyr is None:
                 return None
 
@@ -556,6 +543,7 @@ class MainDialog(QtWidgets.QDialog):
                 uri = f"Point?crs={crs}"
 
             mem = QgsVectorLayer(uri, name, "memory")
+            
             pr = mem.dataProvider()
             pr.addAttributes(src_lyr.fields())
             mem.updateFields()
@@ -563,31 +551,30 @@ class MainDialog(QtWidgets.QDialog):
             feats = [f for f in src_lyr.getFeatures()]
             if feats:
                 pr.addFeatures(feats)
-            mem.updateExtents()
+                mem.updateExtents()
+
             return mem
-
-        self.img_gcps_lyr = clone_to_memory(lyr_dict.get("img_gcps_lyr"), "img_gcps_mem")
-        self.map_gcps_lyr = clone_to_memory(lyr_dict.get("map_gcps_lyr"), "map_gcps_mem")
-
-        orig_img_line = lyr_dict.get("img_line_lyr")
-
-        if orig_img_line is not None and self.img_gcps_lyr is not None:
-            pixel_crs = self.img_gcps_lyr.crs().authid()
-
-            uri = f"LineString?crs={pixel_crs}"
-            mem_line = QgsVectorLayer(uri, "img_lines_mem", "memory")
-
-            pr = mem_line.dataProvider()
-            pr.addAttributes(orig_img_line.fields())
-            mem_line.updateFields()
-
-            self.img_line_lyr = mem_line
-        else:
-            self.img_line_lyr = None
         
-        self.map_line_vx_lyr = clone_to_memory(lyr_dict.get("map_line_vx_lyr"), "map_line_vx_mem")
+        self.original_img_gcps_lyr = lyr_dict.get("img_gcps_lyr")
+        self.img_gcps_lyr = clone_to_memory(self.original_img_gcps_lyr, "img_gcps_mem")
 
-        self.map_line_lyr = lyr_dict.get("map_line_lyr")
+        self.original_map_gcps_lyr = lyr_dict.get("map_gcps_lyr")
+        self.map_gcps_lyr = clone_to_memory(self.original_map_gcps_lyr, "map_gcps_mem")
+
+        self.original_img_line_lyr = lyr_dict.get("img_line_lyr")
+        self.img_line_lyr = clone_to_memory(self.original_img_line_lyr, "img_line_mem")
+
+        self.original_map_line_vx_lyr = lyr_dict.get("map_line_vx_lyr")
+        self.map_line_vx_lyr = clone_to_memory(self.original_map_line_vx_lyr, "map_line_vx_mem")
+
+        self.original_map_line_lyr = lyr_dict.get("map_line_lyr")
+        self.map_line_lyr = clone_to_memory(self.original_map_line_lyr, "map_line_mem")
+
+        self.reg_lyr = lyr_dict["reg_lyr"]
+        self.cam_lyr = lyr_dict["cam_lyr"]
+        self.img_lyr = None
+
+        # self.map_line_lyr = self.original_map_line_lyr
 
         if self.img_gcps_lyr is not None:
             self.img_gcps_gid_ix = self.img_gcps_lyr.fields().indexOf("gid")
@@ -610,12 +597,12 @@ class MainDialog(QtWidgets.QDialog):
             self.map_gcps_lyr_obj_z_ix = -1
 
         canvas_layers = []
-        if self.img_line_lyr is not None:
+
+        if self.img_line_lyr:
             canvas_layers.append(self.img_line_lyr)
-        if self.img_gcps_lyr is not None:
+        if self.img_gcps_lyr:
             canvas_layers.append(self.img_gcps_lyr)
 
-        #define layers which should be shown/considered in which canvas
         self.img_canvas.setLayers(canvas_layers)
         self.img_canvas.setMapTool(self.img_pan_tool)
 
@@ -623,46 +610,77 @@ class MainDialog(QtWidgets.QDialog):
         self.mono_select_tool.set_layers(self.img_line_lyr, self.map_line_lyr, self.map_line_vx_lyr)
         self.mono_vertex_tool.set_layers(self.img_line_lyr, self.map_line_lyr)
 
-        self.img_gcps_lyr.geometryChanged.connect(self._layer_changed)
-        self.img_gcps_lyr.attributeValueChanged.connect(self._layer_changed)
-        self.img_gcps_lyr.featureAdded.connect(self._layer_changed)
-        self.img_gcps_lyr.featureDeleted.connect(self._layer_changed)
+        qml_dir = os.path.join(self.plugin_dir, "gfx", "qml")
 
-        self.map_gcps_lyr.geometryChanged.connect(self._layer_changed)
-        self.map_gcps_lyr.attributeValueChanged.connect(self._layer_changed)
-        self.map_gcps_lyr.featureAdded.connect(self._layer_changed)
-        self.map_gcps_lyr.featureDeleted.connect(self._layer_changed)
+        self.apply_qml(self.img_gcps_lyr, os.path.join(qml_dir, "gcps_img.qml"))
+        self.apply_qml(self.map_gcps_lyr, os.path.join(qml_dir, "gcps_map.qml"))
+        self.apply_qml(self.img_line_lyr, os.path.join(qml_dir, "lines_img.qml"))
+        self.apply_qml(self.map_line_lyr, os.path.join(qml_dir, "lines_map.qml"))
+        self.apply_qml(self.map_line_vx_lyr, os.path.join(qml_dir, "lines_map_vx.qml"))
 
+        for lyr in (self.img_gcps_lyr, self.map_gcps_lyr, self.img_line_lyr, self.map_line_lyr, self.map_line_vx_lyr):
+            if lyr:
+                lyr.geometryChanged.connect(self.layer_changed)
+                lyr.attributeValueChanged.connect(self.layer_changed)
+                lyr.featureAdded.connect(self.layer_changed)
+                lyr.featureDeleted.connect(self.layer_changed)
+        
+    def apply_qml(self, layer, qml_path):
+        if layer and layer.isValid():
+            layer.loadNamedStyle(qml_path)
+            layer.triggerRepaint()
 
-    def _layer_changed(self, *args):
+    def layer_changed(self):
         self.mark_gcp_changed(True)
-
 
     def mark_gcp_changed(self, changed):
         self.gcp_changed = bool(changed)
         self.btn_save_prj.setEnabled(changed)
 
-
     def save_memory_layers_to_gpkg(self):
-
         orig_img = self.original_img_gcps_lyr
         orig_map = self.original_map_gcps_lyr
+        orig_img_lines = self.original_img_line_lyr
+        orig_map_lines = self.original_map_line_lyr
+        orig_map_vx = self.original_map_line_vx_lyr
 
-        if orig_img is None or orig_map is None:
-            print("ERROR: Original GPKG layers not available!")
+        if None in (orig_img, orig_map, orig_img_lines, orig_map_lines, orig_map_vx):
+            print("ERROR: One or more original layers missing!")
             return
 
-        pr_img = orig_img.dataProvider()
-        pr_img.truncate()
-        pr_img.addFeatures(self.img_gcps_lyr.getFeatures())
-        orig_img.commitChanges()
-        orig_img.triggerRepaint()
+        def overwrite_layer(target, source_feats):
+            pr = target.dataProvider()
+            pr.truncate()
+            pr.addFeatures(source_feats)
+            target.commitChanges()
+            target.triggerRepaint()
 
-        pr_map = orig_map.dataProvider()
-        pr_map.truncate()
-        pr_map.addFeatures(self.map_gcps_lyr.getFeatures())
-        orig_map.commitChanges()
-        orig_map.triggerRepaint()
+        overwrite_layer(orig_img, self.img_gcps_lyr.getFeatures())
+        overwrite_layer(orig_map, self.map_gcps_lyr.getFeatures())
+        overwrite_layer(orig_img_lines, self.img_line_lyr.getFeatures())
+        overwrite_layer(orig_map_lines, self.map_line_lyr.getFeatures())
+        overwrite_layer(orig_map_vx, self.map_line_vx_lyr.getFeatures())
+
+        project = QgsProject.instance()
+
+        def sync_qgis_layer(original, memory_layer):
+            qgis_layer = project.mapLayer(original.id())
+            if qgis_layer is None:
+                print("Warning: visible layer not found for", original.name())
+                return
+
+            qgis_layer.startEditing()
+            prov = qgis_layer.dataProvider()
+            prov.truncate()
+            prov.addFeatures(memory_layer.getFeatures())
+            qgis_layer.commitChanges()
+            qgis_layer.triggerRepaint()
+
+        sync_qgis_layer(orig_img, self.img_gcps_lyr)
+        sync_qgis_layer(orig_map, self.map_gcps_lyr)
+        sync_qgis_layer(orig_img_lines, self.img_line_lyr)
+        sync_qgis_layer(orig_map_lines, self.map_line_lyr)
+        sync_qgis_layer(orig_map_vx, self.map_line_vx_lyr)
 
         self.mark_gcp_changed(False)
 
@@ -672,6 +690,7 @@ class MainDialog(QtWidgets.QDialog):
             level=Qgis.Success,
             duration=3
         )
+
 
 
     def show_dlg_create(self):
@@ -1437,8 +1456,6 @@ class MainDialog(QtWidgets.QDialog):
         self.img_gcps_lyr.selectByExpression(f"\"gid\" = {self.sel_gid}")
         self.map_gcps_lyr.selectByExpression(f"\"gid\" = {self.sel_gid}")
 
-        self.draw_img_gcps()
-        self.draw_img_residual_lines()
         self.draw_obj_gcps()
 
     
@@ -1448,8 +1465,6 @@ class MainDialog(QtWidgets.QDialog):
         self.img_gcps_lyr.removeSelection()
         self.map_gcps_lyr.removeSelection()
 
-        self.draw_img_gcps()
-        self.draw_img_residual_lines()
         self.draw_obj_gcps()
 
         
@@ -1569,7 +1584,6 @@ class MainDialog(QtWidgets.QDialog):
         if self.json_check == False:
             self.update_camera(data)
             self.update_gcps(data)
-            self.draw_img_residual_lines()
         
     def update_camera(self, data):
         curr_cam = list(self.cam_lyr.getFeatures(expression = "\"iid\" = '%s'" % (self.active_camera.iid)))[0]
@@ -2114,145 +2128,6 @@ class MainDialog(QtWidgets.QDialog):
         # self.map_line_vx_lyr.triggerRepaint()
 
 
-    def draw_img_gcps(self):
-
-        if self.current_iid is None or self.img_gcps_lyr is None:
-            return
-
-        root = QgsRuleBasedRenderer.Rule(None)
-
-        if self.sel_gid is not None:
-            sel_symbol = QgsMarkerSymbol.createSimple({
-                "color": self.color_selected_2d,
-                "size": "2.5"
-            })
-            rule_sel = QgsRuleBasedRenderer.Rule(sel_symbol)
-            rule_sel.setFilterExpression(
-                f"\"iid\" = '{self.current_iid}' AND \"gid\" = '{self.sel_gid}'"
-            )
-            root.appendChild(rule_sel)
-
-        active_symbol = QgsMarkerSymbol.createSimple({
-            "color": self.color_active_2d,
-            "size": "2.5"
-        })
-        rule_active = QgsRuleBasedRenderer.Rule(active_symbol)
-        rule_active.setFilterExpression(
-            f"\"iid\" = '{self.current_iid}' AND \"active\" = '1'"
-        )
-        root.appendChild(rule_active)
-
-        inactive_symbol = QgsMarkerSymbol.createSimple({
-            "color": self.color_inactive_2d,
-            "size": "2.5"
-        })
-        rule_inactive = QgsRuleBasedRenderer.Rule(inactive_symbol)
-        rule_inactive.setFilterExpression(
-            f"\"iid\" = '{self.current_iid}' AND \"active\" = '0'"
-        )
-        root.appendChild(rule_inactive)
-
-        renderer = QgsRuleBasedRenderer(root)
-        self.img_gcps_lyr.setRenderer(renderer)
-        self.img_gcps_lyr.triggerRepaint()
-
-        label_settings = QgsPalLayerSettings()
-        label_settings.fieldName = "gid"
-        label_settings.placement = QgsPalLayerSettings.OverPoint
-        label_settings.enabled = True
-
-        text_format = QgsTextFormat()
-
-        font = text_format.font()
-        font.setFamily("Roboto")
-        font.setStretch(95)
-        font.setWeight(QFont.DemiBold)
-
-        buffer = QgsTextBufferSettings()
-        buffer.setEnabled(True)
-        buffer.setSize(1)
-        buffer.setColor(QColor(255, 255, 255))
-
-        text_format.setFont(font)
-        text_format.setBuffer(buffer)
-        text_format.setSize(20)
-        text_format.setColor(QColor(0, 0, 0))
-
-        label_settings.setFormat(text_format)
-
-        label_settings.xOffset = 0
-        label_settings.yOffset = -20
-        label_settings.offsetUnits = QgsUnitTypes.RenderPixels
-
-        self.img_gcps_lyr.setLabelsEnabled(True)
-        self.img_gcps_lyr.setLabeling(QgsVectorLayerSimpleLabeling(label_settings))
-        self.img_gcps_lyr.triggerRepaint()
-        self.img_canvas.refresh()
-
-
-    def draw_img_residual_lines(self):
-
-        if self.current_iid is None:
-            return
-        if self.img_gcps_lyr is None or self.img_line_lyr is None:
-            return
-
-        prov = self.img_line_lyr.dataProvider()
-
-        self.img_line_lyr.startEditing()
-        old_ids = [f.id() for f in self.img_line_lyr.getFeatures()]
-        if old_ids:
-            prov.deleteFeatures(old_ids)
-
-        new_feats = []
-        scale = 1.0
-
-        for feat in self.img_gcps_lyr.getFeatures():
-            if feat["iid"] != self.current_iid:
-                continue
-
-            x0 = feat["img_x"]
-            y0 = feat["img_y"]
-            dx = feat["img_dx"]
-            dy = feat["img_dy"]
-
-            if dx in (None, "") or dy in (None, ""):
-                continue
-
-            try:
-                x0f = float(x0)
-                y0f = float(y0)
-                dxf = float(dx)
-                dyf = float(dy)
-            except Exception:
-                continue
-
-            x1 = x0f + dxf * scale
-            y1 = y0f + dyf * scale
-
-            lf = QgsFeature(self.img_line_lyr.fields())
-            lf.setGeometry(QgsGeometry.fromPolylineXY([
-                QgsPointXY(x0f, y0f),
-                QgsPointXY(x1, y1)
-            ]))
-            lf.setAttribute("iid", self.current_iid)
-            new_feats.append(lf)
-
-        if new_feats:
-            prov.addFeatures(new_feats)
-
-        symbol = QgsLineSymbol.createSimple({
-            "color": "200,0,0",
-            "width": "1.5"
-        })
-        self.img_line_lyr.setRenderer(QgsSingleSymbolRenderer(symbol))
-
-        self.img_line_lyr.commitChanges()
-        self.img_line_lyr.triggerRepaint()
-        self.img_canvas.refresh()
-
-
-
     def draw_obj_gcps(self):
             
         self.obj_gcps_grp.clear()
@@ -2317,12 +2192,10 @@ class MainDialog(QtWidgets.QDialog):
         self.img_plane_grp.clear()
         self.obj_canvas.request_draw()
 
-        self.img_gcps_lyr.setRenderer(QgsSingleSymbolRenderer(QgsSymbol.defaultSymbol(self.img_gcps_lyr.geometryType())))
-        self.img_gcps_lyr.triggerRepaint()
-        self.img_canvas.refresh()
-
-        if self.cam_lyr is not None:
-            self.cam_lyr.removeSelection()
+        if self.img_gcps_lyr is not None:
+            self.img_gcps_lyr.setSubsetString("")
+        if self.img_line_lyr is not None:
+            self.img_line_lyr.setSubsetString("")
 
         try:
             self.img_canvas.setLayers([])
@@ -2330,12 +2203,16 @@ class MainDialog(QtWidgets.QDialog):
         except Exception:
             pass
 
+        if self.cam_lyr is not None:
+            self.cam_lyr.removeSelection()
+
         self.active_camera = None
         self.current_iid = None
         self.setWindowTitle(self.project_name)
 
         iid = item.text()
         self.repaint_cam_pos(iid, False)
+
 
 
     def toggle_camera(self, item):
@@ -2352,35 +2229,33 @@ class MainDialog(QtWidgets.QDialog):
         iid_path = self.camera_collection[iid].path
 
         if not os.path.exists(iid_path):
-            new_path = QFileDialog.getOpenFileName(self, "Image not found!", "", 
-                        "Image (*.tif *.tiff *.png *.jpg *.jpeg)")[0]
+            new_path = QFileDialog.getOpenFileName(
+                self, "Image not found!", "",
+                "Image (*.tif *.tiff *.png *.jpg *.jpeg)"
+            )[0]
             if not new_path:
                 return
+            self.camera_collection[iid].set_path(new_path)
             iid_path = new_path
-            self.camera_collection[iid].set_path(iid_path)
 
-        # load image
         self.load_img(iid, iid_path)
 
-        # select camera from layer by expression
-        expression = f"\"iid\" = '{iid}'"
-        if self.cam_lyr is not None:
-            self.cam_lyr.selectByExpression(expression, QgsVectorLayer.SelectBehavior.SetSelection)
+        if self.img_gcps_lyr is not None:
+            self.img_gcps_lyr.setSubsetString(f"\"iid\" = '{iid}'")
+        if self.img_line_lyr is not None:
+            self.img_line_lyr.setSubsetString(f"\"iid\" = '{iid}'")
 
-        # update active camera state
+        if self.cam_lyr is not None:
+            self.cam_lyr.selectByExpression(
+                f"\"iid\" = '{iid}'",
+                QgsVectorLayer.SelectBehavior.SetSelection
+            )
+
         self.active_camera = self.camera_collection[iid]
         self.setWindowTitle(f"{self.project_name} - {iid}")
 
-        # draw 2D GCPs from memory layer
-        self.draw_img_gcps()
-
-        # draw residual lines from memory layer
-        self.draw_img_residual_lines()
-
-        # draw 3D GCPs from memory layer
         self.draw_obj_gcps()
 
-        # enable/disable orientation-specific tools
         if self.active_camera.is_oriented == 1:
             self.btn_mono_tool.setEnabled(True)
             self.btn_mono_select.setEnabled(True)
@@ -2401,6 +2276,7 @@ class MainDialog(QtWidgets.QDialog):
 
         self.first_toggle = False
         self.prior_iid = iid
+
 
 
     def toggle_mono_tool(self):
