@@ -526,6 +526,14 @@ class MainDialog(QtWidgets.QDialog):
 
     def set_layers(self, lyr_dict):
 
+        proj = QgsProject.instance()
+
+        def ensure_in_project(layer):
+            if layer is None:
+                return
+            if proj.mapLayer(layer.id()) is None:
+                proj.addMapLayer(layer, False)
+
         def clone_to_memory(src_lyr, name):
             if src_lyr is None:
                 return None
@@ -556,25 +564,29 @@ class MainDialog(QtWidgets.QDialog):
             return mem
         
         self.original_img_gcps_lyr = lyr_dict.get("img_gcps_lyr")
-        self.img_gcps_lyr = clone_to_memory(self.original_img_gcps_lyr, "img_gcps_mem")
-
         self.original_map_gcps_lyr = lyr_dict.get("map_gcps_lyr")
-        self.map_gcps_lyr = clone_to_memory(self.original_map_gcps_lyr, "map_gcps_mem")
-
         self.original_img_line_lyr = lyr_dict.get("img_line_lyr")
-        self.img_line_lyr = clone_to_memory(self.original_img_line_lyr, "img_line_mem")
-
         self.original_map_line_vx_lyr = lyr_dict.get("map_line_vx_lyr")
-        self.map_line_vx_lyr = clone_to_memory(self.original_map_line_vx_lyr, "map_line_vx_mem")
-
         self.original_map_line_lyr = lyr_dict.get("map_line_lyr")
+
+        ensure_in_project(self.original_img_gcps_lyr)
+        ensure_in_project(self.original_map_gcps_lyr)
+        ensure_in_project(self.original_img_line_lyr)
+        ensure_in_project(self.original_map_line_lyr)
+        ensure_in_project(self.original_map_line_vx_lyr)
+
+        self.img_gcps_lyr = clone_to_memory(self.original_img_gcps_lyr, "img_gcps_mem")
+        self.map_gcps_lyr = clone_to_memory(self.original_map_gcps_lyr, "map_gcps_mem")
+        self.img_line_lyr = clone_to_memory(self.original_img_line_lyr, "img_line_mem")
+        self.map_line_vx_lyr = clone_to_memory(self.original_map_line_vx_lyr, "map_line_vx_mem")
         self.map_line_lyr = clone_to_memory(self.original_map_line_lyr, "map_line_mem")
+
+        print("original_map_line_vx_lyr =", self.original_map_line_vx_lyr)
+        print(self.original_map_line_vx_lyr.wkbType())
 
         self.reg_lyr = lyr_dict["reg_lyr"]
         self.cam_lyr = lyr_dict["cam_lyr"]
         self.img_lyr = None
-
-        # self.map_line_lyr = self.original_map_line_lyr
 
         if self.img_gcps_lyr is not None:
             self.img_gcps_gid_ix = self.img_gcps_lyr.fields().indexOf("gid")
@@ -638,49 +650,38 @@ class MainDialog(QtWidgets.QDialog):
         self.btn_save_prj.setEnabled(changed)
 
     def save_memory_layers_to_gpkg(self):
-        orig_img = self.original_img_gcps_lyr
-        orig_map = self.original_map_gcps_lyr
-        orig_img_lines = self.original_img_line_lyr
-        orig_map_lines = self.original_map_line_lyr
-        orig_map_vx = self.original_map_line_vx_lyr
-
-        if None in (orig_img, orig_map, orig_img_lines, orig_map_lines, orig_map_vx):
-            print("ERROR: One or more original layers missing!")
-            return
-
-        def overwrite_layer(target, source_feats):
-            pr = target.dataProvider()
-            pr.truncate()
-            pr.addFeatures(source_feats)
-            target.commitChanges()
-            target.triggerRepaint()
-
-        overwrite_layer(orig_img, self.img_gcps_lyr.getFeatures())
-        overwrite_layer(orig_map, self.map_gcps_lyr.getFeatures())
-        overwrite_layer(orig_img_lines, self.img_line_lyr.getFeatures())
-        overwrite_layer(orig_map_lines, self.map_line_lyr.getFeatures())
-        overwrite_layer(orig_map_vx, self.map_line_vx_lyr.getFeatures())
+        layer_pairs = [
+            (self.original_img_gcps_lyr, self.img_gcps_lyr),
+            (self.original_map_gcps_lyr, self.map_gcps_lyr),
+            (self.original_img_line_lyr, self.img_line_lyr),
+            (self.original_map_line_lyr, self.map_line_lyr),
+            (self.original_map_line_vx_lyr, self.map_line_vx_lyr),
+        ]
 
         project = QgsProject.instance()
 
-        def sync_qgis_layer(original, memory_layer):
-            qgis_layer = project.mapLayer(original.id())
-            if qgis_layer is None:
-                print("Warning: visible layer not found for", original.name())
-                return
+        for orig, mem in layer_pairs:
+            if orig is None or mem is None:
+                print("WARNING: Missing layer pair:", orig, mem)
+                continue
 
-            qgis_layer.startEditing()
-            prov = qgis_layer.dataProvider()
-            prov.truncate()
-            prov.addFeatures(memory_layer.getFeatures())
-            qgis_layer.commitChanges()
-            qgis_layer.triggerRepaint()
+            orig.startEditing()
+            pr = orig.dataProvider()
+            pr.truncate()
+            pr.addFeatures(mem.getFeatures())
+            orig.commitChanges()
+            orig.triggerRepaint()
 
-        sync_qgis_layer(orig_img, self.img_gcps_lyr)
-        sync_qgis_layer(orig_map, self.map_gcps_lyr)
-        sync_qgis_layer(orig_img_lines, self.img_line_lyr)
-        sync_qgis_layer(orig_map_lines, self.map_line_lyr)
-        sync_qgis_layer(orig_map_vx, self.map_line_vx_lyr)
+            vis = project.mapLayer(orig.id())
+            if vis:
+                vis.startEditing()
+                prv = vis.dataProvider()
+                prv.truncate()
+                prv.addFeatures(mem.getFeatures())
+                vis.commitChanges()
+                vis.triggerRepaint()
+            else:
+                print("WARNING: original layer not found in project:", orig.name())
 
         self.mark_gcp_changed(False)
 
@@ -690,7 +691,6 @@ class MainDialog(QtWidgets.QDialog):
             level=Qgis.Success,
             duration=3
         )
-
 
 
     def show_dlg_create(self):
@@ -1990,8 +1990,8 @@ class MainDialog(QtWidgets.QDialog):
         cam_iid = self.img_context_menu.title()
         expression = QgsExpression("\"iid\" = '%s'" % (cam_iid))
                 
-        img_lines = self.img_line_lyr.getFeatures(QgsFeatureRequest(expression))
-        nr_lines = len(list(img_lines))
+        img_lines = list(self.img_line_lyr.getFeatures(QgsFeatureRequest(expression)))
+        nr_lines = len(img_lines)
         
         if nr_lines > 0:
             
@@ -2013,7 +2013,7 @@ class MainDialog(QtWidgets.QDialog):
             self.map_line_lyr.startEditing()
             vex_feats = []
             lx = 0
-            for line_feat in self.img_line_lyr.getFeatures(QgsFeatureRequest(expression)):
+            for line_feat in img_lines:
                 line_geom = line_feat.geometry()
                 
                 line_fid = line_feat["fid"]
@@ -2030,7 +2030,7 @@ class MainDialog(QtWidgets.QDialog):
                     
                     ans_dist = ans["t_hit"].numpy().ravel()
                     ans_valid = np.isfinite(ans_dist)
-            
+
                     ans_coords = rays[:, :3] + rays[:, 3:] * ans_dist.reshape(-1,1)
                     ans_coords = ans_coords[ans_valid, :]
                                         
@@ -2047,26 +2047,35 @@ class MainDialog(QtWidgets.QDialog):
                     dir_evec_north = max_evec_dir_north(ans_covar)
                     
                     vex_obj_coords = ans_coords[0, :] + self.min_xyz
-                    
-                    vex_geom = QgsPoint(vex_obj_coords[0], vex_obj_coords[1], vex_obj_coords[2])
-                    
+
+                    #needs to be 2D point not 3D
+                    vex_geom = QgsPoint(vex_obj_coords[0], vex_obj_coords[1])
+
                     vex_feat = QgsFeature(self.map_line_vx_lyr.fields())
                     vex_feat.setGeometry(QgsGeometry.fromPoint(vex_geom))
                     vex_feat["iid"] = cam_iid
                     vex_feat["lid"] = line_fid
-                    vex_feat["obj_x_std"] = xyz_std[0]
-                    vex_feat["obj_y_std"] = xyz_std[1]
-                    vex_feat["obj_z_std"] = xyz_std[2]
-                    vex_feat["img_x"] = img_x
-                    vex_feat["img_y"] = img_y
-                    vex_feat["max_evec_dir"] = dir_evec_north
-                    vex_feat["pval"] = pval
+                    vex_feat["obj_x_std"] = float(xyz_std[0])
+                    vex_feat["obj_y_std"] = float(xyz_std[1])
+                    vex_feat["obj_z_std"] = float(xyz_std[2])
+                    vex_feat["img_x"] = float(img_x)
+                    vex_feat["img_y"] = float(img_y)
+                    vex_feat["max_evec_dir"] = float(dir_evec_north)
+                    vex_feat["pval"] = float(pval)
                     
                     vex_feats.append(vex_feat)
                     line_vex.append(vex_geom)
-                
-                line_geom_upd = QgsGeometry.fromPolyline(line_vex)
-                self.map_line_lyr.changeGeometry(line_fid, line_geom_upd)
+
+                if line_vex:
+                    line_geom_upd = QgsGeometry.fromPolyline(line_vex)
+
+                    expr = QgsExpression(f"\"iid\"='{cam_iid}' AND \"fid\"={line_fid}")
+                    req = QgsFeatureRequest(expr)
+
+                    for map_feat in self.map_line_lyr.getFeatures(req):
+                        qgis_fid = map_feat.id()
+                        self.map_line_lyr.changeGeometry(line_fid, line_geom_upd)
+                        break
                 
                 prog_box.setValue(lx+1)
                 lx+=1
@@ -2080,8 +2089,13 @@ class MainDialog(QtWidgets.QDialog):
             map_line_vx_lyr_pr.truncate()                               # deleting all features in the Vector layer
             
             map_line_vx_lyr_pr.addFeatures(vex_feats)
+            
             self.map_line_vx_lyr.commitChanges()
             self.map_line_vx_lyr.triggerRepaint()
+
+            prog_box.close()
+
+            # TODO: Remove lines_vx when monoplotting line is removed --> otherwise this leads to a bug where uncertainty can't be calculated after deleting a line
                     
             # prog_box = QtWidgets.QProgressDialog("Recalculating uncertainty...", None, 0, nr_lines, self)
             # prog_box.setWindowTitle("%s" % (cam_iid))
