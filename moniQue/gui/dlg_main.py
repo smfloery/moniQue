@@ -542,7 +542,6 @@ class MainDialog(QtWidgets.QDialog):
             crs_authid = crs.authid()
 
             if not crs_authid:
-                print(f"WARNING: Layer {src_lyr.name()} CRS has no authid → using EPSG:3035 fallback")
                 crs_authid = "EPSG:3035"
 
             geom = src_lyr.geometryType()
@@ -588,9 +587,6 @@ class MainDialog(QtWidgets.QDialog):
         self.img_line_lyr = clone_to_memory(self.original_img_line_lyr, "img_line_mem")
         self.map_line_vx_lyr = clone_to_memory(self.original_map_line_vx_lyr, "map_line_vx_mem")
         self.map_line_lyr = clone_to_memory(self.original_map_line_lyr, "map_line_mem")
-
-        print("original_map_line_vx_lyr =", self.original_map_line_vx_lyr)
-        print(self.original_map_line_vx_lyr.wkbType())
 
         self.reg_lyr = lyr_dict["reg_lyr"]
         self.cam_lyr = lyr_dict["cam_lyr"]
@@ -656,8 +652,14 @@ class MainDialog(QtWidgets.QDialog):
     def mark_gcp_changed(self, changed):
         self.gcp_changed = bool(changed)
         self.btn_save_prj.setEnabled(changed)
+    
 
     def save_memory_layers_to_gpkg(self):
+
+        iid = self.current_iid
+        if iid is None:
+            self.msg_bar.pushMessage("WARNING", "No active camera ID while saving. Please select a camera!", level=Qgis.Critical, duration=3)
+            return
 
         layer_pairs = [
             (self.original_img_gcps_lyr, self.img_gcps_lyr),
@@ -667,35 +669,35 @@ class MainDialog(QtWidgets.QDialog):
             (self.original_map_line_vx_lyr, self.map_line_vx_lyr),
         ]
 
-        project = QgsProject.instance()
+        for orig, mem in layer_pairs:
 
-        def copy_features(orig, mem):
             if orig is None or mem is None:
-                return
+                continue
 
-            prov = orig.dataProvider()
+            if not orig.isEditable():
+                orig.startEditing()
 
-            prov.truncate()
-            prov.addFeatures(list(mem.getFeatures()))
+            for f in orig.getFeatures(f"\"iid\" = '{iid}'"):
+                orig.deleteFeature(f.id())
 
-            if mem.crs().isValid():
-                orig.setCrs(mem.crs())
+            new_feats = [f for f in mem.getFeatures(f"\"iid\" = '{iid}'")]
+            orig.addFeatures(new_feats)
 
-            orig.triggerRepaint()
+            if orig.isEditable():
+                orig.commitChanges()
 
-            vis = project.mapLayer(orig.id())
+            vis = QgsProject.instance().mapLayer(orig.id())
+
             if vis:
-                prv = vis.dataProvider()
-                prv.truncate()
-                prv.addFeatures(list(mem.getFeatures()))
-                if mem.crs().isValid():
-                    vis.setCrs(mem.crs())
+                if vis.isEditable():
+                    vis.commitChanges()
+                vis.startEditing()
+                vis.commitChanges()
                 vis.triggerRepaint()
 
-        for orig, mem in layer_pairs:
-            copy_features(orig, mem)
-
         self.mark_gcp_changed(False)
+        self.msg_bar.pushMessage("Success", "Saved", level=Qgis.Success, duration=3)
+        vis.rollBack()
 
     def show_dlg_create(self):
         json_path = QtWidgets.QFileDialog.getOpenFileName(None, "Open project", "", ("Geopackage (*.json)"))[0]
@@ -1473,28 +1475,43 @@ class MainDialog(QtWidgets.QDialog):
 
         
     def delete_gcp(self, data):
-        if self.map_gcps_lyr.selectedFeatureCount() > 0:
-            self.map_gcps_lyr.startEditing()
-            self.map_gcps_lyr.deleteSelectedFeatures() 
-            self.map_gcps_lyr.commitChanges()
-        
-        if self.img_gcps_lyr.selectedFeatureCount() > 0:
-            self.img_gcps_lyr.startEditing()
-            self.img_gcps_lyr.deleteSelectedFeatures()
-            self.img_gcps_lyr.commitChanges()
+        gid = int(data["gid"])
+        iid = self.current_iid
 
-        del_gcp_obj = None
+        def _delete(lyr):
+            if lyr is None:
+                return 0
+            expr = f"\"gid\" = {gid} AND \"iid\" = '{iid}'"
+            req = QgsFeatureRequest().setFilterExpression(expr)
+            ids = [f.id() for f in lyr.getFeatures(req)]
+            if not ids:
+                return 0
+            lyr.startEditing()
+            lyr.dataProvider().deleteFeatures(ids)
+            lyr.commitChanges()
+            lyr.triggerRepaint()
+            return len(ids)
+
+        deleted_map = _delete(self.map_gcps_lyr)
+        deleted_img = _delete(self.img_gcps_lyr)
+
+        del_obj = None
         for gcp_obj in self.obj_gcps_grp.children:
-            if int(data["gid"]) == int(gcp_obj.geometry.gid.data[0]):
-                del_gcp_obj = gcp_obj
-                
-        if del_gcp_obj:
-            self.obj_gcps_grp.remove(del_gcp_obj)
+            try:
+                gid_obj = int(gcp_obj.geometry.gid.data[0])
+            except:
+                continue
+            if gid_obj == gid:
+                del_obj = gcp_obj
+                break
+
+        if del_obj:
+            self.obj_gcps_grp.remove(del_obj)
             self.obj_canvas.request_draw()
 
         self.mark_gcp_changed(True)
 
-            
+
     def add_camera_to_list(self, camera):
         """Add camera to the image list.
 
@@ -1606,6 +1623,7 @@ class MainDialog(QtWidgets.QDialog):
         for attr in attrs:
             self.cam_lyr.changeAttributeValue(curr_cam_fid, curr_cam.fieldNameIndex(attr), float(data[attr]) if attr in list(data.keys()) else None)
         
+        self.cam_lyr.commitChanges()
         self.cam_lyr.triggerRepaint()
 
         self.update_cam_pos(self.active_camera.iid)
@@ -1618,6 +1636,7 @@ class MainDialog(QtWidgets.QDialog):
         
         self.img_gcps_lyr.startEditing()
         self.map_gcps_lyr.startEditing()
+
         for gcp in curr_img_gcps:
             
             gcp_gid = str(gcp.attribute("gid"))
@@ -1648,13 +1667,19 @@ class MainDialog(QtWidgets.QDialog):
                     if int(gcp_fid) == int(pnts.geometry.gid.data[0]):
                         pnts.material = gfx.PointsMaterial(color=(0.87, 0.87, 0.87, 1), size=10)
 
+        self.img_gcps_lyr.commitChanges()
+        self.map_gcps_lyr.commitChanges()
+
+        self.img_gcps_lyr.triggerRepaint()
+        self.map_gcps_lyr.triggerRepaint()
+
         self.mark_gcp_changed(True)
 
     
     def save_gcp_to_lyr(self, data):
-        img_feat_geom = QgsPoint(data["img_x"], data["img_y"])
-        
+
         img_feat = QgsFeature(self.img_gcps_lyr.fields())
+        img_feat_geom = QgsPoint(data["img_x"], data["img_y"])
         img_feat.setGeometry(img_feat_geom)
         img_feat.setAttribute("iid", self.active_camera.iid)
         img_feat.setAttribute("gid", data["gid"])
@@ -1663,8 +1688,11 @@ class MainDialog(QtWidgets.QDialog):
         img_feat.setAttribute("desc", "")
         img_feat.setAttribute("active", 1)
         
+
         map_feat = QgsFeature(self.map_gcps_lyr.fields())
-        map_feat.setGeometry(QgsPoint(data["obj_x"], data["obj_y"]))
+        # map_feat.setGeometry(QgsPoint(data["obj_x"], data["obj_y"]))
+        map_feat_geom = QgsGeometry.fromPointXY(QgsPointXY(data["obj_x"], data["obj_y"]))
+        map_feat.setGeometry(map_feat_geom)
         map_feat["iid"] = self.active_camera.iid
         map_feat["gid"] = data["gid"]
         map_feat["obj_x"] = data["obj_x"]
@@ -2098,6 +2126,13 @@ class MainDialog(QtWidgets.QDialog):
             self.map_line_vx_lyr.triggerRepaint()
 
             prog_box.close()
+            self.mark_gcp_changed(True)
+
+        if self.map_line_lyr.isEditable():
+            self.map_line_lyr.commitChanges()
+        if self.map_line_vx_lyr.isEditable():
+            self.map_line_vx_lyr.commitChanges()
+        
 
             # TODO: Remove lines_vx when monoplotting line is removed --> otherwise this leads to a bug where uncertainty can't be calculated after deleting a line
                     
@@ -2439,7 +2474,20 @@ class MainDialog(QtWidgets.QDialog):
             feat_geom = QgsPoint(click_pos_global[0], click_pos_global[1])
 
             if self.map_gcps_lyr.selectedFeatureCount() > 0:
-                sel_fid = self.map_gcps_lyr.selectedFeatureIds()[0]
+
+                #sel_fid = self.map_gcps_lyr.selectedFeatureIds()[0]
+
+                sel_gid = self.sel_gid
+                iid = self.active_camera.iid
+                req = QgsFeatureRequest().setFilterExpression(f"\"iid\" = '{iid}' AND \"gid\" = {sel_gid}")
+                feats = list(self.map_gcps_lyr.getFeatures(req))
+
+                if not feats:
+                    return
+
+                feat = feats[0]
+                sel_fid = feat.id()
+
                 self.map_gcps_lyr.startEditing()
                 self.map_gcps_lyr.changeGeometry(sel_fid, QgsGeometry.fromPoint(feat_geom))
                 self.map_gcps_lyr.changeAttributeValue(sel_fid, self.map_gcps_lyr_obj_x_ix, float(click_pos_global[0]))
@@ -2457,17 +2505,23 @@ class MainDialog(QtWidgets.QDialog):
                 self.obj_canvas.request_draw()
                 self.dlg_orient.update_selected_gcp({"obj_x":click_pos_global[0],
                                                      "obj_y":click_pos_global[1],
-                                                     "obj_z":click_pos_global[2]}, gcp_type="obj_space")
+                                                     "obj_z":click_pos_global[2]}, 
+                                                     gcp_type="obj_space")
                 
                 self.img_gcps_lyr.removeSelection()
                 self.deselect_gcp()
+                return
 
             else:
                 
                 dlg_meta = GcpMetaDialog()
                 
-                img_gids = [feat.attributes()[self.img_gcps_gid_ix] for feat in self.img_gcps_lyr.getFeatures()]
-                map_gids = [feat.attributes()[self.map_gcps_gid_ix] for feat in self.map_gcps_lyr.getFeatures()]
+                req_img = QgsFeatureRequest().setFilterExpression(f"\"iid\" = '{self.active_camera.iid}'")
+                img_gids = [f["gid"] for f in self.img_gcps_lyr.getFeatures(req_img)]
+
+                req_map = QgsFeatureRequest().setFilterExpression(f"\"iid\" = '{self.active_camera.iid}'")
+                map_gids = [f["gid"] for f in self.map_gcps_lyr.getFeatures(req_map)]
+
                 pot_gids = list(set(img_gids).difference(map_gids))
                     
                 dlg_meta.combo_gid.addItems(pot_gids)
@@ -2495,7 +2549,7 @@ class MainDialog(QtWidgets.QDialog):
                                                       "obj_y":click_pos_global[1],
                                                       "obj_z":click_pos_global[2],
                                                       "gid":curr_gid},
-                                                    gcp_type="obj_space")
+                                                      gcp_type="obj_space")
                     
                     feat = QgsFeature(self.map_gcps_lyr.fields())
                     
@@ -2507,7 +2561,11 @@ class MainDialog(QtWidgets.QDialog):
                     feat.setAttribute("obj_z", float(click_pos_global[2]))
                     feat.setAttribute("desc", dlg_meta.line_desc.text())
                     feat.setAttribute("active", 0)
-                    (res, afeat) = self.map_gcps_lyr.dataProvider().addFeatures([feat])
+
+                    #(res, afeat) = self.map_gcps_lyr.dataProvider().addFeatures([feat])
+
+                    self.map_gcps_lyr.startEditing()
+                    self.map_gcps_lyr.addFeature(feat)
                     self.map_gcps_lyr.commitChanges()
                     self.map_gcps_lyr.triggerRepaint()
 
