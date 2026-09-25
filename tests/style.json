@@ -1,18 +1,33 @@
 {
   "variables": {
-    "minArea": 1000
+    "minArea": 1000,
+    "minVolume": 1000,
+    "minDamLen": 10,
+    "minEfficiency": 0.1
   },
 
   "fill-color": [
     "case",
-    [">=", ["get", "area"], ["var", "minArea"]],
+    [
+      "all",
+      [">=", ["get", "area"], ["var", "minArea"]],
+      [">=", ["get", "volume"], ["var", "minVolume"]],
+      [">=", ["get", "dam_len"], ["var", "minDamLen"]],
+      [">=", ["get", "efficiency"], ["var", "minEfficiency"]]
+    ],
     [255, 100, 100, 0.6],
     [0, 0, 0, 0]
   ],
 
   "stroke-color": [
     "case",
-    [">=", ["get", "area"], ["var", "minArea"]],
+    [
+      "all",
+      [">=", ["get", "area"], ["var", "minArea"]],
+      [">=", ["get", "volume"], ["var", "minVolume"]],
+      [">=", ["get", "dam_len"], ["var", "minDamLen"]],
+      [">=", ["get", "efficiency"], ["var", "minEfficiency"]]
+    ],
     [180, 0, 0, 1],
     [0, 0, 0, 0]
   ],
@@ -24,12 +39,41 @@
     "title": "NRP Filter",
     "properties": {
       "minArea": {
-        "title": "Minimale Fläche [m²]",
+        "title": "minimum area [m²]",
+        "type": "number",
+        "minimum": 0,
+        "maximum": 20000,
+        "format": "range",
+        "default": 0
+      },
+
+      "minVolume": {
+        "title": "minimum volume [m³]",
         "type": "number",
         "minimum": 0,
         "maximum": 100000,
         "format": "range",
-        "default": 100
+        "default": 0
+      },
+
+      "maxDamLen": {
+        "title": "Maximale Damm-Länge",
+        "type": "number",
+        "minimum": 0,
+        "maximum": 200,
+        "step": 1.0,
+        "format": "range",
+        "default": 200
+      },
+
+      "minEfficiency": {
+        "title": "minimum efficiency",
+        "type": "number",
+        "minimum": 0,
+        "maximum": 100,
+        "step": 1.0,
+        "format": "range",
+        "default": 0
       }
     }
   }
