@@ -1,5 +1,36 @@
 {
-  "fill-color": [255, 100, 100, 0.5],
-  "stroke-color": [180, 0, 0, 1],
-  "stroke-width": 1
+  "variables": {
+    "minArea": 1000
+  },
+
+  "fill-color": [
+    "case",
+    [">=", ["get", "area"], ["var", "minArea"]],
+    [255, 100, 100, 0.6],
+    [0, 0, 0, 0]
+  ],
+
+  "stroke-color": [
+    "case",
+    [">=", ["get", "area"], ["var", "minArea"]],
+    [180, 0, 0, 1],
+    [0, 0, 0, 0]
+  ],
+
+  "stroke-width": 1,
+
+  "jsonform": {
+    "type": "object",
+    "title": "NRP Filter",
+    "properties": {
+      "minArea": {
+        "title": "Minimale Fläche [m²]",
+        "type": "number",
+        "minimum": 0,
+        "maximum": 100000,
+        "format": "range",
+        "default": 100
+      }
+    }
+  }
 }
