@@ -2,6 +2,7 @@
   "variables": {
     "minArea": 1000,
     "minVolume": 5000,
+    "minRatio": 0,
     "minEfficiency": 0,
     "maxDamLen": 200
   },
