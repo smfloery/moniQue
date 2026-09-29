@@ -12,6 +12,7 @@
       "all",
       [">=", ["get", "area"], ["var", "minArea"]],
       [">=", ["get", "volume"], ["var", "minVolume"]],
+      [">=", ["get", "ratio_area_vol"], ["var", "minRatio"]],
       [">=", ["get", "efficiency"], ["var", "minEfficiency"]],
       ["<=", ["get", "dam_len"], ["var", "maxDamLen"]]
     ],
@@ -25,6 +26,7 @@
       "all",
       [">=", ["get", "area"], ["var", "minArea"]],
       [">=", ["get", "volume"], ["var", "minVolume"]],
+      [">=", ["get", "ratio_area_vol"], ["var", "minRatio"]],
       [">=", ["get", "efficiency"], ["var", "minEfficiency"]],
       ["<=", ["get", "dam_len"], ["var", "maxDamLen"]]
     ],
@@ -51,6 +53,15 @@
         "type": "number",
         "minimum": 0,
         "maximum": 100000,
+        "format": "range"
+      },
+
+      "minRatio": {
+        "title": "ratio area/volume",
+        "type": "number",
+        "minimum": 0.0,
+        "maximum": 1.0,
+        "step": 0.01,
         "format": "range"
       },
 
