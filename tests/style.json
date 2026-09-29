@@ -1,9 +1,9 @@
 {
   "variables": {
     "minArea": 1000,
-    "minVolume": 1000,
-    "maxDamLen": 100,
-    "minEfficiency": 0.1
+    "minVolume": 5000,
+    "minEfficiency": 0,
+    "maxDamLen": 200
   },
 
   "fill-color": [
@@ -43,8 +43,7 @@
         "type": "number",
         "minimum": 0,
         "maximum": 20000,
-        "format": "range",
-        "default": 1000
+        "format": "range"
       },
 
       "minVolume": {
@@ -52,8 +51,7 @@
         "type": "number",
         "minimum": 0,
         "maximum": 100000,
-        "format": "range",
-        "default": 5000
+        "format": "range"
       },
 
       "minEfficiency": {
@@ -62,8 +60,7 @@
         "minimum": 0,
         "maximum": 100,
         "step": 1.0,
-        "format": "range",
-        "default": 0
+        "format": "range"
       },
 
       "maxDamLen": {
@@ -72,8 +69,7 @@
         "minimum": 0,
         "maximum": 200,
         "step": 1.0,
-        "format": "range",
-        "default": 200
+        "format": "range"
       }
     }
   }
