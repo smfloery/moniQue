@@ -4,7 +4,8 @@
     "minVolume": 5000,
     "minRatio": 0,
     "maxDamLen": 200,
-    "maxDist2Water": 10000
+    "maxDist2Water": 10000,
+    "maxDh2Water": 100
   },
 
   "fill-color": [
@@ -15,7 +16,8 @@
       [">=", ["get", "volume"], ["var", "minVolume"]],
       [">=", ["get", "ratio_area_vol"], ["var", "minRatio"]],
       ["<=", ["get", "dam_len"], ["var", "maxDamLen"]],
-      ["<=", ["get", "dist2water"], ["var", "maxDist2Water"]]
+      ["<=", ["get", "dist2water"], ["var", "maxDist2Water"]],
+      ["<=", ["abs", ["get", "dh2water"]], ["var", "maxDh2Water"]]
     ],
     [255, 100, 100, 0.6],
     [0, 0, 0, 0]
@@ -29,7 +31,8 @@
       [">=", ["get", "volume"], ["var", "minVolume"]],
       [">=", ["get", "ratio_area_vol"], ["var", "minRatio"]],
       ["<=", ["get", "dam_len"], ["var", "maxDamLen"]],
-      ["<=", ["get", "dist2water"], ["var", "maxDist2Water"]]
+      ["<=", ["get", "dist2water"], ["var", "maxDist2Water"]],
+      ["<=", ["abs", ["get", "dh2water"]], ["var", "maxDh2Water"]]
     ],
     [180, 0, 0, 1],
     [0, 0, 0, 0]
@@ -79,8 +82,17 @@
         "title": "Maximum distance to water [m]",
         "type": "number",
         "minimum": 0,
-        "maximum": 10000,
-        "step": 100,
+        "maximum": 3000,
+        "step": 1,
+        "format": "range"
+      },
+
+      "maxDh2Water": {
+        "title": "Maximum height difference to water [m]",
+        "type": "number",
+        "minimum": 0,
+        "maximum": 800,
+        "step": 1,
         "format": "range"
       }
     }
