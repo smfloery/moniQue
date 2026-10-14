@@ -3,7 +3,8 @@
     "minArea": 1000,
     "minVolume": 5000,
     "minRatio": 0,
-    "maxDamLen": 200
+    "maxDamLen": 200,
+    "maxDist2Water": 10000
   },
 
   "fill-color": [
@@ -13,7 +14,8 @@
       [">=", ["get", "area"], ["var", "minArea"]],
       [">=", ["get", "volume"], ["var", "minVolume"]],
       [">=", ["get", "ratio_area_vol"], ["var", "minRatio"]],
-      ["<=", ["get", "dam_len"], ["var", "maxDamLen"]]
+      ["<=", ["get", "dam_len"], ["var", "maxDamLen"]],
+      ["<=", ["get", "dist2water"], ["var", "maxDist2Water"]]
     ],
     [255, 100, 100, 0.6],
     [0, 0, 0, 0]
@@ -26,7 +28,8 @@
       [">=", ["get", "area"], ["var", "minArea"]],
       [">=", ["get", "volume"], ["var", "minVolume"]],
       [">=", ["get", "ratio_area_vol"], ["var", "minRatio"]],
-      ["<=", ["get", "dam_len"], ["var", "maxDamLen"]]
+      ["<=", ["get", "dam_len"], ["var", "maxDamLen"]],
+      ["<=", ["get", "dist2water"], ["var", "maxDist2Water"]]
     ],
     [180, 0, 0, 1],
     [0, 0, 0, 0]
@@ -69,6 +72,15 @@
         "minimum": 0,
         "maximum": 200,
         "step": 1,
+        "format": "range"
+      },
+
+      "maxDist2Water": {
+        "title": "Maximum distance to water [m]",
+        "type": "number",
+        "minimum": 0,
+        "maximum": 10000,
+        "step": 100,
         "format": "range"
       }
     }
