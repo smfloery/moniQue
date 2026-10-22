@@ -1,4 +1,3 @@
-
 {
   "variables": {
     "minVolume": 0,
@@ -14,7 +13,6 @@
     "case",
     [
       "all",
-      ["==", ["geometry-type"], "Polygon"],
       [">=", ["get", "volume"], ["var", "minVolume"]],
       [">=", ["get", "area"], ["var", "minArea"]],
       [">=", ["get", "nrp_d_q95"], ["var", "minNrpDq95"]],
@@ -31,7 +29,6 @@
     "case",
     [
       "all",
-      ["==", ["geometry-type"], "Polygon"],
       [">=", ["get", "volume"], ["var", "minVolume"]],
       [">=", ["get", "area"], ["var", "minArea"]],
       [">=", ["get", "nrp_d_q95"], ["var", "minNrpDq95"]],
@@ -41,30 +38,10 @@
       ["<=", ["abs", ["get", "dh2water"]], ["var", "maxDh2Water"]]
     ],
     [180, 0, 0, 1],
-    [
-      "case",
-      [
-        "all",
-        ["==", ["geometry-type"], "LineString"],
-        [">=", ["get", "volume"], ["var", "minVolume"]],
-        [">=", ["get", "area"], ["var", "minArea"]],
-        [">=", ["get", "nrp_d_q95"], ["var", "minNrpDq95"]],
-        [">=", ["get", "nrp_d_q50"], ["var", "minNrpDq50"]],
-        [">=", ["get", "dam_d_q95"], ["var", "minDamDq95"]],
-        ["<=", ["get", "dist2water"], ["var", "maxDist2Water"]],
-        ["<=", ["abs", ["get", "dh2water"]], ["var", "maxDh2Water"]]
-      ],
-      [40, 40, 40, 1],
-      [0, 0, 0, 0]
-    ]
+    [0, 0, 0, 0]
   ],
 
-  "stroke-width": [
-    "case",
-    ["==", ["geometry-type"], "LineString"],
-    2,
-    1
-  ],
+  "stroke-width": 1,
 
   "jsonform": {
     "type": "object",
@@ -77,6 +54,7 @@
         "maximum": 800000,
         "format": "range"
       },
+
       "minArea": {
         "title": "Minimum area [m²]",
         "type": "number",
@@ -84,6 +62,7 @@
         "maximum": 100000,
         "format": "range"
       },
+
       "minNrpDq95": {
         "title": "Minimum NRP diameter q95",
         "type": "number",
@@ -92,6 +71,7 @@
         "step": 0.1,
         "format": "range"
       },
+
       "minNrpDq50": {
         "title": "Minimum NRP diameter q50",
         "type": "number",
@@ -100,6 +80,7 @@
         "step": 0.1,
         "format": "range"
       },
+
       "minDamDq95": {
         "title": "Minimum dam diameter q95",
         "type": "number",
@@ -108,6 +89,7 @@
         "step": 0.1,
         "format": "range"
       },
+
       "maxDist2Water": {
         "title": "Maximum distance to water [m]",
         "type": "number",
@@ -116,10 +98,11 @@
         "step": 1,
         "format": "range"
       },
+
       "maxDh2Water": {
         "title": "Maximum height difference to water [m]",
         "type": "number",
-        "minimum": -500,
+        "minimum": 0,
         "maximum": 1000,
         "step": 1,
         "format": "range"
