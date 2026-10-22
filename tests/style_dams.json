@@ -13,6 +13,7 @@
     "case",
     [
       "all",
+      ["==", ["geometry-type"], "Polygon"],
       [">=", ["get", "volume"], ["var", "minVolume"]],
       [">=", ["get", "area"], ["var", "minArea"]],
       [">=", ["get", "nrp_d_q95"], ["var", "minNrpDq95"]],
