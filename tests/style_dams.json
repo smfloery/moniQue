@@ -26,14 +26,19 @@
     [0, 0, 0, 0]
   ],
 
-  
   "stroke-color": [
-    "match",
-    ["geometry-type"],
-    "Polygon",
+    "case",
+    [
+      "all",
+      [">=", ["get", "volume"], ["var", "minVolume"]],
+      [">=", ["get", "area"], ["var", "minArea"]],
+      [">=", ["get", "nrp_d_q95"], ["var", "minNrpDq95"]],
+      [">=", ["get", "nrp_d_q50"], ["var", "minNrpDq50"]],
+      [">=", ["get", "dam_d_q95"], ["var", "minDamDq95"]],
+      ["<=", ["get", "dist2water"], ["var", "maxDist2Water"]],
+      ["<=", ["abs", ["get", "dh2water"]], ["var", "maxDh2Water"]]
+    ],
     [180, 0, 0, 1],
-    "LineString",
-    [40, 40, 40, 1],
     [0, 0, 0, 0]
   ],
 
