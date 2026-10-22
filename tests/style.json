@@ -1,13 +1,13 @@
 
 {
   "variables": {
-    "minVolume": 80000,
-    "minArea": 10000,
-    "minNrpDq95": 1,
-    "minNrpDq50": 1,
-    "minDamDq95": 1,
-    "maxDist2Water": 1000,
-    "maxDh2Water": 100
+    "minVolume": 0,
+    "minArea": 0,
+    "minNrpDq95": 0,
+    "minNrpDq50": 0,
+    "minDamDq95": 0,
+    "maxDist2Water": 3000,
+    "maxDh2Water": 1000
   },
 
   "fill-color": [
