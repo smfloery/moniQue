@@ -39,5 +39,80 @@
     [40, 40, 40, 1],
     [0, 0, 0, 0]
   ],
-  "stroke-width": 2
+  "stroke-width": 2,
+  "jsonform": {
+    "type": "div",
+    "elements": [
+      {
+        "type": "range",
+        "label": "Min. Volumen",
+        "options": {
+          "variable": "minVolume",
+          "min": 0,
+          "max": 800000,
+          "step": 1000
+        }
+      },
+      {
+        "type": "range",
+        "label": "Min. Fläche",
+        "options": {
+          "variable": "minArea",
+          "min": 0,
+          "max": 100000,
+          "step": 100
+        }
+      },
+      {
+        "type": "range",
+        "label": "Min. NRP d_q95",
+        "options": {
+          "variable": "minNrpDq95",
+          "min": 0,
+          "max": 10,
+          "step": 0.1
+        }
+      },
+      {
+        "type": "range",
+        "label": "Min. NRP d_q50",
+        "options": {
+          "variable": "minNrpDq50",
+          "min": 0,
+          "max": 10,
+          "step": 0.1
+        }
+      },
+      {
+        "type": "range",
+        "label": "Min. Damm d_q95",
+        "options": {
+          "variable": "minDamDq95",
+          "min": 0,
+          "max": 15,
+          "step": 0.1
+        }
+      },
+      {
+        "type": "range",
+        "label": "Max. Distanz zum Wasser",
+        "options": {
+          "variable": "maxDist2Water",
+          "min": 0,
+          "max": 3000,
+          "step": 1
+        }
+      },
+      {
+        "type": "range",
+        "label": "Max. Höhenunterschied zum Wasser",
+        "options": {
+          "variable": "maxDh2Water",
+          "min": 0,
+          "max": 1000,
+          "step": 1
+        }
+      }
+    ]
+  }
 }
