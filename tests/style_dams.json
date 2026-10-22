@@ -1,5 +1,43 @@
+
 {
-  "fill-color": [255, 100, 100, 0.6],
-  "stroke-color": [180, 0, 0, 1],
+  "variables": {
+    "minVolume": 0,
+    "minArea": 0,
+    "minNrpDq95": 0,
+    "minNrpDq50": 0,
+    "minDamDq95": 0,
+    "maxDist2Water": 3000,
+    "maxDh2Water": 1000
+  },
+  "fill-color": [
+    "case",
+    [
+      "all",
+      [">=", ["get", "volume"], ["var", "minVolume"]],
+      [">=", ["get", "area"], ["var", "minArea"]],
+      [">=", ["get", "nrp_d_q95"], ["var", "minNrpDq95"]],
+      [">=", ["get", "nrp_d_q50"], ["var", "minNrpDq50"]],
+      [">=", ["get", "dam_d_q95"], ["var", "minDamDq95"]],
+      ["<=", ["get", "dist2water"], ["var", "maxDist2Water"]],
+      ["<=", ["abs", ["get", "dh2water"]], ["var", "maxDh2Water"]]
+    ],
+    [255, 100, 100, 0.6],
+    [0, 0, 0, 0]
+  ],
+  "stroke-color": [
+    "case",
+    [
+      "all",
+      [">=", ["get", "volume"], ["var", "minVolume"]],
+      [">=", ["get", "area"], ["var", "minArea"]],
+      [">=", ["get", "nrp_d_q95"], ["var", "minNrpDq95"]],
+      [">=", ["get", "nrp_d_q50"], ["var", "minNrpDq50"]],
+      [">=", ["get", "dam_d_q95"], ["var", "minDamDq95"]],
+      ["<=", ["get", "dist2water"], ["var", "maxDist2Water"]],
+      ["<=", ["abs", ["get", "dh2water"]], ["var", "maxDh2Water"]]
+    ],
+    [40, 40, 40, 1],
+    [0, 0, 0, 0]
+  ],
   "stroke-width": 2
 }
