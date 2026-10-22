@@ -13,6 +13,7 @@
     "case",
     [
       "all",
+      ["==", ["get", "layer_type"], "nrp"],
       [">=", ["get", "volume"], ["var", "minVolume"]],
       [">=", ["get", "area"], ["var", "minArea"]],
       [">=", ["get", "nrp_d_q95"], ["var", "minNrpDq95"]],
@@ -27,12 +28,43 @@
 
   "stroke-color": [
     "case",
-    ["==", ["geometry-type"], "Polygon"],
-    [255, 100, 100, 0.6],
-    [0, 0, 0, 0]
+    [
+      "all",
+      ["==", ["get", "layer_type"], "nrp"],
+      [">=", ["get", "volume"], ["var", "minVolume"]],
+      [">=", ["get", "area"], ["var", "minArea"]],
+      [">=", ["get", "nrp_d_q95"], ["var", "minNrpDq95"]],
+      [">=", ["get", "nrp_d_q50"], ["var", "minNrpDq50"]],
+      [">=", ["get", "dam_d_q95"], ["var", "minDamDq95"]],
+      ["<=", ["get", "dist2water"], ["var", "maxDist2Water"]],
+      ["<=", ["abs", ["get", "dh2water"]], ["var", "maxDh2Water"]]
+    ],
+    [180, 0, 0, 1],
+
+    [
+      "case",
+      [
+        "all",
+        ["==", ["get", "layer_type"], "dam"],
+        [">=", ["get", "volume"], ["var", "minVolume"]],
+        [">=", ["get", "area"], ["var", "minArea"]],
+        [">=", ["get", "nrp_d_q95"], ["var", "minNrpDq95"]],
+        [">=", ["get", "nrp_d_q50"], ["var", "minNrpDq50"]],
+        [">=", ["get", "dam_d_q95"], ["var", "minDamDq95"]],
+        ["<=", ["get", "dist2water"], ["var", "maxDist2Water"]],
+        ["<=", ["abs", ["get", "dh2water"]], ["var", "maxDh2Water"]]
+      ],
+      [100, 0, 0, 1],
+      [0, 0, 0, 0]
+    ]
   ],
 
-  "stroke-width": 1,
+  "stroke-width": [
+    "case",
+    ["==", ["get", "layer_type"], "dam"],
+    2,
+    1
+  ],
 
   "jsonform": {
     "type": "object",
