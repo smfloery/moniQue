@@ -22,7 +22,7 @@
       ["<=", ["get", "dist2water"], ["var", "maxDist2Water"]],
       ["<=", ["abs", ["get", "dh2water"]], ["var", "maxDh2Water"]]
     ],
-    [255, 100, 100, 0.6],
+    [155, 205, 225, 0.45],
     [0, 0, 0, 0]
   ],
 
@@ -39,8 +39,7 @@
       ["<=", ["get", "dist2water"], ["var", "maxDist2Water"]],
       ["<=", ["abs", ["get", "dh2water"]], ["var", "maxDh2Water"]]
     ],
-    [180, 0, 0, 1],
-
+    [35, 115, 165, 1],
     [
       "case",
       [
@@ -54,7 +53,7 @@
         ["<=", ["get", "dist2water"], ["var", "maxDist2Water"]],
         ["<=", ["abs", ["get", "dh2water"]], ["var", "maxDh2Water"]]
       ],
-      [100, 0, 0, 1],
+      [190, 195, 200, 1],
       [0, 0, 0, 0]
     ]
   ],
@@ -62,7 +61,7 @@
   "stroke-width": [
     "case",
     ["==", ["get", "layer_type"], "dam"],
-    2,
+    4,
     1
   ],
 
