@@ -74,6 +74,7 @@
         "type": "number",
         "minimum": 0,
         "maximum": 800000,
+        "step": 1000,
         "format": "range"
       },
 
@@ -82,11 +83,12 @@
         "type": "number",
         "minimum": 0,
         "maximum": 100000,
+        "step": 10,
         "format": "range"
       },
 
       "minNrpDq95": {
-        "title": "Minimum NRP diameter q95",
+        "title": "Minimum NRP depth (95%-quantile) [m]",
         "type": "number",
         "minimum": 0,
         "maximum": 10,
@@ -95,7 +97,7 @@
       },
 
       "minNrpDq50": {
-        "title": "Minimum NRP diameter q50",
+        "title": "Minimum NRP depth (50%-quantile) [m]",
         "type": "number",
         "minimum": 0,
         "maximum": 10,
@@ -104,7 +106,7 @@
       },
 
       "minDamDq95": {
-        "title": "Minimum dam diameter q95",
+        "title": "Minimum dam height (95%-quantile) [m]",
         "type": "number",
         "minimum": 0,
         "maximum": 15,
@@ -117,7 +119,7 @@
         "type": "number",
         "minimum": 0,
         "maximum": 3000,
-        "step": 1,
+        "step": 10,
         "format": "range"
       },
 
@@ -126,7 +128,7 @@
         "type": "number",
         "minimum": 0,
         "maximum": 1000,
-        "step": 1,
+        "step": 10,
         "format": "range"
       }
     }
